@@ -1,0 +1,7 @@
+{
+  "start_command": "npm start",
+  "build_command": "npm install && npm run build",
+  "port": 3000,
+  "watch_paths": ["api/**", "src/**"],
+  "healthcheck_path": "/api/health"
+}

@@ -1,0 +1,274 @@
+/* Skeleton Loader Styles */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, transparent 37%, #f0f0f0 63%);
+  background-size: 400% 100%;
+  border-radius: 4px;
+  display: block;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animation Variants */
+.skeleton.pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton.wave {
+  animation: skeleton-wave 1.6s linear infinite;
+}
+
+.skeleton.none {
+  background: #f0f0f0;
+}
+
+/* Skeleton Variants */
+.skeleton-text {
+  height: 1em;
+  margin-bottom: 0.5em;
+  border-radius: 4px;
+}
+
+.skeleton-text:last-child {
+  margin-bottom: 0;
+}
+
+.skeleton-circular {
+  border-radius: 50%;
+}
+
+.skeleton-rectangular {
+  border-radius: 4px;
+}
+
+.skeleton-avatar {
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+}
+
+.skeleton-button {
+  height: 36px;
+  border-radius: 6px;
+}
+
+/* Text Block Container */
+.skeleton-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+/* Message Skeleton Layout */
+.message-skeleton {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  align-items: flex-start;
+}
+
+.message-skeleton-avatar {
+  flex-shrink: 0;
+}
+
+.message-skeleton-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Conversation Skeleton Layout */
+.conversation-skeleton {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  align-items: center;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.conversation-skeleton-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Chat Header Skeleton Layout */
+.chat-header-skeleton {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+}
+
+.chat-header-skeleton-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-header-skeleton-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Product Card Skeleton Layout */
+.product-card-skeleton {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.product-card-skeleton-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Order Skeleton Layout */
+.order-skeleton {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-skeleton-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-skeleton-customer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-skeleton-items {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Template Skeleton Layout */
+.template-skeleton {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.template-skeleton-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.template-skeleton-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* Animations */
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes skeleton-wave {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+/* Dark Theme Support */
+@media (prefers-color-scheme: dark) {
+  .skeleton {
+    background: linear-gradient(90deg, #374151 25%, transparent 37%, #374151 63%);
+    background-size: 400% 100%;
+  }
+  
+  .skeleton.none {
+    background: #374151;
+  }
+  
+  .conversation-skeleton {
+    border-bottom-color: #374151;
+  }
+  
+  .chat-header-skeleton {
+    border-bottom-color: #374151;
+    background: #1f2937;
+  }
+  
+  .product-card-skeleton,
+  .order-skeleton,
+  .template-skeleton {
+    border-color: #374151;
+    background: #1f2937;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .message-skeleton,
+  .conversation-skeleton,
+  .chat-header-skeleton {
+    padding: 12px;
+  }
+  
+  .product-card-skeleton-content,
+  .order-skeleton,
+  .template-skeleton {
+    padding: 12px;
+  }
+  
+  .chat-header-skeleton-actions {
+    gap: 6px;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton.pulse,
+  .skeleton.wave {
+    animation: none;
+  }
+  
+  .skeleton {
+    background: #f0f0f0;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .skeleton {
+    background: #d1d5db;
+    border: 1px solid #6b7280;
+  }
+}
