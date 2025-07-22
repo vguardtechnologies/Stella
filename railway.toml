@@ -1,32 +1,28 @@
 # Railway Deployment Configuration
-version: 2
 
-# Build configuration
-build:
-  builder: NIXPACKS
-  nixpacksConfigPath: nixpacks.toml
+[build]
+builder = "NIXPACKS"
 
-# Service configuration  
-services:
-  backend:
-    source: .
-    domains:
-      - stella-api.up.railway.app
-    variables:
-      NODE_ENV: production
-      PORT: ${{ PORT }}
-    healthcheck:
-      path: /api/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
+[[services]]
+name = "stella"
+source = "."
 
-# Environment variables (you'll need to set these in Railway dashboard)
-environments:
-  production:
-    variables:
-      DATABASE_URL: ${{ DATABASE_URL }}
-      JWT_SECRET: ${{ JWT_SECRET }}
-      WHATSAPP_ACCESS_TOKEN: ${{ WHATSAPP_ACCESS_TOKEN }}
-      WHATSAPP_VERIFY_TOKEN: ${{ WHATSAPP_VERIFY_TOKEN }}
-      WHATSAPP_PHONE_NUMBER_ID: ${{ WHATSAPP_PHONE_NUMBER_ID }}
+[[services.domains]]
+domain = "stella-api.up.railway.app"
+
+[services.variables]
+NODE_ENV = "production"
+PORT = "${{ PORT }}"
+
+[services.healthcheck]
+path = "/api/health"
+interval = "30s"
+timeout = "10s"
+retries = 3
+
+[environments.production.variables]
+DATABASE_URL = "${{ DATABASE_URL }}"
+JWT_SECRET = "${{ JWT_SECRET }}"
+WHATSAPP_ACCESS_TOKEN = "${{ WHATSAPP_ACCESS_TOKEN }}"
+WHATSAPP_VERIFY_TOKEN = "${{ WHATSAPP_VERIFY_TOKEN }}"
+WHATSAPP_PHONE_NUMBER_ID = "${{ WHATSAPP_PHONE_NUMBER_ID }}"
