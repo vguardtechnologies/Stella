@@ -12,6 +12,17 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load saved credentials from localStorage
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('whatsapp_api_key');
+    const savedPhoneNumberId = localStorage.getItem('whatsapp_phone_number_id');
+    const savedWebhookUrl = localStorage.getItem('whatsapp_webhook_url');
+    
+    if (savedApiKey) setApiKey(savedApiKey);
+    if (savedPhoneNumberId) setPhoneNumberId(savedPhoneNumberId);
+    if (savedWebhookUrl) setWebhookUrl(savedWebhookUrl);
+  }, []);
+
   // Load current configuration status when component mounts
   useEffect(() => {
     const loadConfiguration = async () => {
@@ -63,6 +74,14 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
 
       if (result.success) {
         setIsConnected(true);
+        
+        // Save credentials to localStorage
+        localStorage.setItem('whatsapp_api_key', apiKey);
+        localStorage.setItem('whatsapp_phone_number_id', phoneNumberId);
+        if (webhookUrl) {
+          localStorage.setItem('whatsapp_webhook_url', webhookUrl);
+        }
+        
         alert(`✅ ${result.message}\n\nPhone: ${result.data?.phoneNumber || 'Connected'}\nStatus: ${result.data?.status || 'Active'}`);
       } else {
         setIsConnected(false);

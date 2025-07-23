@@ -26,7 +26,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
         title="Home"
       >
         <img 
-          src="/src/assets/icons/Home 3D Fluency.png" 
+          src="/assets/icons/Home 3D Fluency.png" 
           alt="Home" 
           width="24" 
           height="24"
@@ -43,7 +43,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
         onClick={onWhatsAppClick || (() => window.open('https://wa.me/', '_blank'))}
       >
         <img 
-          src="/src/assets/icons/WhatsApp 3D Fluency.png" 
+          src="/assets/icons/WhatsApp 3D Fluency.png" 
           alt="WhatsApp" 
           width="24" 
           height="24"
@@ -57,7 +57,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
         onClick={onOtpClick || (() => console.log('Opt-In/Opt-Out functionality'))}
       >
         <img 
-          src="/src/assets/icons/Check Mark 3D Fluency.png" 
+          src="/assets/icons/Check Mark 3D Fluency.png" 
           alt="Opt-In/Out" 
           width="24" 
           height="24"
@@ -71,7 +71,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
         onClick={onOcClick || (() => console.log('Order Confirmation functionality'))}
       >
         <img 
-          src="/src/assets/icons/Purchase Order Isometric Color.png" 
+          src="/assets/icons/Purchase Order Isometric Color.png" 
           alt="Order Confirmation" 
           width="24" 
           height="24"
@@ -85,7 +85,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
         onClick={onChatClick || (() => console.log('Chat functionality'))}
       >
         <img 
-          src="/src/assets/icons/Speech Bubble 3D Fluency.png" 
+          src="/assets/icons/Speech Bubble 3D Fluency.png" 
           alt="Chat" 
           width="24" 
           height="24"
@@ -101,7 +101,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
         onClick={onLoginClick || (() => console.log('Login functionality'))}
       >
         <img 
-          src="/src/assets/icons/Padlock 3D Fluency.png" 
+          src="/assets/icons/Padlock 3D Fluency.png" 
           alt="Login" 
           width="24" 
           height="24"
@@ -111,7 +111,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
       
       <button className="action-button" title="Menu">
         <img 
-          src="/src/assets/icons/Bulleted List Isometric Color.png" 
+          src="/assets/icons/Bulleted List Isometric Color.png" 
           alt="Menu" 
           width="24" 
           height="24"
