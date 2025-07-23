@@ -30,7 +30,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
   transition: all 0.2s ease;
   position: relative;
 }
@@ -168,4 +168,59 @@
   color: #667eea;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* SVG Icon Styling */
+.action-button svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  transition: all 0.2s ease;
+}
+
+.action-button:hover svg {
+  transform: scale(1.1);
+}
+
+/* Image Icon Styling */
+.action-button img {
+  width: 24px;
+  height: 24px;
+  transition: all 0.2s ease;
+  border-radius: 2px;
+}
+
+.action-button:hover img {
+  transform: scale(1.1);
+}
+
+/* Icon color inheritance from parent button */
+.home-button svg {
+  stroke: #646cff;
+}
+
+.whatsapp-button svg {
+  stroke: #25D366;
+}
+
+.otp-button svg {
+  stroke: #FFC107;
+}
+
+.oc-button svg {
+  stroke: #28A745;
+}
+
+.chat-button svg {
+  stroke: #17A2B8;
+}
+
+.login-button svg {
+  stroke: #667eea;
+}
+
+/* On hover, change to white for better contrast */
+.action-button:hover svg {
+  stroke: #ffffff;
 }
