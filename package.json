@@ -2,7 +2,6 @@
   "name": "stella_app",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -10,7 +9,6 @@
     "preview": "vite preview",
     "start": "node server.js",
     "railway:deploy": "railway up",
-    "go-live": "./go-live.sh",
     "test": "echo \"No tests yet\"",
     "check": "npx tsc --noEmit"
   },
@@ -22,6 +20,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@vercel/node": "^5.3.6",
     "@vercel/postgres": "^0.10.0",
+    "axios": "^1.10.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "express": "^5.1.0",

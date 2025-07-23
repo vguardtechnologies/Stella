@@ -8,35 +8,50 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('dist'));
+
+// Serve static files from dist directory
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // API Routes
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'production',
-    platform: 'Railway',
-    message: 'Stella API is running successfully on Railway!'
+    environment: process.env.NODE_ENV || 'development',
+    platform: 'Local',
+    message: 'Stella API is running successfully!'
   });
 });
 
-// Import API handlers (we'll create these)
-const authHandler = require('./api/auth/index.js');
-const whatsappHandler = require('./api/whatsapp/index.js');
-const webhookHandler = require('./api/webhook/whatsapp.js');
+// Import and use API handlers - testing one by one
+try {
+  const authHandler = require('./api/auth/index.js');
+  app.use('/api/auth', authHandler);
+  console.log('✅ Auth routes loaded');
 
-// API Endpoints
-app.use('/api/auth', authHandler);
-app.use('/api/whatsapp', whatsappHandler);
-app.use('/api/webhook', webhookHandler);
+  const whatsappHandler = require('./api/whatsapp/index.js');
+  app.use('/api/whatsapp', whatsappHandler);
+  console.log('✅ WhatsApp routes loaded');
 
-// Serve React app for all other routes
-app.get('*', (req, res) => {
+  const webhookHandler = require('./api/webhook/whatsapp.js');
+  app.use('/api/webhook', webhookHandler);
+  console.log('✅ Webhook routes loaded');
+  
+} catch (error) {
+  console.log('⚠️ API routes error:', error.message);
+}
+
+// Serve React app for all other routes (using express.static fallback)
+app.use((req, res, next) => {
+  // If it's an API route that doesn't exist, return 404
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  // For all other routes, serve the React app
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Stella app running on Railway at port ${PORT}`);
+  console.log(`🚀 Stella app running at http://localhost:${PORT}`);
   console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
 });

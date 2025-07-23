@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './WhatsAppPage.css';
 
 interface WhatsAppPageProps {
@@ -10,6 +10,34 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load current configuration status when component mounts
+  useEffect(() => {
+    const loadConfiguration = async () => {
+      try {
+        const response = await fetch('/api/whatsapp/status');
+        const result = await response.json();
+        
+        if (result.success) {
+          setIsConnected(result.data.isConfigured);
+          if (result.data.webhookUrl) {
+            setWebhookUrl(result.data.webhookUrl);
+          }
+          if (result.data.phoneNumberId) {
+            // Show partially masked phone number ID
+            setPhoneNumberId(result.data.phoneNumberId);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load configuration:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadConfiguration();
+  }, []);
 
   const handleConnectAPI = async () => {
     if (!apiKey || !phoneNumberId) {
@@ -17,37 +45,73 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
       return;
     }
 
-    // This is where you would test WhatsApp API connection
-    console.log('Connecting to WhatsApp API:', {
-      apiKey: apiKey,
-      phoneNumberId: phoneNumberId,
-      webhookUrl: webhookUrl
-    });
-
-    // Simulate API connection test
     try {
-      // Replace this with actual WhatsApp API connection test
-      setIsConnected(true);
-      alert('Successfully connected to WhatsApp Business API!');
+      console.log('Testing WhatsApp API connection...');
+      
+      const response = await fetch('/api/whatsapp/test-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accessToken: apiKey,
+          phoneNumberId: phoneNumberId
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setIsConnected(true);
+        alert(`✅ ${result.message}\n\nPhone: ${result.data?.phoneNumber || 'Connected'}\nStatus: ${result.data?.status || 'Active'}`);
+      } else {
+        setIsConnected(false);
+        alert(`❌ Connection failed: ${result.message}`);
+      }
     } catch (error) {
-      alert('Failed to connect. Please check your API credentials.');
+      console.error('Connection test failed:', error);
+      setIsConnected(false);
+      alert('❌ Network error. Please check your connection and try again.');
     }
   };
 
-  const handleSaveConfiguration = () => {
+  const handleSaveConfiguration = async () => {
     if (!isConnected) {
       alert('Please connect to the API first');
       return;
     }
     
-    // Save configuration to your backend/local storage
-    console.log('Saving WhatsApp configuration:', {
-      apiKey,
-      phoneNumberId,
-      webhookUrl
-    });
-    
-    alert('WhatsApp configuration saved successfully!');
+    try {
+      console.log('Saving WhatsApp configuration...');
+      
+      const response = await fetch('/api/whatsapp/configure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accessToken: apiKey,
+          phoneNumberId: phoneNumberId,
+          webhookUrl: webhookUrl
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`✅ ${result.message}\n\nYour WhatsApp API is now configured and ready to use!`);
+        
+        // Optionally clear the form after successful save
+        // setApiKey('');
+        // setPhoneNumberId('');
+        // setWebhookUrl('');
+      } else {
+        alert(`❌ Save failed: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Configuration save failed:', error);
+      alert('❌ Network error. Please try again.');
+    }
   };
 
   return (
@@ -69,14 +133,27 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
         </div>
 
         <div className="whatsapp-content">
-          {/* API Configuration Section */}
-          <div className="api-config-section">
-            <h3>API Configuration</h3>
-            <div className="config-status">
-              <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
-                {isConnected ? '🟢 Connected' : '🔴 Not Connected'}
-              </span>
+          {/* Loading State */}
+          {isLoading && (
+            <div className="loading-state">
+              <p>🔄 Loading configuration...</p>
             </div>
+          )}
+
+          {/* API Configuration Section */}
+          {!isLoading && (
+            <div className="api-config-section">
+              <h3>API Configuration</h3>
+              <div className="config-status">
+                <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
+                  {isConnected ? '🟢 Connected & Configured' : '🔴 Not Connected'}
+                </span>
+                {isConnected && (
+                  <small style={{ display: 'block', marginTop: '4px', color: '#666' }}>
+                    WhatsApp API is ready to use
+                  </small>
+                )}
+              </div>
             
             <div className="input-group">
               <label htmlFor="api-key">WhatsApp Business API Access Token:</label>
@@ -131,10 +208,12 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
                 Save Configuration
               </button>
             </div>
-          </div>
+            </div>
+          )}
 
           {/* Integration Guide */}
-          <div className="integration-guide">
+          {!isLoading && (
+            <div className="integration-guide">
             <h3>Integration Guide</h3>
             <div className="guide-content">
               <h4>Steps to integrate WhatsApp Business API:</h4>
@@ -159,6 +238,7 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
               <p>This page is for setting up the WhatsApp API integration. Actual messaging functionality will be implemented in separate components of your application.</p>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
