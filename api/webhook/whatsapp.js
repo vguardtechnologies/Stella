@@ -5,7 +5,7 @@ const router = express.Router();
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'stella_webhook_verify_token';
 
 // Webhook verification (GET request from WhatsApp)
-router.get('/whatsapp', (req, res) => {
+router.get('/', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -31,7 +31,7 @@ router.get('/whatsapp', (req, res) => {
 });
 
 // Webhook for receiving messages (POST request from WhatsApp)
-router.post('/whatsapp', (req, res) => {
+router.post('/', (req, res) => {
   try {
     const body = req.body;
 

@@ -34,7 +34,7 @@ try {
   console.log('✅ WhatsApp routes loaded');
 
   const webhookHandler = require('./api/webhook/whatsapp.js');
-  app.use('/api/webhook', webhookHandler);
+  app.use('/api/webhook/whatsapp', webhookHandler);
   console.log('✅ Webhook routes loaded');
   
 } catch (error) {
