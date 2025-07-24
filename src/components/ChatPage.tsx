@@ -10,10 +10,16 @@ interface Message {
   text: string;
   sender: 'user' | 'agent';
   timestamp: Date;
-  type: 'text' | 'product' | 'order' | 'recommendation';
+  type: 'text' | 'product' | 'order' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location';
   productData?: Product;
   orderData?: Order;
   status: 'sending' | 'sent' | 'delivered' | 'read';
+  // WhatsApp specific fields
+  whatsapp_message_id?: string;
+  media_url?: string;
+  media_mime_type?: string;
+  voice_duration?: number;
+  direction?: 'incoming' | 'outgoing';
 }
 
 interface Conversation {
@@ -25,6 +31,11 @@ interface Conversation {
   unreadCount: number;
   status: 'active' | 'pending' | 'resolved';
   avatar?: string;
+  // WhatsApp specific fields
+  display_name?: string;
+  profile_name?: string;
+  last_message_type?: string;
+  isWhatsApp?: boolean;
 }
 
 interface Product {
@@ -66,8 +77,82 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // WhatsApp Integration State
+  const [whatsappConversations, setWhatsappConversations] = useState<Conversation[]>([]);
+
+  const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
+  // Fetch WhatsApp conversations from the database
+  const fetchWhatsAppConversations = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/messages/conversations`);
+      const data = await response.json();
+      if (data.success) {
+        const convertedConversations = data.data.map((conv: any) => ({
+          id: `wa_${conv.phone_number}`,
+          customerName: conv.display_name || conv.profile_name || conv.phone_number,
+          customerPhone: conv.phone_number,
+          lastMessage: conv.last_message_content || 'No messages yet',
+          timestamp: new Date(conv.last_message_timestamp ? parseInt(conv.last_message_timestamp) * 1000 : conv.last_message_at),
+          unreadCount: 0,
+          status: 'active',
+          display_name: conv.display_name,
+          profile_name: conv.profile_name,
+          last_message_type: conv.last_message_type,
+          isWhatsApp: true
+        }));
+        setWhatsappConversations(convertedConversations);
+      }
+    } catch (error) {
+      console.error('Error fetching WhatsApp conversations:', error);
+    }
+  };  // Fetch WhatsApp messages for a specific conversation
+  const fetchWhatsAppMessages = async (phoneNumber: string) => {
+    try {
+      const response = await fetch(`${API_BASE}/messages/conversations/${phoneNumber}`);
+      const data = await response.json();
+      if (data.success) {
+        const convertedMessages = data.data.map((msg: any) => ({
+          id: msg.whatsapp_message_id || msg.id.toString(),
+          text: msg.content || '',
+          sender: msg.direction === 'incoming' ? 'user' : 'agent',
+          timestamp: new Date(parseInt(msg.timestamp) * 1000),
+          type: msg.message_type,
+          status: msg.status,
+          whatsapp_message_id: msg.whatsapp_message_id,
+          media_url: msg.media_url,
+          media_mime_type: msg.media_mime_type,
+          voice_duration: msg.voice_duration,
+          direction: msg.direction
+        }));
+        setMessages(convertedMessages.reverse());
+      }
+    } catch (error) {
+      console.error('Error fetching WhatsApp messages:', error);
+    }
+  };
+
+  // Load WhatsApp data on component mount
+  useEffect(() => {
+    fetchWhatsAppConversations();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchWhatsAppConversations, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Refresh WhatsApp messages when conversation changes
+  useEffect(() => {
+    if (selectedConversation && selectedConversation.startsWith('wa_')) {
+      const conversation = whatsappConversations.find(c => c.id === selectedConversation);
+      if (conversation) {
+        fetchWhatsAppMessages(conversation.customerPhone);
+      }
+    }
+  }, [selectedConversation, whatsappConversations]);
+
   // Mock conversations
-  const conversations: Conversation[] = [
+  const mockConversations: Conversation[] = [
     {
       id: '1',
       customerName: 'John Smith',
@@ -105,6 +190,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       status: 'pending'
     }
   ];
+
+  // Combine WhatsApp and mock conversations
+  const allConversations = [...whatsappConversations, ...mockConversations]
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   // Mock products
   const products: Product[] = [
@@ -443,7 +532,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   };
 
   // Filter conversations based on search query
-  const filteredConversations = conversations.filter(conversation => 
+  const filteredConversations = allConversations.filter((conversation: Conversation) => 
     conversation.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conversation.customerPhone.includes(searchQuery) ||
     conversation.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
@@ -547,8 +636,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
               <>
                 <div className="chat-header-info">
                   <div className="customer-details">
-                    <h3>{conversations.find(c => c.id === selectedConversation)?.customerName}</h3>
-                    <span>{conversations.find(c => c.id === selectedConversation)?.customerPhone}</span>
+                    <h3>{allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerName}</h3>
+                    <span>{allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone}</span>
                   </div>
                   <div className="chat-actions">
                     <button className="action-btn" onClick={sendSizeGuide}>
@@ -588,6 +677,39 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                             <p>Total: ${message.orderData.total.toFixed(2)}</p>
                             <p>Status: {message.orderData.status}</p>
                           </div>
+                        </div>
+                      ) : message.type === 'voice' ? (
+                        <div className="whatsapp-message voice-message">
+                          🎵 Voice message ({message.voice_duration}s)
+                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                        </div>
+                      ) : message.type === 'image' ? (
+                        <div className="whatsapp-message image-message">
+                          📷 Image
+                          {message.text && <div className="caption">{message.text}</div>}
+                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                        </div>
+                      ) : message.type === 'document' ? (
+                        <div className="whatsapp-message document-message">
+                          📄 Document
+                          {message.text && <div className="filename">{message.text}</div>}
+                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                        </div>
+                      ) : message.type === 'video' ? (
+                        <div className="whatsapp-message video-message">
+                          🎥 Video
+                          {message.text && <div className="caption">{message.text}</div>}
+                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                        </div>
+                      ) : message.type === 'sticker' ? (
+                        <div className="whatsapp-message sticker-message">
+                          😄 Sticker
+                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                        </div>
+                      ) : message.type === 'location' ? (
+                        <div className="whatsapp-message location-message">
+                          📍 Location
+                          {message.text && <div className="location-data">{message.text}</div>}
                         </div>
                       ) : (
                         <div className="message-content">

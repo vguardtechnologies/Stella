@@ -45,7 +45,7 @@ function App() {
 
   const handleChatClick = () => {
     console.log('Chat button clicked!')
-    setShowChat(true)
+    setShowChat(true) // Show ChatPage with integrated WhatsApp features
   }
 
   const handleWhatsAppClick = () => {
