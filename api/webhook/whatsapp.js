@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const whatsappMessageService = require('../../services/whatsappMessageService');
 
 // Store verification token (should match what you set in WhatsApp Business API)
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'stella_webhook_verify_token';
@@ -47,10 +48,10 @@ router.post('/', (req, res) => {
         if (webhookEvent) {
           console.log('Webhook event:', webhookEvent);
 
-          // Handle different types of webhook events
+          // Handle incoming messages
           if (webhookEvent.messages) {
             // Handle incoming messages
-            webhookEvent.messages.forEach(message => {
+            webhookEvent.messages.forEach(async (message) => {
               console.log('Received message:', {
                 from: message.from,
                 id: message.id,
@@ -59,21 +60,41 @@ router.post('/', (req, res) => {
                 text: message.text?.body || message.caption || 'Media message'
               });
 
+              try {
+                // Save message to database
+                await whatsappMessageService.saveIncomingMessage(message);
+                console.log(`✅ Message ${message.id} saved to database`);
+              } catch (error) {
+                console.error(`❌ Failed to save message ${message.id}:`, error);
+              }
+
               // Here you can process the incoming message
-              // For example: save to database, trigger automated responses, etc.
+              // For example: trigger automated responses, etc.
               handleIncomingMessage(message, webhookEvent);
             });
           }
 
           if (webhookEvent.statuses) {
             // Handle message status updates (sent, delivered, read, failed)
-            webhookEvent.statuses.forEach(status => {
+            webhookEvent.statuses.forEach(async (status) => {
               console.log('Message status update:', {
                 id: status.id,
                 status: status.status,
                 timestamp: status.timestamp,
                 recipient_id: status.recipient_id
               });
+
+              try {
+                // Update message status in database
+                await whatsappMessageService.updateMessageStatus(
+                  status.id, 
+                  status.status, 
+                  status.timestamp
+                );
+                console.log(`✅ Status updated for message ${status.id}`);
+              } catch (error) {
+                console.error(`❌ Failed to update status for message ${status.id}:`, error);
+              }
 
               // Here you can update message status in your database
               handleMessageStatus(status);
