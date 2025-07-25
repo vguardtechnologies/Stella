@@ -175,7 +175,9 @@
 }
 
 .button-group .connect-button,
-.button-group .save-button {
+.button-group .save-button,
+.button-group .disconnect-button,
+.button-group .restore-button {
   margin-top: 0;
   flex: 1;
 }
@@ -186,6 +188,42 @@
 
 .save-button:hover:not(:disabled) {
   background: linear-gradient(135deg, #0056b3, #004085);
+}
+
+.restore-button {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.restore-button:hover {
+  background: linear-gradient(135deg, #f57c00, #ef6c00);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.disconnect-button {
+  background: linear-gradient(135deg, #dc3545, #c82333);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.disconnect-button:hover {
+  background: linear-gradient(135deg, #c82333, #a71e2a);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
 }
 
 .connect-button:hover:not(:disabled),

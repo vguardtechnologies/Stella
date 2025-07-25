@@ -43,6 +43,18 @@ try {
   const webhookHandler = require('./api/webhook/whatsapp.js');
   app.use('/api/webhook/whatsapp', webhookHandler);
   console.log('✅ Webhook routes loaded');
+
+  const mediaHandler = require('./api/media.js');
+  app.use('/api/media', mediaHandler);
+  console.log('✅ Media routes loaded');
+
+  const whatsappMediaHandler = require('./api/whatsapp-media.js');
+  app.use('/api/whatsapp', whatsappMediaHandler);
+  console.log('✅ WhatsApp media routes loaded');
+
+  const contactsHandler = require('./api/contacts.js');
+  app.use('/api/contacts', contactsHandler);
+  console.log('✅ Contacts routes loaded');
   
 } catch (error) {
   console.log('⚠️ API routes error:', error.message);

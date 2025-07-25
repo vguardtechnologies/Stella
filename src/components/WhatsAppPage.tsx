@@ -11,6 +11,7 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [backendError, setBackendError] = useState<string | null>(null);
 
   // Load saved credentials from localStorage
   useEffect(() => {
@@ -27,21 +28,60 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
   useEffect(() => {
     const loadConfiguration = async () => {
       try {
-        const response = await fetch('/api/whatsapp/status');
+        // Use Vite proxy in development, direct URL in production
+        const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+        
+        console.log('Checking WhatsApp configuration status...', { 
+          baseUrl, 
+          isDev: import.meta.env.DEV,
+          fullUrl: `${baseUrl}/api/whatsapp/config-status`
+        });
+        
+        const response = await fetch(`${baseUrl}/api/whatsapp/config-status`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const result = await response.json();
+        console.log('Backend response:', result);
         
         if (result.success) {
-          setIsConnected(result.data.isConfigured);
-          if (result.data.webhookUrl) {
-            setWebhookUrl(result.data.webhookUrl);
-          }
-          if (result.data.phoneNumberId) {
-            // Show partially masked phone number ID
-            setPhoneNumberId(result.data.phoneNumberId);
+          setIsConnected(result.isConfigured);
+          setBackendError(null); // Clear any previous errors
+          console.log('Backend configuration status:', result);
+          
+          // Always load from localStorage first (browser persistence)
+          const savedApiKey = localStorage.getItem('whatsapp_api_key');
+          const savedPhoneNumberId = localStorage.getItem('whatsapp_phone_number_id');
+          const savedWebhookUrl = localStorage.getItem('whatsapp_webhook_url');
+          
+          if (savedApiKey) setApiKey(savedApiKey);
+          if (savedPhoneNumberId) setPhoneNumberId(savedPhoneNumberId);
+          if (savedWebhookUrl) setWebhookUrl(savedWebhookUrl);
+          
+          // If we have localStorage credentials but backend says not configured,
+          // attempt to restore backend configuration
+          if ((savedApiKey && savedPhoneNumberId) && !result.isConfigured) {
+            console.log('Restoring backend configuration from localStorage...');
+            await restoreBackendConfiguration(savedApiKey, savedPhoneNumberId, savedWebhookUrl);
           }
         }
       } catch (error) {
         console.error('Failed to load configuration:', error);
+        setBackendError(error instanceof Error ? error.message : 'Backend connection failed');
+        
+        // If backend is unreachable, still load from localStorage and show appropriate status
+        const savedApiKey = localStorage.getItem('whatsapp_api_key');
+        const savedPhoneNumberId = localStorage.getItem('whatsapp_phone_number_id');
+        const savedWebhookUrl = localStorage.getItem('whatsapp_webhook_url');
+        
+        if (savedApiKey) setApiKey(savedApiKey);
+        if (savedPhoneNumberId) setPhoneNumberId(savedPhoneNumberId);
+        if (savedWebhookUrl) setWebhookUrl(savedWebhookUrl);
+        
+        // Set as disconnected since we can't verify backend status
+        setIsConnected(false);
       } finally {
         setIsLoading(false);
       }
@@ -49,6 +89,43 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
 
     loadConfiguration();
   }, []);
+
+  // Function to restore backend configuration from localStorage
+  const restoreBackendConfiguration = async (accessToken: string, phoneNumberId: string, webhookUrl?: string) => {
+    try {
+      const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      
+      const response = await fetch(`${baseUrl}/api/whatsapp/configure`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accessToken,
+          phoneNumberId,
+          webhookUrl: webhookUrl || ''
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setIsConnected(true);
+        setBackendError(null);
+        console.log('Backend configuration restored successfully');
+      } else {
+        console.error('Failed to restore backend configuration:', result.message);
+        // If restore fails, clear potentially invalid localStorage
+        localStorage.removeItem('whatsapp_api_key');
+        localStorage.removeItem('whatsapp_phone_number_id');
+        localStorage.removeItem('whatsapp_webhook_url');
+        setApiKey('');
+        setPhoneNumberId('');
+        setWebhookUrl('');
+      }
+    } catch (error) {
+      console.error('Error restoring backend configuration:', error);
+    }
+  };
 
   const handleConnectAPI = async () => {
     if (!apiKey || !phoneNumberId) {
@@ -58,8 +135,9 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
 
     try {
       console.log('Testing WhatsApp API connection...');
+      const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
-      const response = await fetch('/api/whatsapp/test-connection', {
+      const response = await fetch(`${baseUrl}/api/whatsapp/test-connection`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,6 +152,7 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
 
       if (result.success) {
         setIsConnected(true);
+        setBackendError(null);
         
         // Save credentials to localStorage
         localStorage.setItem('whatsapp_api_key', apiKey);
@@ -102,8 +181,9 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
     
     try {
       console.log('Saving WhatsApp configuration...');
+      const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
-      const response = await fetch('/api/whatsapp/configure', {
+      const response = await fetch(`${baseUrl}/api/whatsapp/configure`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -129,6 +209,53 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
       }
     } catch (error) {
       console.error('Configuration save failed:', error);
+      alert('❌ Network error. Please try again.');
+    }
+  };
+
+  const handleDisconnect = async () => {
+    const confirmed = window.confirm(
+      '⚠️ Are you sure you want to disconnect WhatsApp integration?\n\n' +
+      'This will:\n' +
+      '• Clear all saved credentials\n' +
+      '• Stop message functionality\n' +
+      '• Require reconfiguration to use WhatsApp again'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      console.log('Disconnecting WhatsApp integration...');
+      const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      
+      const response = await fetch(`${baseUrl}/api/whatsapp/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Clear local state
+        setIsConnected(false);
+        setApiKey('');
+        setPhoneNumberId('');
+        setWebhookUrl('');
+        setBackendError(null);
+        
+        // Clear localStorage
+        localStorage.removeItem('whatsapp_api_key');
+        localStorage.removeItem('whatsapp_phone_number_id');
+        localStorage.removeItem('whatsapp_webhook_url');
+        
+        alert(`✅ ${result.message}`);
+      } else {
+        alert(`❌ Disconnect failed: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Disconnect failed:', error);
       alert('❌ Network error. Please try again.');
     }
   };
@@ -170,6 +297,16 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
                 {isConnected && (
                   <small style={{ display: 'block', marginTop: '4px', color: '#666' }}>
                     WhatsApp API is ready to use
+                  </small>
+                )}
+                {backendError && (
+                  <small style={{ display: 'block', marginTop: '4px', color: '#f44336' }}>
+                    🚫 Backend Error: {backendError}
+                  </small>
+                )}
+                {!isConnected && !backendError && (apiKey || phoneNumberId) && (
+                  <small style={{ display: 'block', marginTop: '4px', color: '#ff9800' }}>
+                    ⚠️ Credentials found in browser but not synced with backend
                   </small>
                 )}
               </div>
@@ -226,6 +363,25 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
               >
                 Save Configuration
               </button>
+
+              {/* Show restore button if we have credentials but not connected */}
+              {!isConnected && (apiKey && phoneNumberId) && (
+                <button 
+                  className="restore-button" 
+                  onClick={() => restoreBackendConfiguration(apiKey, phoneNumberId, webhookUrl)}
+                >
+                  Restore Config
+                </button>
+              )}
+
+              {isConnected && (
+                <button 
+                  className="disconnect-button" 
+                  onClick={handleDisconnect}
+                >
+                  Disconnect
+                </button>
+              )}
             </div>
             </div>
           )}

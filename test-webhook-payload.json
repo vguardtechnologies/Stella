@@ -1,0 +1,31 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "test_entry_1",
+    "changes": [{
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": {
+          "display_phone_number": "15551234567",
+          "phone_number_id": "test_phone_id"
+        },
+        "contacts": [{
+          "profile": {
+            "name": "Sarah Johnson 🌟"
+          },
+          "wa_id": "15551234568"
+        }],
+        "messages": [{
+          "from": "15551234568",
+          "id": "test_msg_1",
+          "timestamp": "1640995200",
+          "text": {
+            "body": "Hello! I love your products 💖"
+          },
+          "type": "text"
+        }]
+      },
+      "field": "messages"
+    }]
+  }]
+}

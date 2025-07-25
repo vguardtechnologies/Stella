@@ -1,0 +1,249 @@
+.multimedia-sender {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  backdrop-filter: blur(10px);
+}
+
+.message-type-selector {
+  margin-bottom: 1rem;
+}
+
+.message-type-selector label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.type-select {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.type-select:focus {
+  outline: none;
+  border-color: #25D366;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.text-input-section,
+.media-input-section {
+  margin-bottom: 1rem;
+}
+
+.text-input {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: #25D366;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.text-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.input-group {
+  margin-bottom: 1rem;
+}
+
+.input-group:last-child {
+  margin-bottom: 0;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.media-url-input,
+.filename-input,
+.caption-input {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+.media-url-input:focus,
+.filename-input:focus,
+.caption-input:focus {
+  outline: none;
+  border-color: #25D366;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.media-url-input::placeholder,
+.filename-input::placeholder,
+.caption-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.send-section {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cancel-multimedia-btn {
+  background: rgba(244, 67, 54, 0.8);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.2s ease;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.cancel-multimedia-btn:hover {
+  background: rgba(244, 67, 54, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.send-multimedia-btn {
+  background: linear-gradient(135deg, #25D366, #20b858);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.2s ease;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.send-multimedia-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #20b858, #1da84a);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+}
+
+.send-multimedia-btn:disabled {
+  background: rgba(255, 255, 255, 0.2);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.format-help {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.format-help h4 {
+  margin: 0 0 0.75rem 0;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.format-help ul {
+  margin: 0 0 0.75rem 0;
+  padding-left: 1.25rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+}
+
+.format-help li {
+  margin-bottom: 0.25rem;
+}
+
+.format-help li strong {
+  color: #25D366;
+}
+
+.format-help p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* Media type icons in select options */
+.type-select option {
+  background: #2a2a2a;
+  color: #ffffff;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .multimedia-sender {
+    padding: 1rem;
+    margin: 0.5rem 0;
+  }
+  
+  .send-multimedia-btn {
+    padding: 0.875rem 1rem;
+    font-size: 0.95rem;
+  }
+  
+  .format-help {
+    padding: 0.875rem;
+  }
+  
+  .format-help ul {
+    font-size: 0.85rem;
+  }
+}
+
+/* Animation for type switching */
+.media-input-section {
+  animation: fadeIn 0.3s ease;
+}
+
+.text-input-section {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

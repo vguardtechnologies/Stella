@@ -39,7 +39,7 @@ class WhatsAppMessageService {
   }
 
   // Save incoming message
-  async saveIncomingMessage(messageData) {
+  async saveIncomingMessage(messageData, contactNames = null) {
     try {
       const {
         id: whatsappMessageId,
@@ -58,8 +58,17 @@ class WhatsAppMessageService {
         interactive
       } = messageData;
 
-      // Get or create conversation
-      const conversation = await this.createOrGetConversation(phoneNumber);
+      // Extract display name from contact names if available
+      let displayName = null;
+      let profileName = null;
+      
+      if (contactNames) {
+        displayName = contactNames.bestDisplayName;
+        profileName = contactNames.profileName;
+      }
+
+      // Get or create conversation with contact names
+      const conversation = await this.createOrGetConversation(phoneNumber, displayName, profileName);
 
       let content = '';
       let mediaUrl = null;
@@ -190,7 +199,7 @@ class WhatsAppMessageService {
           content,
           mediaUrl,
           mediaMimeType,
-          Date.now(),
+          Math.floor(Date.now() / 1000), // Convert to seconds and round down to integer
           'sent'
         ]
       );

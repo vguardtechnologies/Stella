@@ -16,8 +16,8 @@
 
 .chat-container {
   width: 100%;
-  max-width: 1400px;
-  height: 90vh;
+  max-width: 1600px;
+  height: 95vh;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(20px);
   border-radius: 20px;
@@ -280,6 +280,7 @@ mark {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 .chat-header-info {
@@ -329,15 +330,15 @@ mark {
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 8px;
 }
 
 /* Message positioning - Agent messages on right, User messages on left */
 .message {
   display: flex;
   flex-direction: column;
-  max-width: 80%;
-  margin-bottom: 15px;
+  max-width: 70%;
+  margin-bottom: 8px;
 }
 
 .user-message {
@@ -352,18 +353,18 @@ mark {
 
 .message-content {
   background: rgba(255, 255, 255, 0.1);
-  padding: 12px 16px;
-  border-radius: 18px;
+  padding: 8px 12px;
+  border-radius: 14px;
   backdrop-filter: blur(10px);
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
 .user-message .message-content {
   background: rgba(255, 255, 255, 0.15);
-  color: white;
+  color: #1a1a1a;
   border-bottom-left-radius: 6px;
 }
 
@@ -373,10 +374,26 @@ mark {
   border-bottom-right-radius: 6px;
 }
 
+/* Clean message text styling */
 .message-text {
   margin: 0;
+  padding: 0;
+  font-size: 14px;
   line-height: 1.4;
   white-space: pre-wrap;
+  background: transparent;
+  text-shadow: none;
+  border: none;
+}
+
+/* User messages: dark text on light background */
+.user-message .message-text {
+  color: #1a1a1a;
+}
+
+/* Agent messages: white text on dark background */
+.agent-message .message-text {
+  color: white;
 }
 
 .message-status {
@@ -634,6 +651,90 @@ mark {
 .emoji-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   transform: scale(1.1);
+}
+
+.multimedia-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  color: white;
+}
+
+.multimedia-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+/* Multimedia Message Styles */
+.media-image, .media-video {
+  margin-top: 8px;
+  border-radius: 8px;
+  max-width: 100%;
+  height: auto;
+}
+
+.media-video {
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.media-video:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.media-video::-webkit-media-controls-panel {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.media-video::-webkit-media-controls-play-button {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+}
+
+.audio-player {
+  margin-top: 8px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.document-link {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: white;
+  text-decoration: none;
+  font-size: 12px;
+  transition: background 0.3s ease;
+}
+
+.document-link:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.caption, .filename {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.media-id {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
 }
 
 .message-input {
@@ -1133,9 +1234,84 @@ mark {
 
 /* Video Message */
 .video-message {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  background: transparent !important;
   color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  box-shadow: none !important;
+  position: relative;
+  overflow: visible;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.video-message::before {
+  display: none;
+}
+
+/* Enhanced Video Player Styles */
+.media-video {
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  transition: all 0.3s ease;
+  background: #000;
+  width: 100%;
+  height: auto;
+  max-height: 240px;
+  object-fit: cover;
+  display: block;
+}
+
+.media-video:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+  transform: translateY(-2px);
+}
+
+/* Custom video controls styling */
+.media-video::-webkit-media-controls-panel {
+  background-color: rgba(0,0,0,0.8);
+  border-radius: 0 0 12px 12px;
+}
+
+.media-video::-webkit-media-controls-play-button,
+.media-video::-webkit-media-controls-pause-button {
+  background-color: rgba(255,255,255,0.9);
+  border-radius: 50%;
+}
+
+.media-video::-webkit-media-controls-timeline {
+  background-color: rgba(255,255,255,0.3);
+  border-radius: 2px;
+}
+
+.media-video::-webkit-media-controls-current-time-display,
+.media-video::-webkit-media-controls-time-remaining-display {
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+/* Video loading state */
+.video-loading {
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+/* Enhanced button hover effects for video controls */
+.video-message button {
+  transition: all 0.2s ease;
+}
+
+.video-message button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34,197,94,0.3);
+}
+
+.video-message .caption {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+  font-size: 12px;
 }
 
 /* Sticker Message */
@@ -1195,4 +1371,70 @@ mark {
     margin-top: 6px;
     padding: 3px 6px;
   }
+}
+
+/* WhatsApp Badge and Live Indicator */
+.whatsapp-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 10px;
+  box-shadow: 0 2px 8px rgba(37, 211, 102, 0.3);
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: #25D366;
+  border-radius: 50%;
+  animation: pulse-green 2s infinite;
+  box-shadow: 0 0 8px rgba(37, 211, 102, 0.6);
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Enhanced message input for WhatsApp conversations */
+.message-input-wrapper {
+  position: relative;
+}
+
+.whatsapp-reply-active .message-input {
+  border: 2px solid #25D366;
+  box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+}
+
+.whatsapp-reply-active .send-btn {
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  color: white;
+  border: none;
+}
+
+.whatsapp-reply-active .send-btn:hover {
+  background: linear-gradient(135deg, #20b358, #0f7a6b);
 }

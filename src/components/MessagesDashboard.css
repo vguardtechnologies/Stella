@@ -1,0 +1,366 @@
+.messages-dashboard {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.messages-dashboard.loading,
+.messages-dashboard.error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+  font-size: 18px;
+}
+
+.messages-dashboard.error {
+  color: #d32f2f;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.dashboard-header h2 {
+  margin: 0;
+  color: #1976d2;
+  font-size: 28px;
+}
+
+.refresh-button {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.refresh-button:hover {
+  background: #45a049;
+}
+
+/* Statistics Section */
+.stats-section {
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.stat-card h3 {
+  margin: 0 0 15px 0;
+  font-size: 20px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255,255,255,0.1);
+  padding: 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.stat-label {
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.message-types {
+  background: rgba(255,255,255,0.1);
+  padding: 15px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.message-types h4 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+}
+
+.type-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+/* Dashboard Content */
+.dashboard-content {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 20px;
+  height: 600px;
+}
+
+/* Conversations Panel */
+.conversations-panel {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.conversations-panel h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.no-conversations {
+  text-align: center;
+  color: #666;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+.conversations-list {
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.conversation-item {
+  padding: 15px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-radius: 8px;
+  margin-bottom: 5px;
+}
+
+.conversation-item:hover {
+  background: #f8f9fa;
+}
+
+.conversation-item.selected {
+  background: #e3f2fd;
+  border-left: 4px solid #1976d2;
+}
+
+.conversation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.phone-number {
+  font-weight: bold;
+  color: #1976d2;
+  font-size: 16px;
+}
+
+.last-message-time {
+  font-size: 12px;
+  color: #666;
+}
+
+.display-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.last-message {
+  color: #666;
+  font-size: 14px;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Messages Panel */
+.messages-panel {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.messages-panel h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.select-conversation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+  color: #666;
+  font-style: italic;
+  font-size: 16px;
+}
+
+.messages-list {
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.no-messages {
+  text-align: center;
+  color: #666;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+/* Message Items */
+.message-item {
+  margin-bottom: 15px;
+  padding: 12px;
+  border-radius: 12px;
+  max-width: 80%;
+}
+
+.message-item.incoming {
+  background: #f1f3f4;
+  margin-right: auto;
+  border-bottom-left-radius: 4px;
+}
+
+.message-item.outgoing {
+  background: #dcf8c6;
+  margin-left: auto;
+  border-bottom-right-radius: 4px;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.message-type {
+  background: #2196f3;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.message-status {
+  font-style: italic;
+}
+
+.message-content {
+  line-height: 1.4;
+}
+
+.message-text {
+  color: #333;
+  font-size: 14px;
+}
+
+.message-voice,
+.message-image,
+.message-document,
+.message-audio,
+.message-video,
+.message-sticker,
+.message-location,
+.message-other {
+  color: #555;
+  font-size: 14px;
+  padding: 8px;
+  background: rgba(33, 150, 243, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid #2196f3;
+}
+
+.caption,
+.filename,
+.location-data {
+  margin-top: 5px;
+  font-style: italic;
+  color: #666;
+}
+
+.media-id {
+  font-size: 10px;
+  color: #999;
+  font-family: monospace;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-content {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  
+  .conversations-panel,
+  .messages-panel {
+    height: 400px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .message-item {
+    max-width: 95%;
+  }
+}
+
+/* Scrollbar Styling */
+.conversations-list::-webkit-scrollbar,
+.messages-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.conversations-list::-webkit-scrollbar-track,
+.messages-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.conversations-list::-webkit-scrollbar-thumb,
+.messages-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.conversations-list::-webkit-scrollbar-thumb:hover,
+.messages-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

@@ -49,6 +49,20 @@ const createTables = async () => {
       );
     `);
 
+    // Create whatsapp_config table for persistent configuration
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS whatsapp_config (
+        id SERIAL PRIMARY KEY,
+        access_token TEXT NOT NULL,
+        phone_number_id VARCHAR(50) NOT NULL,
+        webhook_url VARCHAR(500),
+        verify_token VARCHAR(255),
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Create indexes for better performance
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_messages_phone_number ON messages(phone_number);

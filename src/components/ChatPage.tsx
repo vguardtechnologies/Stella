@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import VideoMessage from './VideoMessage';
+import ContactManager from './ContactManager';
+import ImageModal from './ImageModal';
 import './ChatPage.css';
 
 interface ChatPageProps {
@@ -13,13 +16,16 @@ interface Message {
   type: 'text' | 'product' | 'order' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location';
   productData?: Product;
   orderData?: Order;
-  status: 'sending' | 'sent' | 'delivered' | 'read';
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   // WhatsApp specific fields
   whatsapp_message_id?: string;
   media_url?: string;
+  media_file_id?: string;
   media_mime_type?: string;
   voice_duration?: number;
   direction?: 'incoming' | 'outgoing';
+  // Enhanced video support
+  videoUrl?: string;
 }
 
 interface Conversation {
@@ -76,17 +82,69 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [isNearBottom, setIsNearBottom] = useState(true);
 
   // WhatsApp Integration State
   const [whatsappConversations, setWhatsappConversations] = useState<Conversation[]>([]);
+  const [whatsappConfigured, setWhatsappConfigured] = useState(true); // Assume configured since we have permanent token
+
+  // Contact Management State
+  const [showContactManager, setShowContactManager] = useState(false);
+  const [currentContact, setCurrentContact] = useState<any>(null);
+  const [savedContacts, setSavedContacts] = useState<Map<string, any>>(new Map());
+
+  // Image Modal State
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [modalImageUrl, setModalImageUrl] = useState('');
+  const [modalImageCaption, setModalImageCaption] = useState('');
 
   const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
+  // Function to open image modal
+  const openImageModal = (imageUrl: string, caption?: string) => {
+    setModalImageUrl(imageUrl);
+    setModalImageCaption(caption || '');
+    setShowImageModal(true);
+  };
+
+  // Function to close image modal
+  const closeImageModal = () => {
+    setShowImageModal(false);
+    setModalImageUrl('');
+    setModalImageCaption('');
+  };
 
   // Fetch WhatsApp conversations from the database
   const fetchWhatsAppConversations = async () => {
     try {
-      const response = await fetch(`${API_BASE}/messages/conversations`);
-      const data = await response.json();
+      console.log('🔄 Fetching WhatsApp conversations from:', `${API_BASE}/api/messages/conversations`);
+      const response = await fetch(`${API_BASE}/api/messages/conversations`);
+      
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        console.error('❌ HTTP error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ Error response body:', errorText);
+        return;
+      }
+
+      const responseText = await response.text();
+      console.log('📄 Raw response:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON parsing failed:', parseError);
+        console.error('❌ Response was not valid JSON:', responseText);
+        return;
+      }
+
+      console.log('✅ Parsed data:', data);
+      
       if (data.success) {
         const convertedConversations = data.data.map((conv: any) => ({
           id: `wa_${conv.phone_number}`,
@@ -107,10 +165,34 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       console.error('Error fetching WhatsApp conversations:', error);
     }
   };  // Fetch WhatsApp messages for a specific conversation
-  const fetchWhatsAppMessages = async (phoneNumber: string) => {
+  const fetchWhatsAppMessages = async (phoneNumber: string, isAutoRefresh = false) => {
     try {
-      const response = await fetch(`${API_BASE}/messages/conversations/${phoneNumber}`);
-      const data = await response.json();
+      console.log('🔄 Fetching messages for phone:', phoneNumber);
+      const response = await fetch(`${API_BASE}/api/messages/conversations/${phoneNumber}`);
+      
+      console.log('📡 Messages response status:', response.status);
+      
+      if (!response.ok) {
+        console.error('❌ HTTP error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ Error response body:', errorText);
+        return;
+      }
+
+      const responseText = await response.text();
+      console.log('📄 Raw messages response:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON parsing failed for messages:', parseError);
+        console.error('❌ Response was not valid JSON:', responseText);
+        return;
+      }
+
+      console.log('✅ Parsed messages data:', data);
+      
       if (data.success) {
         const convertedMessages = data.data.map((msg: any) => ({
           id: msg.whatsapp_message_id || msg.id.toString(),
@@ -122,13 +204,80 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
           whatsapp_message_id: msg.whatsapp_message_id,
           media_url: msg.media_url,
           media_mime_type: msg.media_mime_type,
+          media_file_id: msg.media_file_id, // Add media_file_id for thumbnails
           voice_duration: msg.voice_duration,
           direction: msg.direction
         }));
+        console.log('✅ Converted messages:', convertedMessages);
+        
+        // Check if there are new messages during auto-refresh
+        if (isAutoRefresh && messages.length > 0) {
+          const oldMessageIds = new Set(messages.map((m: Message) => m.id));
+          const hasNewMessages = convertedMessages.some((m: any) => !oldMessageIds.has(m.id));
+          
+          // Only enable auto-scroll for auto-refresh if user is near bottom or if there are genuinely new incoming messages
+          if (hasNewMessages && !isNearBottom) {
+            console.log('📩 New messages detected, but user is not near bottom - maintaining scroll position');
+            // Don't change shouldAutoScroll state
+          } else if (hasNewMessages && isNearBottom) {
+            console.log('📩 New messages detected and user is near bottom - enabling auto-scroll');
+            setShouldAutoScroll(true);
+          }
+          
+          // Preserve existing videoUrl states during auto-refresh
+          const existingVideoUrls = new Map();
+          messages.forEach(msg => {
+            if (msg.videoUrl) {
+              existingVideoUrls.set(msg.id, msg.videoUrl);
+            }
+          });
+          
+          // Merge existing video URLs with refreshed messages
+          convertedMessages.forEach((msg: any) => {
+            if (existingVideoUrls.has(msg.id)) {
+              msg.videoUrl = existingVideoUrls.get(msg.id);
+            }
+          });
+        }
+        
         setMessages(convertedMessages.reverse());
+      } else {
+        console.warn('⚠️ Messages fetch was not successful:', data);
       }
     } catch (error) {
-      console.error('Error fetching WhatsApp messages:', error);
+      console.error('❌ Error fetching WhatsApp messages:', error);
+    }
+  };
+
+  // General function to fetch messages for any conversation
+  const fetchMessages = async (conversationId: string, isAutoRefresh = false) => {
+    if (conversationId.startsWith('wa_')) {
+      // WhatsApp conversation
+      const conversation = whatsappConversations.find(c => c.id === conversationId);
+      if (conversation) {
+        await fetchWhatsAppMessages(conversation.customerPhone, isAutoRefresh);
+      }
+    }
+    // Can add other conversation types here in the future
+  };
+
+  // Function to get actual media URL from WhatsApp media ID
+  const getMediaUrl = async (mediaId: string): Promise<string | null> => {
+    try {
+      console.log(`Attempting to fetch media URL for ID: ${mediaId}`);
+      const response = await fetch(`${API_BASE}/api/whatsapp/media/${mediaId}`);
+      
+      if (!response.ok) {
+        console.error(`Media fetch failed with status ${response.status} for media ID: ${mediaId}`);
+        return null;
+      }
+      
+      const data = await response.json();
+      console.log(`✅ Media URL obtained for ${mediaId}:`, data.url?.substring(0, 100) + '...');
+      return data.url;
+    } catch (error) {
+      console.error('Error fetching media URL:', error);
+      return null;
     }
   };
 
@@ -136,63 +285,36 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   useEffect(() => {
     fetchWhatsAppConversations();
     
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchWhatsAppConversations, 30000);
+    // Simple auto-refresh - fetch conversations every 30 seconds
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing conversations');
+      fetchWhatsAppConversations();
+    }, 30000);
+    
     return () => clearInterval(interval);
   }, []);
 
-  // Refresh WhatsApp messages when conversation changes
+  // Refresh messages when conversation changes
   useEffect(() => {
-    if (selectedConversation && selectedConversation.startsWith('wa_')) {
-      const conversation = whatsappConversations.find(c => c.id === selectedConversation);
-      if (conversation) {
-        fetchWhatsAppMessages(conversation.customerPhone);
-      }
+    if (selectedConversation) {
+      fetchMessages(selectedConversation);
     }
   }, [selectedConversation, whatsappConversations]);
 
-  // Mock conversations
-  const mockConversations: Conversation[] = [
-    {
-      id: '1',
-      customerName: 'John Smith',
-      customerPhone: '+1234567890',
-      lastMessage: 'When will my water delivery arrive?',
-      timestamp: new Date(Date.now() - 5 * 60000), // 5 minutes ago
-      unreadCount: 2,
-      status: 'active'
-    },
-    {
-      id: '2',
-      customerName: 'Sarah Johnson',
-      customerPhone: '+1234567891',
-      lastMessage: 'I need to order 10 gallons of water',
-      timestamp: new Date(Date.now() - 15 * 60000), // 15 minutes ago
-      unreadCount: 1,
-      status: 'active'
-    },
-    {
-      id: '3',
-      customerName: 'Mike Davis',
-      customerPhone: '+1234567892',
-      lastMessage: 'Thank you for the quick delivery!',
-      timestamp: new Date(Date.now() - 30 * 60000), // 30 minutes ago
-      unreadCount: 0,
-      status: 'resolved'
-    },
-    {
-      id: '4',
-      customerName: 'Lisa Wilson',
-      customerPhone: '+1234567893',
-      lastMessage: 'Do you have water dispensers available?',
-      timestamp: new Date(Date.now() - 60 * 60000), // 1 hour ago
-      unreadCount: 3,
-      status: 'pending'
-    }
-  ];
+  // Auto-refresh messages for the selected conversation
+  useEffect(() => {
+    if (!selectedConversation) return;
 
-  // Combine WhatsApp and mock conversations
-  const allConversations = [...whatsappConversations, ...mockConversations]
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing messages for selected conversation');
+      fetchMessages(selectedConversation, true); // Pass true for isAutoRefresh
+    }, 15000); // Refresh messages every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [selectedConversation]);
+
+  // Use only real WhatsApp conversations - no mock data
+  const allConversations = whatsappConversations
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   // Mock products
@@ -246,70 +368,52 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     }
   ];
 
-  // Mock messages for selected conversation
-  const mockMessages: { [key: string]: Message[] } = {
-    '1': [
-      {
-        id: 'm1',
-        text: 'Hi! I ordered 5 gallons of water yesterday. When will it arrive? 🚚',
-        sender: 'user',
-        timestamp: new Date(Date.now() - 10 * 60000),
-        type: 'text',
-        status: 'read'
-      },
-      {
-        id: 'm2',
-        text: 'Hello John! Let me check your order status for you. 😊',
-        sender: 'agent',
-        timestamp: new Date(Date.now() - 8 * 60000),
-        type: 'text',
-        status: 'read'
-      },
-      {
-        id: 'm3',
-        text: 'Your order is scheduled for delivery today between 2-4 PM. You should receive it within the next hour! 🎉',
-        sender: 'agent',
-        timestamp: new Date(Date.now() - 5 * 60000),
-        type: 'text',
-        status: 'delivered'
-      }
-    ],
-    '2': [
-      {
-        id: 'm4',
-        text: 'Hello! I need to order water for my office. We need about 10 gallons. 💼',
-        sender: 'user',
-        timestamp: new Date(Date.now() - 20 * 60000),
-        type: 'text',
-        status: 'read'
-      },
-      {
-        id: 'm5',
-        text: 'Great! I can help you with that. Let me show you our available options. 💧',
-        sender: 'agent',
-        timestamp: new Date(Date.now() - 15 * 60000),
-        type: 'text',
-        status: 'sent'
-      }
-    ]
-  };
-
+  // Smart scroll behavior - only scroll to bottom when appropriate
   useEffect(() => {
-    if (selectedConversation && mockMessages[selectedConversation]) {
-      setMessages(mockMessages[selectedConversation]);
+    if (shouldAutoScroll && isNearBottom) {
+      scrollToBottom();
     }
-  }, [selectedConversation]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  }, [messages, shouldAutoScroll, isNearBottom]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSendMessage = () => {
+  // Track scroll position to determine if user is near bottom
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const element = e.currentTarget;
+    const threshold = 100; // pixels from bottom
+    const isNear = element.scrollHeight - element.scrollTop - element.clientHeight < threshold;
+    setIsNearBottom(isNear);
+    
+    // If user scrolls back to bottom, re-enable auto-scroll
+    if (isNear) {
+      setShouldAutoScroll(true);
+    } else {
+      // If user scrolls away from bottom, disable auto-scroll during refresh
+      setShouldAutoScroll(false);
+    }
+  };
+
+  // Handle scroll to bottom button click
+  const handleScrollToBottom = () => {
+    setShouldAutoScroll(true);
+    setIsNearBottom(true);
+    scrollToBottom();
+  };
+
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
+
+    // Extract phone number from conversation ID
+    const conversation = whatsappConversations.find(c => c.id === selectedConversation);
+    if (!conversation) {
+      console.error('❌ No conversation found for ID:', selectedConversation);
+      return;
+    }
+
+    const phoneNumber = conversation.customerPhone;
+    console.log('📤 Sending message to:', phoneNumber);
 
     const message: Message = {
       id: `m${Date.now()}`,
@@ -320,40 +424,74 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       status: 'sending'
     };
 
+    // Add message to UI immediately (optimistic update)
     setMessages(prev => [...prev, message]);
+    const messageToSend = newMessage;
     setNewMessage('');
     setShowEmojiPicker(false);
 
-    // Simulate message delivery status updates
-    setTimeout(() => {
+    // Enable auto-scroll and force scroll to bottom when sending a message
+    setShouldAutoScroll(true);
+    setIsNearBottom(true);
+    setTimeout(() => scrollToBottom(), 100);
+
+    try {
+      // Send message via WhatsApp API
+      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: phoneNumber,
+          message: messageToSend,
+          type: 'text'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Message sent successfully:', result);
+        
+        // Update message status to sent
+        setMessages(prev => prev.map(msg => 
+          msg.id === message.id ? { 
+            ...msg, 
+            status: 'sent',
+            whatsapp_message_id: result.messageId 
+          } : msg
+        ));
+
+        // Update to delivered after a short delay
+        setTimeout(() => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === message.id ? { ...msg, status: 'delivered' } : msg
+          ));
+        }, 1000);
+
+      } else {
+        console.error('❌ Failed to send message:', result);
+        
+        // Update message status to failed
+        setMessages(prev => prev.map(msg => 
+          msg.id === message.id ? { ...msg, status: 'failed' } : msg
+        ));
+        
+        // Show error to user
+        alert('Failed to send message: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('❌ Error sending message:', error);
+      
+      // Update message status to failed
       setMessages(prev => prev.map(msg => 
-        msg.id === message.id ? { ...msg, status: 'sent' } : msg
+        msg.id === message.id ? { ...msg, status: 'failed' } : msg
       ));
-    }, 500);
-
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === message.id ? { ...msg, status: 'delivered' } : msg
-      ));
-    }, 1500);
-
-    // Simulate customer typing response
-    setTimeout(() => {
-      setIsTyping(true);
-    }, 2000);
-
-    setTimeout(() => {
-      setIsTyping(false);
-      const customerResponse: Message = {
-        id: `m${Date.now() + 1}`,
-        text: 'Thank you! That helps a lot! 😊',
-        sender: 'user',
-        timestamp: new Date(),
-        type: 'text',
-        status: 'sent'
-      };
-      setMessages(prev => [...prev, customerResponse]);
-    }, 4000);
+      
+      // Show error to user
+      alert('Error sending message: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -410,29 +548,98 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     }, 1000);
   };
 
-  const sendSizeGuide = () => {
-    if (!selectedConversation) return;
+  // Contact Management Functions
+  const checkContactStatus = async (phoneNumber: string) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/contacts/check/${phoneNumber}`);
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.exists ? data.contact : null;
+    } catch (error) {
+      console.error('Error checking contact status:', error);
+      return null;
+    }
+  };
 
-    const sizeGuideText = `📏 **Water Size Guide** 💧\n\n🥤 **1 Gallon** - Perfect for:\n• Individual use (1-2 people) 👤\n• Daily drinking water 🚰\n• Small households 🏠\n\n🪣 **5 Gallons** - Perfect for:\n• Families (3-5 people) 👨‍👩‍👧‍👦\n• Office use 🏢\n• Water dispensers 🚰\n• Long-term storage 📦\n\n💡 **Recommendation**: For your needs, I suggest starting with our 5-gallon option! 🎯`;
+  const handleSaveContact = () => {
+    const conversation = whatsappConversations.find(c => c.id === selectedConversation);
+    if (!conversation) return;
 
-    const message: Message = {
-      id: `m${Date.now()}`,
-      text: sizeGuideText,
-      sender: 'agent',
-      timestamp: new Date(),
-      type: 'recommendation',
-      status: 'sending'
+    setCurrentContact({
+      phoneNumber: conversation.customerPhone,
+      displayName: conversation.display_name,
+      whatsappProfileName: conversation.profile_name
+    });
+    setShowContactManager(true);
+  };
+
+  const handleContactSaved = (contactInfo: any) => {
+    // Update the saved contacts map
+    setSavedContacts(prev => {
+      const newMap = new Map(prev);
+      newMap.set(contactInfo.phone_number, contactInfo);
+      return newMap;
+    });
+
+    // Update the conversation list to show the saved name
+    setWhatsappConversations(prev => 
+      prev.map(conv => 
+        conv.customerPhone === contactInfo.phone_number
+          ? { ...conv, customerName: contactInfo.displayName }
+          : conv
+      )
+    );
+
+    console.log('✅ Contact saved successfully:', contactInfo);
+  };
+
+  const getDisplayNameForPhone = (phoneNumber: string, originalName?: string) => {
+    // First check if we have a saved contact with custom name
+    const savedContact = savedContacts.get(phoneNumber);
+    if (savedContact) {
+      return savedContact.has_susa_suffix 
+        ? `${savedContact.saved_name} 🦋Susa`
+        : savedContact.saved_name;
+    }
+    
+    // Then check if we have WhatsApp profile information
+    const conversation = whatsappConversations.find(c => c.customerPhone === phoneNumber);
+    if (conversation) {
+      // Prioritize display_name (which includes the best name from WhatsApp)
+      if (conversation.display_name && conversation.display_name !== phoneNumber) {
+        return conversation.display_name;
+      }
+      // Fall back to profile_name if available
+      if (conversation.profile_name && conversation.profile_name !== phoneNumber) {
+        return conversation.profile_name;
+      }
+    }
+    
+    // Finally fall back to original name or phone number
+    return originalName || phoneNumber;
+  };
+
+  // Load saved contacts on component mount
+  useEffect(() => {
+    const loadSavedContacts = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/contacts`);
+        if (response.ok) {
+          const contacts = await response.json();
+          const contactsMap = new Map();
+          contacts.forEach((contact: any) => {
+            contactsMap.set(contact.phone_number, contact);
+          });
+          setSavedContacts(contactsMap);
+        }
+      } catch (error) {
+        console.error('Error loading saved contacts:', error);
+      }
     };
 
-    setMessages(prev => [...prev, message]);
-
-    // Simulate delivery status
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === message.id ? { ...msg, status: 'delivered' } : msg
-      ));
-    }, 1000);
-  };
+    loadSavedContacts();
+  }, [API_BASE]);
 
   const removeFromCart = (index: number) => {
     setCurrentOrder(prev => prev.filter((_, i) => i !== index));
@@ -499,22 +706,24 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     }
   };
 
-  const getStatusIcon = (status: 'sending' | 'sent' | 'delivered' | 'read') => {
+  const getStatusIcon = (status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed') => {
     switch (status) {
       case 'sending': return '🔄';
       case 'sent': return '✓';
       case 'delivered': return '✓✓';
       case 'read': return '✓✓';
+      case 'failed': return '❌';
       default: return '';
     }
   };
 
-  const getStatusIconColor = (status: 'sending' | 'sent' | 'delivered' | 'read') => {
+  const getStatusIconColor = (status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed') => {
     switch (status) {
       case 'sending': return '#999';
       case 'sent': return '#999';
       case 'delivered': return '#2196F3';
       case 'read': return '#4CAF50';
+      case 'failed': return '#f44336';
       default: return '#999';
     }
   };
@@ -594,14 +803,17 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                     onClick={() => setSelectedConversation(conversation.id)}
                   >
                     <div className="conversation-avatar">
-                      {conversation.avatar || conversation.customerName.charAt(0)}
+                      {conversation.avatar || getDisplayNameForPhone(conversation.customerPhone, conversation.customerName).charAt(0)}
                     </div>
                     <div className="conversation-info">
                       <div className="conversation-header">
                         <span 
                           className="customer-name"
                           dangerouslySetInnerHTML={{ 
-                            __html: highlightSearchTerm(conversation.customerName, searchQuery) 
+                            __html: highlightSearchTerm(
+                              getDisplayNameForPhone(conversation.customerPhone, conversation.customerName), 
+                              searchQuery
+                            ) 
                           }}
                         />
                         <span className="timestamp">{formatTime(conversation.timestamp)}</span>
@@ -622,6 +834,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                         {conversation.unreadCount > 0 && (
                           <span className="unread-count">{conversation.unreadCount}</span>
                         )}
+                        {savedContacts.has(conversation.customerPhone) && (
+                          <span style={{
+                            fontSize: '10px',
+                            backgroundColor: '#e3f2fd',
+                            color: '#1976d2',
+                            padding: '2px 6px',
+                            borderRadius: '10px',
+                            marginLeft: '4px'
+                          }}>
+                            📇
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -636,17 +860,47 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
               <>
                 <div className="chat-header-info">
                   <div className="customer-details">
-                    <h3>{allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerName}</h3>
+                    <h3>{getDisplayNameForPhone(
+                      allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '',
+                      allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerName
+                    )}</h3>
                     <span>{allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone}</span>
                   </div>
                   <div className="chat-actions">
-                    <button className="action-btn" onClick={sendSizeGuide}>
-                      📏 Send Size Guide
-                    </button>
+                    {!savedContacts.has(allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '') ? (
+                      <button className="action-btn" onClick={handleSaveContact} style={{
+                        backgroundColor: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        � Save Contact
+                      </button>
+                    ) : (
+                      <div style={{
+                        backgroundColor: '#e8f5e8',
+                        color: '#2e7d32',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        border: '1px solid #4caf50'
+                      }}>
+                        ✅ Contact Saved
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="messages-container">
+                <div className="messages-container" onScroll={handleScroll}>
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -680,26 +934,197 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                         </div>
                       ) : message.type === 'voice' ? (
                         <div className="whatsapp-message voice-message">
-                          🎵 Voice message ({message.voice_duration}s)
-                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                          {message.media_file_id ? (
+                            <div className="audio-player-container" style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              padding: '12px',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              backgroundColor: '#f0f8ff'
+                            }}>
+                              <div style={{ fontSize: '20px' }}>🎵</div>
+                              <div style={{ flex: 1 }}>
+                                <audio 
+                                  controls 
+                                  style={{ width: '100%', height: '32px' }}
+                                  preload="metadata"
+                                >
+                                  <source src={`${API_BASE}/api/media/media/${message.media_file_id}`} type={message.media_mime_type || 'audio/ogg'} />
+                                  Your browser does not support the audio element.
+                                </audio>
+                                {message.voice_duration && (
+                                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                    Duration: {message.voice_duration}s
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : message.media_url ? (
+                            <div className="audio-player-container" style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              padding: '12px',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              backgroundColor: '#f0f8ff'
+                            }}>
+                              <div style={{ fontSize: '20px' }}>🎵</div>
+                              <div style={{ flex: 1 }}>
+                                <audio 
+                                  controls 
+                                  style={{ width: '100%', height: '32px' }}
+                                  preload="metadata"
+                                >
+                                  <source src={`${API_BASE}/api/whatsapp/media-proxy/${message.media_url}`} type={message.media_mime_type || 'audio/ogg'} />
+                                  Your browser does not support the audio element.
+                                </audio>
+                                {message.voice_duration && (
+                                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                    Duration: {message.voice_duration}s
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              🎵 Voice message ({message.voice_duration}s)
+                              {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                            </div>
+                          )}
                         </div>
                       ) : message.type === 'image' ? (
-                        <div className="whatsapp-message image-message">
-                          📷 Image
-                          {message.text && <div className="caption">{message.text}</div>}
-                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                        <div className="whatsapp-message image-message" style={{ padding: '0', background: 'transparent' }}>
+                          {message.media_file_id ? (
+                            <div className="image-preview-container">
+                              <img 
+                                src={`${API_BASE}/api/media/thumbnail/${message.media_file_id}/medium`}
+                                alt="Image message"
+                                className="image-preview"
+                                style={{ 
+                                  maxWidth: '300px', 
+                                  maxHeight: '200px', 
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  display: 'block'
+                                }}
+                                onClick={() => {
+                                  // Open image in modal
+                                  openImageModal(`${API_BASE}/api/media/media/${message.media_file_id}`, message.text);
+                                }}
+                              />
+                              {message.text && <div className="caption" style={{marginTop: '8px', fontSize: '14px', padding: '0 8px'}}>{message.text}</div>}
+                            </div>
+                          ) : message.media_url ? (
+                            <div className="image-preview-container">
+                              <img 
+                                src={`${API_BASE}/api/whatsapp/media-proxy/${message.media_url}`}
+                                alt="Image message"
+                                className="image-preview"
+                                style={{ 
+                                  maxWidth: '300px', 
+                                  maxHeight: '200px', 
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  backgroundColor: '#f0f0f0',
+                                  display: 'block'
+                                }}
+                                onClick={() => {
+                                  // Open image in modal
+                                  openImageModal(`${API_BASE}/api/whatsapp/media-proxy/${message.media_url}`, message.text);
+                                }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling.style.display = 'block';
+                                }}
+                              />
+                              <div style={{ display: 'none', padding: '20px', border: '1px dashed #ccc', borderRadius: '8px', textAlign: 'center' }}>
+                                📷 Image (ID: {message.media_url})
+                                <br />
+                                <small>Click to download</small>
+                              </div>
+                              {message.text && <div className="caption" style={{marginTop: '8px', fontSize: '14px', padding: '0 8px'}}>{message.text}</div>}
+                            </div>
+                          ) : (
+                            <div>
+                              📷 Image
+                              {message.text && <div className="caption">{message.text}</div>}
+                              {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                            </div>
+                          )}
                         </div>
                       ) : message.type === 'document' ? (
                         <div className="whatsapp-message document-message">
-                          📄 Document
-                          {message.text && <div className="filename">{message.text}</div>}
-                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                          {message.media_file_id ? (
+                            <div className="document-preview-container" style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '12px',
+                              padding: '12px',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              backgroundColor: '#f9f9f9',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => {
+                              // Open/download document
+                              window.open(`${API_BASE}/api/media/media/${message.media_file_id}`, '_blank');
+                            }}>
+                              <div style={{ fontSize: '24px' }}>📄</div>
+                              <div>
+                                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                                  {message.text || 'Document'}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#666' }}>
+                                  {message.media_mime_type || 'Unknown type'} • Click to open
+                                </div>
+                              </div>
+                            </div>
+                          ) : message.media_url ? (
+                            <div className="document-preview-container" style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '12px',
+                              padding: '12px',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              backgroundColor: '#f9f9f9',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => {
+                              // Open/download document via WhatsApp proxy
+                              window.open(`${API_BASE}/api/whatsapp/media-proxy/${message.media_url}`, '_blank');
+                            }}>
+                              <div style={{ fontSize: '24px' }}>📄</div>
+                              <div>
+                                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                                  {message.text || 'Document'}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#666' }}>
+                                  {message.media_mime_type || 'Document'} • Click to open
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              📄 Document
+                              {message.text && <div className="filename">{message.text}</div>}
+                              {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                            </div>
+                          )}
                         </div>
                       ) : message.type === 'video' ? (
-                        <div className="whatsapp-message video-message">
-                          🎥 Video
-                          {message.text && <div className="caption">{message.text}</div>}
-                          {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                        <div className="whatsapp-message video-message" style={{ padding: '0', background: 'transparent' }}>
+                          <VideoMessage
+                            message={message}
+                            whatsappConfigured={whatsappConfigured}
+                            API_BASE={API_BASE}
+                            setMessages={setMessages}
+                            formatTime={formatTime}
+                            onVideoAction={() => setShouldAutoScroll(false)}
+                          />
                         </div>
                       ) : message.type === 'sticker' ? (
                         <div className="whatsapp-message sticker-message">
@@ -747,6 +1172,47 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                   
                   <div ref={messagesEndRef} />
                 </div>
+
+                {/* Scroll to Bottom Button - only show when not near bottom */}
+                {!isNearBottom && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '80px',
+                    right: '20px',
+                    zIndex: 1000,
+                  }}>
+                    <button
+                      onClick={handleScrollToBottom}
+                      style={{
+                        background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '48px',
+                        height: '48px',
+                        color: 'white',
+                        fontSize: '20px',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.3s ease',
+                        backdropFilter: 'blur(10px)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                      }}
+                      title="Scroll to bottom"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                )}
 
                 <div className="message-input-container">
                   {showEmojiPicker && (
@@ -932,13 +1398,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                   <div className="recommendation-actions">
                     <button 
                       className="recommendation-btn"
-                      onClick={sendSizeGuide}
-                      disabled={!selectedConversation}
-                    >
-                      📏 Send Size Guide
-                    </button>
-                    <button 
-                      className="recommendation-btn"
                       onClick={() => sendProductRecommendation(products[0])}
                       disabled={!selectedConversation}
                     >
@@ -951,15 +1410,22 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                     >
                       🚰 Recommend Dispenser
                     </button>
+                    <button 
+                      className="recommendation-btn"
+                      onClick={() => sendProductRecommendation(products[1])}
+                      disabled={!selectedConversation}
+                    >
+                      🧊 Recommend 1-Gallon Water
+                    </button>
                   </div>
                   
-                  <div className="size-guide-preview">
-                    <h5>📏 Water Size Guide</h5>
-                    <div className="size-option">
-                      <strong>1 Gallon</strong> - Individual use, 1-2 people
-                    </div>
-                    <div className="size-option">
-                      <strong>5 Gallons</strong> - Families, offices, dispensers
+                  <div className="contact-management-info">
+                    <h5>� Contact Management</h5>
+                    <p>Save customer contacts with their WhatsApp info for better relationship management.</p>
+                    <div className="contact-features">
+                      <div className="feature-item">✅ Save with custom names</div>
+                      <div className="feature-item">🦋 Add Susa suffix option</div>
+                      <div className="feature-item">📝 Add personal notes</div>
                     </div>
                   </div>
                 </div>
@@ -968,6 +1434,25 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
           </div>
         </div>
       </div>
+
+      {/* Contact Manager Modal */}
+      {showContactManager && currentContact && (
+        <ContactManager
+          phoneNumber={currentContact.phoneNumber}
+          displayName={currentContact.displayName}
+          whatsappProfileName={currentContact.whatsappProfileName}
+          onContactSaved={handleContactSaved}
+          onClose={() => setShowContactManager(false)}
+        />
+      )}
+
+      {/* Image Modal */}
+      <ImageModal
+        isOpen={showImageModal}
+        imageUrl={modalImageUrl}
+        caption={modalImageCaption}
+        onClose={closeImageModal}
+      />
     </div>
   );
 };

@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const whatsappMessageService = require('../../services/whatsappMessageService');
+const whatsappMediaService = require('../../services/whatsappMediaService');
+const whatsappContactService = require('../../services/whatsappContactService');
 
 // Store verification token (should match what you set in WhatsApp Business API)
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'stella_webhook_verify_token';
@@ -60,10 +62,38 @@ router.post('/', (req, res) => {
                 text: message.text?.body || message.caption || 'Media message'
               });
 
+              // Extract all available contact name information
+              const contactNames = whatsappContactService.extractContactNames(message, webhookEvent);
+              const bestDisplayName = whatsappContactService.getBestDisplayName(contactNames);
+              
+              console.log(`� Best display name for ${message.from}: "${bestDisplayName}"`);
+
               try {
-                // Save message to database
-                await whatsappMessageService.saveIncomingMessage(message);
-                console.log(`✅ Message ${message.id} saved to database`);
+                // Process media if present
+                let mediaProcessingResult = null;
+                if (message.image || message.video || message.audio || message.document) {
+                  console.log(`🎯 Processing media for message ${message.id}`);
+                  try {
+                    mediaProcessingResult = await whatsappMediaService.processIncomingMedia(message);
+                    console.log(`✅ Media processed for message ${message.id}:`, mediaProcessingResult);
+                  } catch (mediaError) {
+                    console.error(`❌ Failed to process media for message ${message.id}:`, mediaError);
+                    // Continue with message saving even if media processing fails
+                  }
+                }
+
+                // Save message to database with enhanced contact info
+                await whatsappMessageService.saveIncomingMessage(message, contactNames);
+                console.log(`✅ Message ${message.id} saved to database with contact info`);
+
+                // If media was processed, log the details
+                if (mediaProcessingResult) {
+                  console.log(`📁 Media stored: ${mediaProcessingResult.filePath}`);
+                  if (mediaProcessingResult.thumbnailPath) {
+                    console.log(`🖼️ Thumbnail: ${mediaProcessingResult.thumbnailPath}`);
+                  }
+                }
+
               } catch (error) {
                 console.error(`❌ Failed to save message ${message.id}:`, error);
               }
@@ -121,8 +151,34 @@ function handleIncomingMessage(message, webhookEvent) {
   
   console.log(`Processing ${type} message from ${from}:`, text?.body || 'Media content');
 
+  // Log media information if present
+  if (message.image) {
+    console.log('📷 Image message received:', {
+      id: message.image.id,
+      mime_type: message.image.mime_type,
+      caption: message.image.caption
+    });
+  } else if (message.video) {
+    console.log('🎥 Video message received:', {
+      id: message.video.id,
+      mime_type: message.video.mime_type,
+      caption: message.video.caption
+    });
+  } else if (message.audio) {
+    console.log('🎵 Audio message received:', {
+      id: message.audio.id,
+      mime_type: message.audio.mime_type
+    });
+  } else if (message.document) {
+    console.log('📄 Document message received:', {
+      id: message.document.id,
+      mime_type: message.document.mime_type,
+      filename: message.document.filename
+    });
+  }
+
   // Here you can implement your business logic:
-  // - Save message to database
+  // - Save message to database (already done above)
   // - Trigger automated responses
   // - Forward to customer service
   // - Process commands or keywords
