@@ -4,6 +4,149 @@ import ContactManager from './ContactManager';
 import ImageModal from './ImageModal';
 import './ChatPage.css';
 
+// Voice Message Component with audio controls
+const VoiceMessageComponent: React.FC<{
+  audioSrc: string;
+  duration?: number;
+  sender: 'user' | 'agent';
+  mimeType?: string;
+}> = ({ audioSrc, duration, sender, mimeType }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(duration || 0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const togglePlayPause = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setAudioDuration(audioRef.current.duration);
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const formatTime = (time: number) => {
+    return Math.round(time);
+  };
+
+  return (
+    <div className="whatsapp-voice-container" style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 12px',
+      backgroundColor: sender === 'user' ? '#e7ffdb' : '#ffffff',
+      borderRadius: '7.5px',
+      maxWidth: '250px',
+      border: '1px solid #e1e8ed',
+      position: 'relative',
+      zIndex: 1
+    }}>
+      {/* Play/Pause Button */}
+      <button
+        onClick={togglePlayPause}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '50%',
+          backgroundColor: '#25d366',
+          border: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          flexShrink: 0,
+          outline: 'none',
+          zIndex: 2
+        }}
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        <span style={{ color: 'white', fontSize: '12px', userSelect: 'none' }}>
+          {isPlaying ? '⏸️' : '▶️'}
+        </span>
+      </button>
+      
+      {/* Waveform Visualization */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '1px',
+        height: '32px',
+        overflow: 'hidden',
+        cursor: 'pointer'
+      }}
+      onClick={togglePlayPause}
+      >
+        {/* Generate waveform bars */}
+        {Array.from({ length: 20 }, (_, i) => {
+          const progress = audioDuration > 0 ? currentTime / audioDuration : 0;
+          const barProgress = i / 20;
+          const isActive = barProgress <= progress;
+          
+          return (
+            <div
+              key={i}
+              style={{
+                width: '2px',
+                height: `${Math.random() * 20 + 5}px`,
+                backgroundColor: isActive ? '#25d366' : '#d1d7db',
+                borderRadius: '1px',
+                opacity: isActive ? 1 : 0.5,
+                transition: 'all 0.1s ease'
+              }}
+            />
+          );
+        })}
+      </div>
+      
+      {/* Duration */}
+      <span style={{
+        fontSize: '12px',
+        color: '#667781',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        flexShrink: 0,
+        minWidth: '25px',
+        userSelect: 'none'
+      }}>
+        {isPlaying ? `${formatTime(currentTime)}"` : `${formatTime(audioDuration)}"`}
+      </span>
+      
+      {/* Audio element */}
+      <audio 
+        ref={audioRef}
+        preload="metadata"
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        style={{ display: 'none' }}
+      >
+        <source src={audioSrc} type={mimeType || 'audio/ogg'} />
+        Your browser does not support the audio element.
+      </audio>
+    </div>
+  );
+};
+
 interface ChatPageProps {
   onClose: () => void;
 }
@@ -78,7 +221,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const [newMessage, setNewMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'recommendations'>('products');
   const [currentOrder, setCurrentOrder] = useState<OrderItem[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -98,6 +240,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState('');
   const [modalImageCaption, setModalImageCaption] = useState('');
+
+  // Attachment Menu State
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -194,26 +341,45 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       console.log('✅ Parsed messages data:', data);
       
       if (data.success) {
-        const convertedMessages = data.data.map((msg: any) => ({
-          id: msg.whatsapp_message_id || msg.id.toString(),
-          text: msg.content || '',
-          sender: msg.direction === 'incoming' ? 'user' : 'agent',
-          timestamp: new Date(parseInt(msg.timestamp) * 1000),
-          type: msg.message_type,
-          status: msg.status,
-          whatsapp_message_id: msg.whatsapp_message_id,
-          media_url: msg.media_url,
-          media_mime_type: msg.media_mime_type,
-          media_file_id: msg.media_file_id, // Add media_file_id for thumbnails
-          voice_duration: msg.voice_duration,
-          direction: msg.direction
-        }));
+        const convertedMessages = data.data.map((msg: any) => {
+          // Voice message detection
+          if (msg.message_type === 'voice' || msg.message_type === 'audio' || msg.media_mime_type?.includes('audio') || msg.voice_duration || 
+              msg.media_mime_type?.includes('ogg') || msg.media_mime_type?.includes('mpeg') || 
+              msg.media_mime_type?.includes('wav') || msg.media_mime_type?.includes('m4a')) {
+            // Voice message detected - no debug output needed
+          }
+          
+          return {
+            id: msg.whatsapp_message_id || msg.id.toString(),
+            text: msg.content || '',
+            sender: msg.direction === 'incoming' ? 'user' : 'agent',
+            timestamp: new Date(parseInt(msg.timestamp) * 1000),
+            type: (msg.message_type === 'audio' || msg.message_type === 'voice') ? 'voice' :
+                  (msg.media_mime_type?.includes('audio') || 
+                   msg.media_mime_type?.includes('ogg') || 
+                   msg.media_mime_type?.includes('mpeg') || 
+                   msg.media_mime_type?.includes('wav') || 
+                   msg.media_mime_type?.includes('m4a') ||
+                   msg.voice_duration ? 'voice' : (msg.message_type || 'text')), // Enhanced audio detection
+            status: msg.status,
+            whatsapp_message_id: msg.whatsapp_message_id,
+            media_url: msg.media_url,
+            media_mime_type: msg.media_mime_type,
+            media_file_id: msg.media_file_id, // Add media_file_id for thumbnails
+            voice_duration: msg.voice_duration,
+            direction: msg.direction
+          };
+        });
         console.log('✅ Converted messages:', convertedMessages);
+        console.log('📊 Message types found:', [...new Set(convertedMessages.map((m: any) => m.type))]);
         
         // Check if there are new messages during auto-refresh
         if (isAutoRefresh && messages.length > 0) {
           const oldMessageIds = new Set(messages.map((m: Message) => m.id));
           const hasNewMessages = convertedMessages.some((m: any) => !oldMessageIds.has(m.id));
+          const hasNewIncomingMessages = convertedMessages.some((m: any) => 
+            !oldMessageIds.has(m.id) && m.sender === 'user'
+          );
           
           // Only enable auto-scroll for auto-refresh if user is near bottom or if there are genuinely new incoming messages
           if (hasNewMessages && !isNearBottom) {
@@ -281,6 +447,62 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     }
   };
 
+  // Attachment Menu Functions
+  const handleAttachmentClick = () => {
+    setShowAttachmentMenu(!showAttachmentMenu);
+    setShowEmojiPicker(false); // Close emoji picker if open
+  };
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+    setShowAttachmentMenu(false);
+  };
+
+  const handlePhotoVideoSelect = () => {
+    imageInputRef.current?.click();
+    setShowAttachmentMenu(false);
+  };
+
+  const handleContactSelect = () => {
+    // TODO: Implement contact sharing
+    console.log('📞 Contact sharing selected');
+    setShowAttachmentMenu(false);
+  };
+
+  const handlePollSelect = () => {
+    // TODO: Implement poll creation
+    console.log('📊 Poll creation selected');
+    setShowAttachmentMenu(false);
+  };
+
+  const handleEventSelect = () => {
+    // TODO: Implement event creation
+    console.log('📅 Event creation selected');
+    setShowAttachmentMenu(false);
+  };
+
+  const handleLocationSelect = () => {
+    // TODO: Implement location sharing
+    console.log('📍 Location sharing selected');
+    setShowAttachmentMenu(false);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      console.log('📄 File selected:', file.name, file.type);
+      // TODO: Implement file upload to WhatsApp
+    }
+  };
+
+  const handleImageVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      console.log('🖼️ Image/Video selected:', file.name, file.type);
+      // TODO: Implement image/video upload to WhatsApp
+    }
+  };
+
   // Load WhatsApp data on component mount
   useEffect(() => {
     fetchWhatsAppConversations();
@@ -307,10 +529,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
 
     const interval = setInterval(() => {
       console.log('🔄 Auto-refreshing messages for selected conversation');
+      
       fetchMessages(selectedConversation, true); // Pass true for isAutoRefresh
     }, 15000); // Refresh messages every 15 seconds
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [selectedConversation]);
 
   // Use only real WhatsApp conversations - no mock data
@@ -321,49 +546,49 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const products: Product[] = [
     {
       id: 'p1',
-      name: '5-Gallon Spring Water',
-      price: 8.99,
-      image: '🪣',
-      description: 'Premium spring water in 5-gallon containers',
-      category: 'water',
-      sizes: ['5 Gallon'],
+      name: 'Premium Wireless Headphones',
+      price: 199.99,
+      image: '🎧',
+      description: 'High-quality wireless headphones with noise cancellation',
+      category: 'electronics',
+      sizes: ['One Size'],
       inStock: true
     },
     {
       id: 'p2',
-      name: '1-Gallon Distilled Water',
-      price: 1.99,
-      image: '🥤',
-      description: 'Pure distilled water in convenient 1-gallon bottles',
-      category: 'water',
-      sizes: ['1 Gallon'],
+      name: 'Smart Fitness Watch',
+      price: 299.99,
+      image: '⌚',
+      description: 'Advanced fitness tracking with heart rate monitor',
+      category: 'wearables',
+      sizes: ['S', 'M', 'L'],
       inStock: true
     },
     {
       id: 'p3',
-      name: 'Countertop Water Dispenser',
-      price: 89.99,
-      image: '🚰',
-      description: 'Convenient countertop water dispenser',
-      category: 'dispenser',
+      name: 'Portable Bluetooth Speaker',
+      price: 79.99,
+      image: '�',
+      description: 'Waterproof portable speaker with rich sound',
+      category: 'audio',
       inStock: true
     },
     {
       id: 'p4',
-      name: 'Water Filter Cartridge',
-      price: 24.99,
-      image: '🔧',
-      description: 'Replacement filter cartridge for dispensers',
-      category: 'filter',
+      name: 'Wireless Phone Charger',
+      price: 49.99,
+      image: '�',
+      description: 'Fast wireless charging pad for all devices',
+      category: 'accessories',
       inStock: true
     },
     {
       id: 'p5',
-      name: 'Bottle Pump',
-      price: 12.99,
-      image: '⚙️',
-      description: 'Manual pump for 5-gallon bottles',
-      category: 'accessory',
+      name: 'Premium Phone Case',
+      price: 29.99,
+      image: '📱',
+      description: 'Durable protection with elegant design',
+      category: 'accessories',
       inStock: true
     }
   ];
@@ -728,17 +953,53 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     }
   };
 
-  // Common emojis for water business
-  const commonEmojis = [
-    '😊', '😃', '👍', '👋', '🙏', '❤️', '🎉', '✨',
-    '💧', '🚰', '🪣', '🥤', '🚚', '📦', '🏠', '🏢',
-    '👤', '👨‍👩‍👧‍👦', '💼', '📞', '📱', '⏰', '📍', '🎯'
+  // WhatsApp emoji categories (organized like the latest WhatsApp)
+  const recentEmojis = ['😊', '👍', '❤️', '😂', '😢', '😮', '😡', '🎉'];
+  
+  const frequentlyUsed = [
+    '�', '😃', '😄', '😁', '�😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰',
+    '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑',
+    '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄',
+    '😬', '🤥', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
+    '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕',
+    '😟', '🙁', '☹️', '�', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰',
+    '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤',
+    '😡', '😠', '🤬', '�', '�', '�', '☠️', '💩', '🤡', '👹', '👺', '👻',
+    '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
   ];
+
+  const businessEmojis = [
+    '�', '�', '📦', '🚚', '�', '🏪', '🛍️', '💎', '👤', '👨‍👩‍👧‍👦', 
+    '💼', '📞', '📱', '⏰', '📍', '🎯', '✅', '❌', '⭐', '💯', '🔥', '👌',
+    '💪', '🙌', '👏', '🤝', '🤞', '✌️', '🤟', '🤘', '👍', '👎', '👊', '✊'
+  ];
+
+  // Combine all emojis for easy access
+  const allEmojis = [...new Set([...recentEmojis, ...frequentlyUsed, ...businessEmojis])];
 
   const addEmoji = (emoji: string) => {
     setNewMessage(prev => prev + emoji);
     setShowEmojiPicker(false);
   };
+
+  // Close attachment menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showAttachmentMenu || showEmojiPicker) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.attachment-menu') && 
+            !target.closest('.attachment-btn') &&
+            !target.closest('.emoji-picker') &&
+            !target.closest('.emoji-btn')) {
+          setShowAttachmentMenu(false);
+          setShowEmojiPicker(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAttachmentMenu, showEmojiPicker]);
 
   // Filter conversations based on search query
   const filteredConversations = allConversations.filter((conversation: Conversation) => 
@@ -759,7 +1020,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     <div className="chat-page">
       <div className="chat-container">
         <div className="chat-header">
-          <h1>Customer Chat & Orders</h1>
+          <h1>WhatsApp E-commerce Platform</h1>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
@@ -933,65 +1194,56 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                           </div>
                         </div>
                       ) : message.type === 'voice' ? (
-                        <div className="whatsapp-message voice-message">
+                        <div className="whatsapp-message voice-message" style={{ padding: '0', background: 'transparent' }}>
                           {message.media_file_id ? (
-                            <div className="audio-player-container" style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '12px',
-                              padding: '12px',
-                              border: '1px solid #e0e0e0',
-                              borderRadius: '8px',
-                              backgroundColor: '#f0f8ff'
-                            }}>
-                              <div style={{ fontSize: '20px' }}>🎵</div>
-                              <div style={{ flex: 1 }}>
-                                <audio 
-                                  controls 
-                                  style={{ width: '100%', height: '32px' }}
-                                  preload="metadata"
-                                >
-                                  <source src={`${API_BASE}/api/media/media/${message.media_file_id}`} type={message.media_mime_type || 'audio/ogg'} />
-                                  Your browser does not support the audio element.
-                                </audio>
-                                {message.voice_duration && (
-                                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                                    Duration: {message.voice_duration}s
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+                            <VoiceMessageComponent 
+                              audioSrc={`${API_BASE}/api/media/media/${message.media_file_id}`}
+                              duration={message.voice_duration}
+                              sender={message.sender}
+                              mimeType={message.media_mime_type}
+                            />
                           ) : message.media_url ? (
-                            <div className="audio-player-container" style={{
+                            <VoiceMessageComponent 
+                              audioSrc={`${API_BASE}/api/whatsapp/media-proxy/${message.media_url}`}
+                              duration={message.voice_duration}
+                              sender={message.sender}
+                              mimeType={message.media_mime_type}
+                            />
+                          ) : (
+                            <div className="whatsapp-voice-container" style={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '12px',
-                              padding: '12px',
-                              border: '1px solid #e0e0e0',
-                              borderRadius: '8px',
-                              backgroundColor: '#f0f8ff'
+                              gap: '8px',
+                              padding: '8px 12px',
+                              backgroundColor: message.sender === 'user' ? '#e7ffdb' : '#ffffff',
+                              borderRadius: '7.5px',
+                              maxWidth: '250px',
+                              border: '1px solid #e1e8ed'
                             }}>
-                              <div style={{ fontSize: '20px' }}>🎵</div>
-                              <div style={{ flex: 1 }}>
-                                <audio 
-                                  controls 
-                                  style={{ width: '100%', height: '32px' }}
-                                  preload="metadata"
-                                >
-                                  <source src={`${API_BASE}/api/whatsapp/media-proxy/${message.media_url}`} type={message.media_mime_type || 'audio/ogg'} />
-                                  Your browser does not support the audio element.
-                                </audio>
-                                {message.voice_duration && (
-                                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                                    Duration: {message.voice_duration}s
-                                  </div>
-                                )}
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: '#25d366',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                <span style={{ color: 'white', fontSize: '12px' }}>🎵</span>
                               </div>
-                            </div>
-                          ) : (
-                            <div>
-                              🎵 Voice message ({message.voice_duration}s)
-                              {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
+                              
+                              <span style={{ flex: 1, fontSize: '14px', color: '#333' }}>
+                                Voice message
+                              </span>
+                              
+                              <span style={{
+                                fontSize: '12px',
+                                color: '#667781',
+                                flexShrink: 0
+                              }}>
+                                {message.voice_duration ? `${message.voice_duration}"` : '0"'}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -1037,7 +1289,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                                 }}
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling.style.display = 'block';
+                                  const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (nextElement) {
+                                    nextElement.style.display = 'block';
+                                  }
                                 }}
                               />
                               <div style={{ display: 'none', padding: '20px', border: '1px dashed #ccc', borderRadius: '8px', textAlign: 'center' }}>
@@ -1157,19 +1412,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                     </div>
                   ))}
                   
-                  {isTyping && (
-                    <div className="typing-indicator">
-                      <div className="typing-bubble">
-                        <div className="typing-dots">
-                          <span></span>
-                          <span></span>
-                          <span></span>
-                        </div>
-                        <span className="typing-text">Customer is typing...</span>
-                      </div>
-                    </div>
-                  )}
-                  
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -1215,23 +1457,92 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                 )}
 
                 <div className="message-input-container">
+                  {showAttachmentMenu && (
+                    <div className="attachment-menu">
+                      <div className="attachment-option" onClick={handleFileSelect}>
+                        <div className="attachment-icon">📄</div>
+                        <span>Document</span>
+                      </div>
+                      <div className="attachment-option" onClick={handlePhotoVideoSelect}>
+                        <div className="attachment-icon">🖼️</div>
+                        <span>Photos & Videos</span>
+                      </div>
+                      <div className="attachment-option" onClick={handleContactSelect}>
+                        <div className="attachment-icon">👤</div>
+                        <span>Contact</span>
+                      </div>
+                      <div className="attachment-option" onClick={handlePollSelect}>
+                        <div className="attachment-icon">📊</div>
+                        <span>Poll</span>
+                      </div>
+                      <div className="attachment-option" onClick={handleEventSelect}>
+                        <div className="attachment-icon">📅</div>
+                        <span>Event</span>
+                      </div>
+                      <div className="attachment-option" onClick={handleLocationSelect}>
+                        <div className="attachment-icon">📍</div>
+                        <span>Location</span>
+                      </div>
+                    </div>
+                  )}
+
                   {showEmojiPicker && (
                     <div className="emoji-picker">
-                      <div className="emoji-grid">
-                        {commonEmojis.map((emoji, index) => (
-                          <button
-                            key={index}
-                            className="emoji-button"
-                            onClick={() => addEmoji(emoji)}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
+                      <div className="emoji-categories">
+                        <div className="emoji-category">
+                          <div className="emoji-category-title">😊 Recent</div>
+                          <div className="emoji-grid">
+                            {recentEmojis.map((emoji, index) => (
+                              <button
+                                key={`recent-${index}`}
+                                className="emoji-button"
+                                onClick={() => addEmoji(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="emoji-category">
+                          <div className="emoji-category-title">💼 Business</div>
+                          <div className="emoji-grid">
+                            {businessEmojis.map((emoji, index) => (
+                              <button
+                                key={`business-${index}`}
+                                className="emoji-button"
+                                onClick={() => addEmoji(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="emoji-category">
+                          <div className="emoji-category-title">😀 Smileys</div>
+                          <div className="emoji-grid">
+                            {recentEmojis.map((emoji, index) => (
+                              <button
+                                key={`smiley-${index}`}
+                                className="emoji-button"
+                                onClick={() => addEmoji(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
                   
                   <div className="message-input-wrapper">
+                    <button 
+                      className="attachment-btn"
+                      onClick={handleAttachmentClick}
+                      title="Attach files"
+                    >
+                      📎
+                    </button>
                     <button 
                       className="emoji-btn"
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -1254,20 +1565,36 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                       Send
                     </button>
                   </div>
+
+                  {/* Hidden file inputs */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={handleFileUpload}
+                    accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
+                  />
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={handleImageVideoUpload}
+                    accept="image/*,video/*"
+                  />
                 </div>
               </>
             ) : (
               <div className="no-conversation-selected">
                 <h3>💬 Select a conversation to start chatting</h3>
-                <p>Choose a customer from the conversation list to begin assisting them with their water delivery needs.</p>
+                <p>Choose a customer from the conversation list to begin assisting them with their e-commerce needs.</p>
               </div>
             )}
           </div>
 
-          {/* Shopify Integration Panel */}
+          {/* E-commerce Integration Panel */}
           <div className="shopify-panel">
             <div className="panel-header">
-              <h3>🛒 Shop & Orders</h3>
+              <h3>🛒 E-commerce Store</h3>
               <div className="shop-tabs">
                 <button 
                   className={`tab-btn ${activeTab === 'products' ? 'active' : ''}`}

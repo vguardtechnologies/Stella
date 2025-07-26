@@ -92,13 +92,17 @@ class WhatsAppMessageService {
           mediaUrl = audio?.id;
           mediaMimeType = audio?.mime_type;
           mediaSha256 = audio?.sha256;
-          voiceDuration = audio?.voice ? parseInt(audio.voice) : null;
+          // For audio messages, voice duration might be in different fields
+          voiceDuration = null;
+          if (audio?.voice === true || audio?.voice_duration) {
+            voiceDuration = audio.voice_duration ? (parseInt(audio.voice_duration) || null) : null;
+          }
           break;
         case 'voice':
           mediaUrl = voice?.id;
           mediaMimeType = voice?.mime_type;
           mediaSha256 = voice?.sha256;
-          voiceDuration = voice?.voice ? parseInt(voice.voice) : null;
+          voiceDuration = voice?.voice_duration ? (parseInt(voice.voice_duration) || null) : null;
           break;
         case 'video':
           content = video?.caption || '';
@@ -111,7 +115,7 @@ class WhatsAppMessageService {
           mediaUrl = document?.id;
           mediaMimeType = document?.mime_type;
           mediaSha256 = document?.sha256;
-          mediaFileSize = document?.filesize;
+          mediaFileSize = document?.filesize ? (parseInt(document.filesize) || null) : null;
           break;
         case 'sticker':
           mediaUrl = sticker?.id;
@@ -135,6 +139,30 @@ class WhatsAppMessageService {
         default:
           content = JSON.stringify(messageData);
       }
+
+      // Debug logging for voice messages
+      if (messageType === 'audio' || messageType === 'voice') {
+        console.log('🎵 Voice message processing:', {
+          messageType,
+          mediaUrl,
+          mediaMimeType,
+          voiceDuration,
+          audioData: audio,
+          voiceData: voice
+        });
+      }
+
+      // Ensure numeric fields are valid before database insert
+      voiceDuration = (voiceDuration && !isNaN(voiceDuration)) ? voiceDuration : null;
+      mediaFileSize = (mediaFileSize && !isNaN(mediaFileSize)) ? mediaFileSize : null;
+
+      console.log('📊 Final values for DB insert:', {
+        messageType,
+        voiceDuration,
+        mediaFileSize,
+        mediaUrl,
+        mediaMimeType
+      });
 
       // Save message to database
       const savedMessage = await pool.query(
