@@ -216,6 +216,16 @@
   stroke: #17A2B8;
 }
 
+.contacts-button {
+  background: rgba(139, 69, 19, 0.1);
+  border-color: rgba(139, 69, 19, 0.3);
+}
+
+.contacts-button:hover {
+  background: rgba(139, 69, 19, 0.2);
+  border-color: rgba(139, 69, 19, 0.4);
+}
+
 .login-button svg {
   stroke: #667eea;
 }

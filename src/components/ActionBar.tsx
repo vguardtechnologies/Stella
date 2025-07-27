@@ -7,6 +7,7 @@ interface ActionBarProps {
   onOtpClick?: () => void;
   onOcClick?: () => void;
   onChatClick?: () => void;
+  onContactsClick?: () => void;
   onLoginClick?: () => void;
 }
 
@@ -16,6 +17,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
   onOtpClick, 
   onOcClick, 
   onChatClick,
+  onContactsClick,
   onLoginClick 
 }) => {
   return (
@@ -91,6 +93,14 @@ const ActionBar: React.FC<ActionBarProps> = ({
           height="24"
           style={{ objectFit: 'contain' }}
         />
+      </button>
+      
+      <button 
+        className="action-button contacts-button" 
+        title="Contacts & Customer Profiles"
+        onClick={onContactsClick || (() => console.log('Contacts functionality'))}
+      >
+        <span style={{ fontSize: '20px', fontWeight: 'bold' }}>📇</span>
       </button>
       
       <div className="action-divider"></div>

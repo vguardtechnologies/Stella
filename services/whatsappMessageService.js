@@ -241,7 +241,7 @@ class WhatsAppMessageService {
   }
 
   // Update message status
-  async updateMessageStatus(whatsappMessageId, status, timestamp) {
+  async updateMessageStatus(whatsappMessageId, status, timestamp, failureReason = null) {
     try {
       // Find the message
       const message = await pool.query(
@@ -254,11 +254,18 @@ class WhatsAppMessageService {
         return;
       }
 
-      // Update message status
-      await pool.query(
-        'UPDATE messages SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE whatsapp_message_id = $2',
-        [status, whatsappMessageId]
-      );
+      // Update message status with failure reason if provided
+      if (failureReason) {
+        await pool.query(
+          'UPDATE messages SET status = $1, failure_reason = $2, updated_at = CURRENT_TIMESTAMP WHERE whatsapp_message_id = $3',
+          [status, failureReason, whatsappMessageId]
+        );
+      } else {
+        await pool.query(
+          'UPDATE messages SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE whatsapp_message_id = $2',
+          [status, whatsappMessageId]
+        );
+      }
 
       // Insert status history
       await pool.query(
@@ -266,7 +273,11 @@ class WhatsAppMessageService {
         [message.rows[0].id, status, timestamp]
       );
 
-      console.log(`✅ Updated message ${whatsappMessageId} status to ${status}`);
+      if (failureReason) {
+        console.log(`✅ Updated message ${whatsappMessageId} status to ${status} with failure reason: ${failureReason}`);
+      } else {
+        console.log(`✅ Updated message ${whatsappMessageId} status to ${status}`);
+      }
     } catch (error) {
       console.error('Error updating message status:', error);
       throw error;

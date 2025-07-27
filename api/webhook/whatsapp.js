@@ -114,12 +114,31 @@ router.post('/', (req, res) => {
                 recipient_id: status.recipient_id
               });
 
+              // Extract failure reason if message failed
+              let failureReason = null;
+              if (status.status === 'failed' && status.errors && status.errors.length > 0) {
+                const error = status.errors[0];
+                console.log('Message failure details:', error);
+                
+                // Check for 24-hour rule violation (error code 131047)
+                if (error.code === 131047 || 
+                    error.message?.includes('24 hours') || 
+                    error.title?.includes('Re-engagement')) {
+                  failureReason = '24_hour_rule';
+                  console.log('🚫 24-hour rule violation detected for message:', status.id);
+                } else {
+                  failureReason = 'general_error';
+                  console.log('❌ General error detected for message:', status.id, 'Error:', error.message);
+                }
+              }
+
               try {
-                // Update message status in database
+                // Update message status in database with failure reason
                 await whatsappMessageService.updateMessageStatus(
                   status.id, 
                   status.status, 
-                  status.timestamp
+                  status.timestamp,
+                  failureReason
                 );
                 console.log(`✅ Status updated for message ${status.id}`);
               } catch (error) {

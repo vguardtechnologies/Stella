@@ -2,7 +2,20 @@ import React, { useState, useRef, useEffect } from 'react';
 import VideoMessage from './VideoMessage';
 import ContactManager from './ContactManager';
 import ImageModal from './ImageModal';
+import WhatsAppTemplateManager from './WhatsAppTemplateManager';
 import './ChatPage.css';
+
+// Template interface for WhatsApp templates
+interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  category: 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
+  content: string;
+  variables: string[];
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: Date;
+  description: string;
+}
 
 // Voice Message Component with audio controls
 const VoiceMessageComponent: React.FC<{
@@ -169,6 +182,11 @@ interface Message {
   direction?: 'incoming' | 'outgoing';
   // Enhanced video support
   videoUrl?: string;
+  // Template message properties
+  isTemplate?: boolean;
+  templateName?: string;
+  // Failure reason for display
+  failureReason?: '24_hour_rule' | 'general_error';
 }
 
 interface Conversation {
@@ -223,6 +241,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const [currentOrder, setCurrentOrder] = useState<OrderItem[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -245,6 +264,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Template Management State
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -367,7 +389,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
             media_mime_type: msg.media_mime_type,
             media_file_id: msg.media_file_id, // Add media_file_id for thumbnails
             voice_duration: msg.voice_duration,
-            direction: msg.direction
+            direction: msg.direction,
+            failureReason: msg.failure_reason as '24_hour_rule' | 'general_error' | undefined
           };
         });
         console.log('✅ Converted messages:', convertedMessages);
@@ -418,11 +441,22 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   // General function to fetch messages for any conversation
   const fetchMessages = async (conversationId: string, isAutoRefresh = false) => {
     if (conversationId.startsWith('wa_')) {
-      // WhatsApp conversation
+      // WhatsApp conversation - extract phone number from ID
+      let phoneNumber: string;
       const conversation = whatsappConversations.find(c => c.id === conversationId);
+      
       if (conversation) {
-        await fetchWhatsAppMessages(conversation.customerPhone, isAutoRefresh);
+        phoneNumber = conversation.customerPhone;
+      } else {
+        // Extract phone from wa_<phone> format and add + prefix if needed
+        phoneNumber = conversationId.replace('wa_', '');
+        if (!phoneNumber.startsWith('+')) {
+          phoneNumber = '+' + phoneNumber;
+        }
       }
+      
+      console.log('🔄 Fetching messages for conversation ID:', conversationId, 'Phone:', phoneNumber);
+      await fetchWhatsAppMessages(phoneNumber.replace(/[^\d]/g, ''), isAutoRefresh);
     }
     // Can add other conversation types here in the future
   };
@@ -631,13 +665,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     if (!newMessage.trim() || !selectedConversation) return;
 
     // Extract phone number from conversation ID
-    const conversation = whatsappConversations.find(c => c.id === selectedConversation);
+    let conversation = whatsappConversations.find(c => c.id === selectedConversation);
+    
+    // If conversation not found in the list, try to extract phone from the conversation ID
+    let phoneNumber: string;
     if (!conversation) {
-      console.error('❌ No conversation found for ID:', selectedConversation);
-      return;
+      console.warn('⚠️ Conversation not found in list, extracting from ID:', selectedConversation);
+      // Extract phone number from wa_<phone> format
+      if (selectedConversation.startsWith('wa_')) {
+        phoneNumber = '+' + selectedConversation.replace('wa_', '');
+      } else {
+        console.error('❌ No conversation found for ID:', selectedConversation);
+        return;
+      }
+    } else {
+      phoneNumber = conversation.customerPhone;
     }
 
-    const phoneNumber = conversation.customerPhone;
     console.log('📤 Sending message to:', phoneNumber);
 
     const message: Message = {
@@ -668,7 +712,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: phoneNumber,
+          to: phoneNumber.replace(/[^\d]/g, ''), // Send only digits to the API
           message: messageToSend,
           type: 'text'
         }),
@@ -698,24 +742,48 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       } else {
         console.error('❌ Failed to send message:', result);
         
-        // Update message status to failed
+        // Check if it's a 24-hour rule violation
+        const isReEngagementError = result.error && 
+          (result.error.includes('24 hours') || 
+           result.error.includes('Re-engagement') ||
+           result.error.includes('131047'));
+        
+        // Update message status to failed with failure reason
         setMessages(prev => prev.map(msg => 
-          msg.id === message.id ? { ...msg, status: 'failed' } : msg
+          msg.id === message.id ? { 
+            ...msg, 
+            status: 'failed',
+            failureReason: isReEngagementError ? '24_hour_rule' : 'general_error'
+          } : msg
         ));
         
-        // Show error to user
-        alert('Failed to send message: ' + (result.error || 'Unknown error'));
+        if (isReEngagementError) {
+          alert('⏰ Cannot send message: WhatsApp Business policy requires customers to message first or you must wait for them to reply within 24 hours. The customer needs to send you a message before you can respond.');
+        } else {
+          alert('Failed to send message: ' + (result.error || 'Unknown error'));
+        }
       }
     } catch (error) {
       console.error('❌ Error sending message:', error);
       
-      // Update message status to failed
+      // Show error to user with more context
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const is24HourError = errorMessage.includes('24 hours') || errorMessage.includes('Re-engagement');
+      
+      // Update message status to failed with failure reason
       setMessages(prev => prev.map(msg => 
-        msg.id === message.id ? { ...msg, status: 'failed' } : msg
+        msg.id === message.id ? { 
+          ...msg, 
+          status: 'failed',
+          failureReason: is24HourError ? '24_hour_rule' : 'general_error'
+        } : msg
       ));
       
-      // Show error to user
-      alert('Error sending message: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      if (is24HourError) {
+        alert('⏰ Cannot send message: WhatsApp Business policy requires customers to message first or you must wait for them to reply within 24 hours.');
+      } else {
+        alert('Error sending message: ' + errorMessage);
+      }
     }
   };
 
@@ -817,6 +885,169 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     );
 
     console.log('✅ Contact saved successfully:', contactInfo);
+  };
+
+  // Handle starting a new WhatsApp conversation
+  const handleStartNewConversation = async () => {
+    const phoneNumber = newConversationPhone.trim();
+    
+    // Check if user has entered enough digits
+    if (phoneNumber.length <= 10) {
+      return;
+    }
+
+    // Format phone number (remove any non-numeric characters except +)
+    const cleanedPhone = phoneNumber.replace(/[^\d+]/g, '');
+    
+    // Check if this conversation already exists in the database conversations
+    const existingConversation = whatsappConversations.find(
+      conv => conv.customerPhone === cleanedPhone || conv.customerPhone === cleanedPhone.replace('+', '')
+    );
+
+    if (existingConversation) {
+      // Select the existing conversation
+      setSelectedConversation(existingConversation.id);
+      setNewConversationPhone('+1 (868) ');
+      return;
+    }
+
+    try {
+      // Create a new conversation entry with database-compatible ID format
+      // Use the same format as database conversations: wa_<phone_without_plus>
+      const phoneForId = cleanedPhone.replace('+', '');
+      const newConversation: Conversation = {
+        id: `wa_${phoneForId}`,
+        customerName: cleanedPhone,
+        customerPhone: cleanedPhone,
+        lastMessage: 'New conversation',
+        timestamp: new Date(),
+        unreadCount: 0,
+        status: 'active',
+        isWhatsApp: true,
+        avatar: '📱'
+      };
+
+      // Add to conversations list
+      setWhatsappConversations(prev => [newConversation, ...prev]);
+      
+      // Select the new conversation
+      setSelectedConversation(newConversation.id);
+      
+      // Reset the input to the prefix
+      setNewConversationPhone('+1 (868) ');
+      
+      console.log('✅ New WhatsApp conversation started for:', cleanedPhone);
+    } catch (error) {
+      console.error('❌ Error starting new conversation:', error);
+    }
+  };
+
+  // Handle using a WhatsApp template
+  const handleUseTemplate = async (template: WhatsAppTemplate, variables: Record<string, string>) => {
+    try {
+      // Replace template variables with actual values
+      let templateContent = template.content;
+      Object.entries(variables).forEach(([key, value]) => {
+        templateContent = templateContent.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+      });
+
+      // Get the current conversation phone number
+      const currentConversation = whatsappConversations.find(conv => conv.id === selectedConversation);
+      const targetPhone = currentConversation?.customerPhone;
+
+      if (!targetPhone || !selectedConversation) {
+        alert('Please select a conversation first');
+        return;
+      }
+
+      // Send the template message using WhatsApp Business API
+      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: targetPhone.replace(/[^\d]/g, ''), // Send only digits to the API
+          message: templateContent,
+          type: 'template',
+          template_name: template.name
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to send template: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      // Add the template message to the conversation
+      const newMessage: Message = {
+        id: `template_${Date.now()}`,
+        text: templateContent,
+        sender: 'agent',
+        timestamp: new Date(),
+        type: 'text',
+        isTemplate: true,
+        templateName: template.name,
+        status: 'sent'
+      };
+
+      // Add message to current conversation
+      setMessages(prev => [...prev, newMessage]);
+      
+      // Update conversation in the list
+      setWhatsappConversations(prev => prev.map(conv => 
+        conv.id === selectedConversation 
+          ? { ...conv, lastMessage: templateContent, timestamp: new Date() }
+          : conv
+      ));
+
+      console.log('✅ Template message sent successfully:', result);
+    } catch (error) {
+      console.error('❌ Error sending template:', error);
+      alert('Failed to send template message. Please try again.');
+    }
+  };
+
+  // Format phone number as user types
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-numeric characters
+    const cleaned = value.replace(/[^\d]/g, '');
+    
+    // Start with +1 (868) and format the remaining digits
+    const prefix = '+1 (868) ';
+    
+    // If user tries to clear everything, keep the prefix
+    if (cleaned.length === 0) {
+      return prefix;
+    }
+    
+    // Take only the digits after 868 (max 7 digits for Trinidad phone numbers)
+    const remainingDigits = cleaned.slice(0, 7);
+    
+    // Format as XXX-XXXX
+    if (remainingDigits.length <= 3) {
+      return prefix + remainingDigits;
+    } else {
+      return prefix + remainingDigits.slice(0, 3) + '-' + remainingDigits.slice(3);
+    }
+  };
+
+  // Handle phone number input change
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // If user tries to delete the prefix, prevent it
+    const prefix = '+1 (868) ';
+    if (value.length < prefix.length) {
+      setNewConversationPhone(prefix);
+      return;
+    }
+    
+    // Extract only the numbers after the prefix
+    const afterPrefix = value.slice(prefix.length);
+    const formatted = formatPhoneNumber(afterPrefix);
+    setNewConversationPhone(formatted);
   };
 
   const getDisplayNameForPhone = (phoneNumber: string, originalName?: string) => {
@@ -1048,6 +1279,42 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                   )}
                 </div>
               </div>
+              
+              {/* WhatsApp Conversation Starter */}
+              <div className="whatsapp-starter">
+                <div className="starter-input-wrapper">
+                  <input
+                    type="tel"
+                    placeholder="Type 7 digits (e.g., 251-3268)"
+                    className="starter-input"
+                    value={newConversationPhone}
+                    onChange={handlePhoneNumberChange}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newConversationPhone.length > 10) {
+                        handleStartNewConversation();
+                      }
+                    }}
+                  />
+                  {newConversationPhone.length > 10 && (
+                    <button 
+                      className="start-chat-btn"
+                      onClick={handleStartNewConversation}
+                      title="Start WhatsApp conversation"
+                    >
+                      💬
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  fontSize: '11px',
+                  color: '#666',
+                  marginTop: '4px',
+                  padding: '0 8px',
+                  lineHeight: '1.3'
+                }}>
+                  ⏰ Note: You can only send messages to customers who have messaged you within the last 24 hours
+                </div>
+              </div>
             </div>
             
             <div className="conversations-list">
@@ -1141,7 +1408,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                         alignItems: 'center',
                         gap: '6px'
                       }}>
-                        � Save Contact
+                        📇 Save Contact
                       </button>
                     ) : (
                       <div style={{
@@ -1158,6 +1425,25 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                         ✅ Contact Saved
                       </div>
                     )}
+                    <button 
+                      className="action-btn" 
+                      onClick={() => setShowTemplateManager(true)}
+                      style={{
+                        backgroundColor: '#25d366',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginLeft: '8px'
+                      }}
+                    >
+                      📝 Templates
+                    </button>
                   </div>
                 </div>
 
@@ -1402,6 +1688,62 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                               >
                                 {getStatusIcon(message.status)}
                               </span>
+                            </div>
+                          )}
+                          {/* Show helpful note for failed messages due to 24-hour rule */}
+                          {message.status === 'failed' && message.failureReason === '24_hour_rule' && (
+                            <div style={{
+                              backgroundColor: '#fff3cd',
+                              border: '1px solid #ffeaa7',
+                              borderRadius: '6px',
+                              padding: '8px 12px',
+                              marginTop: '8px',
+                              fontSize: '12px',
+                              color: '#856404',
+                              lineHeight: '1.4'
+                            }}>
+                              <div style={{ fontWeight: '500', marginBottom: '4px' }}>
+                                ⏰ Message failed - 24-hour rule
+                              </div>
+                              <div>
+                                WhatsApp Business requires customers to message you first, or you must wait for them to reply within 24 hours. Consider using a <strong>template message</strong> instead.
+                              </div>
+                              <button
+                                onClick={() => setShowTemplateManager(true)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#25d366',
+                                  textDecoration: 'underline',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  padding: '0',
+                                  marginTop: '4px',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                📝 Open Templates
+                              </button>
+                            </div>
+                          )}
+                          {/* Show note for general failures */}
+                          {message.status === 'failed' && message.failureReason === 'general_error' && (
+                            <div style={{
+                              backgroundColor: '#f8d7da',
+                              border: '1px solid #f5c6cb',
+                              borderRadius: '6px',
+                              padding: '8px 12px',
+                              marginTop: '8px',
+                              fontSize: '12px',
+                              color: '#721c24',
+                              lineHeight: '1.4'
+                            }}>
+                              <div style={{ fontWeight: '500', marginBottom: '4px' }}>
+                                ❌ Message failed to send
+                              </div>
+                              <div>
+                                There was an error sending this message. Please try again or check your connection.
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1779,6 +2121,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
         imageUrl={modalImageUrl}
         caption={modalImageCaption}
         onClose={closeImageModal}
+      />
+
+      {/* WhatsApp Template Manager */}
+      <WhatsAppTemplateManager
+        isOpen={showTemplateManager}
+        onClose={() => setShowTemplateManager(false)}
+        onUseTemplate={handleUseTemplate}
       />
     </div>
   );

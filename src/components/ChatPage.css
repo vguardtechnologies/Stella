@@ -150,6 +150,65 @@
   transform: scale(1.1);
 }
 
+/* WhatsApp Conversation Starter */
+.whatsapp-starter {
+  margin-top: 15px;
+  padding-bottom: 5px;
+}
+
+.starter-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.starter-input {
+  width: 100%;
+  padding: 10px 15px;
+  padding-right: 50px;
+  background: rgba(37, 211, 102, 0.1);
+  border: 1px solid rgba(37, 211, 102, 0.3);
+  border-radius: 10px;
+  color: white;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.starter-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.starter-input:focus {
+  outline: none;
+  border-color: rgba(37, 211, 102, 0.6);
+  background: rgba(37, 211, 102, 0.15);
+  box-shadow: 0 0 10px rgba(37, 211, 102, 0.3);
+}
+
+.start-chat-btn {
+  position: absolute;
+  right: 8px;
+  background: rgba(37, 211, 102, 0.8);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.start-chat-btn:hover {
+  background: rgba(37, 211, 102, 1);
+  transform: scale(1.1);
+  box-shadow: 0 0 10px rgba(37, 211, 102, 0.5);
+}
+
 .conversations-list {
   flex: 1;
   overflow-y: auto;

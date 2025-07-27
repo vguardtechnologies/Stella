@@ -7,6 +7,7 @@ import OptInOutPage from './components/OptInOutPage'
 import OrderConfirmationPage from './components/OrderConfirmationPage'
 import ChatPage from './components/ChatPage'
 import HomePage from './components/HomePage'
+import ContactsPage from './pages/ContactsPage'
 import './App.css'
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
   const [showOptInOut, setShowOptInOut] = useState(false)
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [showContacts, setShowContacts] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
 
   const handleHomeClick = () => {
@@ -25,6 +27,7 @@ function App() {
     setShowOptInOut(false)
     setShowOrderConfirmation(false)
     setShowChat(false)
+    setShowContacts(false)
     setShowLogin(false)
   }
 
@@ -48,6 +51,11 @@ function App() {
     setShowChat(true) // Show ChatPage with integrated WhatsApp features
   }
 
+  const handleContactsClick = () => {
+    console.log('Contacts button clicked!')
+    setShowContacts(true)
+  }
+
   const handleWhatsAppClick = () => {
     console.log('WhatsApp button clicked!')
     setShowWhatsApp(true)
@@ -65,6 +73,10 @@ function App() {
     setShowChat(false)
   }
 
+  const handleCloseContacts = () => {
+    setShowContacts(false)
+  }
+
   const handleCloseLogin = () => {
     setShowLogin(false)
   }
@@ -77,6 +89,7 @@ function App() {
         onOtpClick={handleOtpClick}
         onOcClick={handleOcClick}
         onChatClick={handleChatClick}
+        onContactsClick={handleContactsClick}
         onLoginClick={handleLoginClick}
       />
       <div className="main-content">
@@ -129,6 +142,10 @@ function App() {
 
       {showChat && (
         <ChatPage onClose={handleCloseChat} />
+      )}
+
+      {showContacts && (
+        <ContactsPage onClose={handleCloseContacts} />
       )}
 
       {showLogin && (
