@@ -211,7 +211,7 @@ interface Product {
   price: number;
   image: string;
   description: string;
-  category: 'water' | 'dispenser' | 'filter' | 'accessory';
+  category: 'water' | 'dispenser' | 'filter' | 'accessory' | 'electronics' | 'wearables' | 'audio';
   sizes?: string[];
   inStock: boolean;
 }
@@ -248,7 +248,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
 
   // WhatsApp Integration State
   const [whatsappConversations, setWhatsappConversations] = useState<Conversation[]>([]);
-  const [whatsappConfigured, setWhatsappConfigured] = useState(true); // Assume configured since we have permanent token
+  const [whatsappConfigured] = useState(true); // Assume configured since we have permanent token
 
   // Contact Management State
   const [showContactManager, setShowContactManager] = useState(false);
@@ -400,9 +400,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
         if (isAutoRefresh && messages.length > 0) {
           const oldMessageIds = new Set(messages.map((m: Message) => m.id));
           const hasNewMessages = convertedMessages.some((m: any) => !oldMessageIds.has(m.id));
-          const hasNewIncomingMessages = convertedMessages.some((m: any) => 
-            !oldMessageIds.has(m.id) && m.sender === 'user'
-          );
+          // const hasNewIncomingMessages = convertedMessages.some((m: any) => 
+          //   !oldMessageIds.has(m.id) && m.sender === 'user'
+          // );
           
           // Only enable auto-scroll for auto-refresh if user is near bottom or if there are genuinely new incoming messages
           if (hasNewMessages && !isNearBottom) {
@@ -462,24 +462,24 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   };
 
   // Function to get actual media URL from WhatsApp media ID
-  const getMediaUrl = async (mediaId: string): Promise<string | null> => {
-    try {
-      console.log(`Attempting to fetch media URL for ID: ${mediaId}`);
-      const response = await fetch(`${API_BASE}/api/whatsapp/media/${mediaId}`);
+  // const getMediaUrl = async (mediaId: string): Promise<string | null> => {
+  //   try {
+  //     console.log(`Attempting to fetch media URL for ID: ${mediaId}`);
+  //     const response = await fetch(`${API_BASE}/api/whatsapp/media/${mediaId}`);
       
-      if (!response.ok) {
-        console.error(`Media fetch failed with status ${response.status} for media ID: ${mediaId}`);
-        return null;
-      }
+  //     if (!response.ok) {
+  //       console.error(`Media fetch failed with status ${response.status} for media ID: ${mediaId}`);
+  //       return null;
+  //     }
       
-      const data = await response.json();
-      console.log(`✅ Media URL obtained for ${mediaId}:`, data.url?.substring(0, 100) + '...');
-      return data.url;
-    } catch (error) {
-      console.error('Error fetching media URL:', error);
-      return null;
-    }
-  };
+  //     const data = await response.json();
+  //     console.log(`✅ Media URL obtained for ${mediaId}:`, data.url?.substring(0, 100) + '...');
+  //     return data.url;
+  //   } catch (error) {
+  //     console.error('Error fetching media URL:', error);
+  //     return null;
+  //   }
+  // };
 
   // Attachment Menu Functions
   const handleAttachmentClick = () => {
@@ -613,7 +613,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       price: 49.99,
       image: '�',
       description: 'Fast wireless charging pad for all devices',
-      category: 'accessories',
+      category: 'accessory',
       inStock: true
     },
     {
@@ -622,7 +622,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       price: 29.99,
       image: '📱',
       description: 'Durable protection with elegant design',
-      category: 'accessories',
+      category: 'accessory',
       inStock: true
     }
   ];
@@ -842,18 +842,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   };
 
   // Contact Management Functions
-  const checkContactStatus = async (phoneNumber: string) => {
-    try {
-      const response = await fetch(`${API_BASE}/api/contacts/check/${phoneNumber}`);
-      if (!response.ok) return null;
+  // const checkContactStatus = async (phoneNumber: string) => {
+  //   try {
+  //     const response = await fetch(`${API_BASE}/api/contacts/check/${phoneNumber}`);
+  //     if (!response.ok) return null;
       
-      const data = await response.json();
-      return data.exists ? data.contact : null;
-    } catch (error) {
-      console.error('Error checking contact status:', error);
-      return null;
-    }
-  };
+  //     const data = await response.json();
+  //     return data.exists ? data.contact : null;
+  //   } catch (error) {
+  //     console.error('Error checking contact status:', error);
+  //     return null;
+  //   }
+  // };
 
   const handleSaveContact = () => {
     const conversation = whatsappConversations.find(c => c.id === selectedConversation);
@@ -1187,26 +1187,26 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   // WhatsApp emoji categories (organized like the latest WhatsApp)
   const recentEmojis = ['😊', '👍', '❤️', '😂', '😢', '😮', '😡', '🎉'];
   
-  const frequentlyUsed = [
-    '�', '😃', '😄', '😁', '�😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰',
-    '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑',
-    '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄',
-    '😬', '🤥', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
-    '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕',
-    '😟', '🙁', '☹️', '�', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰',
-    '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤',
-    '😡', '😠', '🤬', '�', '�', '�', '☠️', '💩', '🤡', '👹', '👺', '👻',
-    '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
-  ];
+  // const frequentlyUsed = [
+  //   '�', '😃', '😄', '😁', '�😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰',
+  //   '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑',
+  //   '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄',
+  //   '😬', '🤥', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
+  //   '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕',
+  //   '😟', '🙁', '☹️', '�', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰',
+  //   '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤',
+  //   '😡', '😠', '🤬', '�', '�', '�', '☠️', '💩', '🤡', '👹', '👺', '👻',
+  //   '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
+  // ];
 
   const businessEmojis = [
-    '�', '�', '📦', '🚚', '�', '🏪', '🛍️', '💎', '👤', '👨‍👩‍👧‍👦', 
+    '💼', '📦', '🚚', '🏪', '🛍️', '💎', '👤', '👨‍👩‍👧‍👦', 
     '💼', '📞', '📱', '⏰', '📍', '🎯', '✅', '❌', '⭐', '💯', '🔥', '👌',
     '💪', '🙌', '👏', '🤝', '🤞', '✌️', '🤟', '🤘', '👍', '👎', '👊', '✊'
   ];
 
   // Combine all emojis for easy access
-  const allEmojis = [...new Set([...recentEmojis, ...frequentlyUsed, ...businessEmojis])];
+  // const allEmojis = [...new Set([...recentEmojis, ...frequentlyUsed, ...businessEmojis])];
 
   const addEmoji = (emoji: string) => {
     setNewMessage(prev => prev + emoji);

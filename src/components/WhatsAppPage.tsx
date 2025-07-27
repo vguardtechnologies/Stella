@@ -64,7 +64,7 @@ const WhatsAppPage: React.FC<WhatsAppPageProps> = ({ onClose }) => {
           // attempt to restore backend configuration
           if ((savedApiKey && savedPhoneNumberId) && !result.isConfigured) {
             console.log('Restoring backend configuration from localStorage...');
-            await restoreBackendConfiguration(savedApiKey, savedPhoneNumberId, savedWebhookUrl);
+            await restoreBackendConfiguration(savedApiKey, savedPhoneNumberId, savedWebhookUrl || '');
           }
         }
       } catch (error) {

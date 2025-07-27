@@ -15,7 +15,7 @@ interface ImageMessageProps {
 const ImageMessage: React.FC<ImageMessageProps> = ({
   message,
   API_BASE,
-  formatTime
+  // formatTime
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
