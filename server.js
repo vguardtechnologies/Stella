@@ -55,10 +55,6 @@ try {
   const contactsHandler = require('./api/contacts.js');
   app.use('/api/contacts', contactsHandler);
   console.log('✅ Contacts routes loaded');
-
-  const debugHandler = require('./api/debug.js');
-  app.use('/api/debug', debugHandler);
-  console.log('✅ Debug routes loaded');
   
 } catch (error) {
   console.log('⚠️ API routes error:', error.message);
