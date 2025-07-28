@@ -46,7 +46,7 @@ const MessagesDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_URL || '/api';
+  const API_BASE = import.meta.env.VITE_API_URL || '';
 
   // Fetch conversations
   const fetchConversations = async () => {

@@ -268,7 +268,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   // Template Management State
   const [showTemplateManager, setShowTemplateManager] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || '/api';
+  const API_BASE = import.meta.env.VITE_API_URL || '';
 
   // Function to open image modal
   const openImageModal = (imageUrl: string, caption?: string) => {
