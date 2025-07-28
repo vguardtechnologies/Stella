@@ -31,7 +31,10 @@ const ContactsPage: React.FC<ContactsPageProps> = ({ onClose }) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:3000/api/contacts');
+      const API_BASE_URL = import.meta.env.VITE_API_URL || (
+        import.meta.env.PROD ? '' : 'http://localhost:3000'
+      );
+      const response = await fetch(`${API_BASE_URL}/api/contacts`);
       if (!response.ok) {
         throw new Error('Failed to fetch contacts');
       }
