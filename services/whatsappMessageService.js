@@ -322,13 +322,6 @@ class WhatsAppMessageService {
         [limit, offset]
       );
 
-      console.log('🔍 getAllConversations debug - raw results:', conversations.rows.map(r => ({
-        id: r.id,
-        phone: r.phone_number,
-        display_name: r.display_name,
-        profile_name: r.profile_name
-      })));
-
       return conversations.rows;
     } catch (error) {
       console.error('Error getting conversations:', error);
