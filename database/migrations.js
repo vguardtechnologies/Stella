@@ -63,6 +63,21 @@ const createTables = async () => {
       );
     `);
 
+    // Create contacts table for storing saved contacts
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id SERIAL PRIMARY KEY,
+        phone_number VARCHAR(20) NOT NULL UNIQUE,
+        display_name VARCHAR(255),
+        whatsapp_profile_name VARCHAR(255),
+        saved_name VARCHAR(255),
+        has_susa_suffix BOOLEAN DEFAULT false,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Create indexes for better performance
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_messages_phone_number ON messages(phone_number);
@@ -70,6 +85,7 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_messages_direction ON messages(direction);
       CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(message_type);
       CREATE INDEX IF NOT EXISTS idx_conversations_phone ON conversations(phone_number);
+      CREATE INDEX IF NOT EXISTS idx_contacts_phone_number ON contacts(phone_number);
     `);
 
     console.log('✅ Database tables created successfully');
