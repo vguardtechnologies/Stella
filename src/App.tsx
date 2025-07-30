@@ -114,41 +114,9 @@ function App() {
         onLoginClick={handleLoginClick}
         onShopifyClick={handleShopifyClick}
       />
-      <div className="main-content">
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+      <div className="simple-main">
+        <h1 className="stella-main-title">Stella</h1>
       </div>
-      <h1>✨ Stella</h1>
-      <p className="subtitle">Modern React Frontend Application</p>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <div className="features">
-        <div className="feature-item">
-          <h3>⚡ Vite</h3>
-          <p>Lightning-fast development with HMR</p>
-        </div>
-        <div className="feature-item">
-          <h3>⚛️ React 18</h3>
-          <p>Modern React with TypeScript</p>
-        </div>
-        <div className="feature-item">
-          <h3>🔧 TypeScript</h3>
-          <p>Type-safe development experience</p>
-        </div>
-      </div>
-      <p className="read-the-docs">
-        Ready to build something amazing? Start editing the components!
-      </p>
       
       {showWhatsApp && (
         <WhatsAppPage onClose={handleCloseWhatsApp} />

@@ -47,7 +47,7 @@ class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="error-boundary">
           <div className="error-boundary-container">
-            <div className="error-icon">💧</div>
+            <div className="error-icon">⚠️</div>
             <h1>Oops! Something went wrong</h1>
             <p className="error-message">
               We're sorry, but something unexpected happened. Our team has been notified.

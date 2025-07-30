@@ -117,7 +117,7 @@
 }
 
 .water-drop-loader::before {
-  content: '💧';
+  content: '✨';
   position: absolute;
   font-size: 2rem;
   animation: water-drop 1.5s ease-in-out infinite;

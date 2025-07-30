@@ -12,7 +12,7 @@ interface OrderTemplate {
   category: 'delivery' | 'pickup' | 'delay' | 'ready';
 }
 
-interface WaterOrder {
+interface Order {
   id: string;
   customerName: string;
   customerPhone: string;
@@ -34,38 +34,38 @@ const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({ onClose }
     {
       id: '1',
       name: 'Order Ready for Pickup',
-      message: '💧 **Your Water Order is Ready!** 💧\n\nHi {{CUSTOMER_NAME}},\n\nGreat news! Your water order is ready for pickup:\n\n📋 **Order Details:**\n- Order #{{ORDER_ID}}\n- Items: {{ORDER_ITEMS}}\n- Total: ${{TOTAL_AMOUNT}}\n\n📍 **Pickup Location:** [Your Store Address]\n🕒 **Pickup Hours:** 9:00 AM - 6:00 PM\n\nPlease bring your order confirmation. Thank you for choosing us! 🙏',
+      message: '� **Your Order is Ready!** �\n\nHi {{CUSTOMER_NAME}},\n\nGreat news! Your order is ready for pickup:\n\n📋 **Order Details:**\n- Order #{{ORDER_ID}}\n- Items: {{ORDER_ITEMS}}\n- Total: ${{TOTAL_AMOUNT}}\n\n📍 **Pickup Location:** [Your Store Address]\n🕒 **Pickup Hours:** 9:00 AM - 6:00 PM\n\nPlease bring your order confirmation. Thank you for choosing us! 🙏',
       category: 'pickup'
     },
     {
       id: '2',
       name: 'Out for Delivery',
-      message: '🚚 **Your Water Order is Out for Delivery!** 🚚\n\nHi {{CUSTOMER_NAME}},\n\nYour fresh water is on its way to you!\n\n📋 **Order Details:**\n- Order #{{ORDER_ID}}\n- Items: {{ORDER_ITEMS}}\n- Total: ${{TOTAL_AMOUNT}}\n\n🕒 **Estimated Delivery:** Within 2 hours\n📱 **Track your order:** [Tracking Link]\n\nPlease be available to receive your delivery. Stay hydrated! 💧',
+      message: '🚚 **Your Order is Out for Delivery!** 🚚\n\nHi {{CUSTOMER_NAME}},\n\nYour order is on its way to you!\n\n📋 **Order Details:**\n- Order #{{ORDER_ID}}\n- Items: {{ORDER_ITEMS}}\n- Total: ${{TOTAL_AMOUNT}}\n\n🕒 **Estimated Delivery:** Within 2 hours\n📱 **Track your order:** [Tracking Link]\n\nPlease be available to receive your order. Thank you! �',
       category: 'delivery'
     },
     {
       id: '3',
       name: 'Order Delay Notification',
-      message: '⏰ **Order Delay Notification** ⏰\n\nHi {{CUSTOMER_NAME}},\n\nWe apologize for the inconvenience. Your water order has been slightly delayed:\n\n📋 **Order Details:**\n- Order #{{ORDER_ID}}\n- Items: {{ORDER_ITEMS}}\n\n🕒 **New Estimated Time:** {{NEW_TIME}}\n\nWe appreciate your patience and will notify you as soon as your order is ready. Thank you for understanding! 🙏',
+      message: '⏰ **Order Delay Notification** ⏰\n\nHi {{CUSTOMER_NAME}},\n\nWe apologize for the inconvenience. Your order has been slightly delayed:\n\n📋 **Order Details:**\n- Order #{{ORDER_ID}}\n- Items: {{ORDER_ITEMS}}\n\n🕒 **New Estimated Time:** {{NEW_TIME}}\n\nWe appreciate your patience and will notify you as soon as your order is ready. Thank you for understanding! 🙏',
       category: 'delay'
     },
     {
       id: '4',
       name: 'Delivery Completed',
-      message: '✅ **Order Delivered Successfully!** ✅\n\nHi {{CUSTOMER_NAME}},\n\nYour water order has been delivered successfully!\n\n📋 **Order Details:**\n- Order #{{ORDER_ID}}\n- Items: {{ORDER_ITEMS}}\n- Total: ${{TOTAL_AMOUNT}}\n\n💧 Enjoy your fresh, clean water!\n🌟 Please rate your experience: [Rating Link]\n\nThank you for choosing us! We look forward to serving you again. 🙏',
+      message: '✅ **Order Delivered Successfully!** ✅\n\nHi {{CUSTOMER_NAME}},\n\nYour order has been delivered successfully!\n\n📋 **Order Details:**\n- Order #{{ORDER_ID}}\n- Items: {{ORDER_ITEMS}}\n- Total: ${{TOTAL_AMOUNT}}\n\n� Enjoy your purchase!\n🌟 Please rate your experience: [Rating Link]\n\nThank you for choosing us! We look forward to serving you again. 🙏',
       category: 'delivery'
     }
   ];
 
   const [templates, setTemplates] = useState<OrderTemplate[]>(defaultTemplates);
 
-  // Mock water orders
-  const mockOrders: WaterOrder[] = [
+  // Mock orders
+  const mockOrders: Order[] = [
     {
       id: 'WO001',
       customerName: 'John Smith',
       customerPhone: '+1234567890',
-      orderItems: '5 x 5-Gallon Bottles, 2 x Water Dispensers',
+      orderItems: '5 x Product A, 2 x Product B',
       totalAmount: 45.99,
       orderDate: '2025-07-19',
       status: 'ready'
@@ -384,7 +384,7 @@ const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({ onClose }
             <h3>Message Preview</h3>
             <div className="message-preview">
               <div className="whatsapp-preview">
-                <div className="preview-header">💧 Water Delivery Service</div>
+                <div className="preview-header">✨ Stella Business Service</div>
                 <div className="preview-content">
                   {messageText || 'Your order confirmation message will appear here...'}
                 </div>

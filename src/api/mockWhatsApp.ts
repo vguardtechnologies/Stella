@@ -37,7 +37,7 @@ const mockMessages: WhatsAppMessage[] = [
     id: 'msg1',
     from: '+1234567890',
     to: '+1234567899', // Business number
-    text: 'Hi! I need 5 gallons of spring water delivered today.',
+    text: 'Hi! I need some products delivered today.',
     timestamp: new Date(Date.now() - 10 * 60 * 1000),
     messageType: 'text',
     status: 'read',
@@ -98,7 +98,7 @@ const mockTemplates: WhatsAppTemplate[] = [
       },
       {
         type: 'footer',
-        text: 'Thanks for choosing our water delivery service!'
+        text: 'Thanks for choosing our service!'
       }
     ]
   },
@@ -111,7 +111,7 @@ const mockTemplates: WhatsAppTemplate[] = [
     components: [
       {
         type: 'body',
-        text: 'Your water delivery is on the way! Our driver will arrive in approximately {{1}} minutes.'
+        text: 'Your order is on the way! Our driver will arrive in approximately {{1}} minutes.'
       }
     ]
   }
@@ -412,11 +412,11 @@ export const mockWhatsAppUtils = {
   // Generate test message
   generateTestMessage(): string {
     const messages = [
-      'Hello! I need water delivery today.',
+      'Hello! I need a delivery today.',
       'What are your prices for 5-gallon bottles?',
       'Can you deliver to my office address?',
       'I need to schedule a weekly delivery.',
-      'Is spring water available?',
+      'Is the product available?',
       'Thank you for the quick delivery!',
       'Can I change my delivery time?',
       'Do you accept credit cards?'

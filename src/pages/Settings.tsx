@@ -69,11 +69,11 @@ const Settings: React.FC<SettingsProps> = ({ onSave, onCancel }) => {
 
   // Business Settings State
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>({
-    businessName: 'Stella Water Delivery',
-    businessAddress: '123 Water Street, Lagos, Nigeria',
+    businessName: 'Stella Business',
+    businessAddress: '123 Business Street, Lagos, Nigeria',
     businessPhone: '+234 801 234 5678',
-    businessEmail: 'info@stellawater.ng',
-    businessDescription: 'Premium water delivery service in Lagos',
+    businessEmail: 'info@stella.ng',
+    businessDescription: 'Premium business services in Lagos',
     businessHours: {
       monday: { open: '08:00', close: '18:00', closed: false },
       tuesday: { open: '08:00', close: '18:00', closed: false },
@@ -94,7 +94,7 @@ const Settings: React.FC<SettingsProps> = ({ onSave, onCancel }) => {
     businessAccountId: '',
     autoReply: true,
     autoReplyMessage: 'Thank you for contacting us! We\'ll get back to you shortly.',
-    welcomeMessage: 'Welcome to Stella Water Delivery! How can we help you today?'
+    welcomeMessage: 'Welcome to Stella! How can we help you today?'
   });
 
   // Notification Settings State

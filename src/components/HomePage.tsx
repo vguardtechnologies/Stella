@@ -52,7 +52,7 @@ const HomePage: React.FC<HomePageProps> = ({ onClose }) => {
       <div className="home-container">
         <div className="home-header">
           <h1>Welcome to Stella</h1>
-          <p>Your Complete Water Delivery Business Solution</p>
+          <p>Your Complete Business Management Solution</p>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
@@ -60,9 +60,9 @@ const HomePage: React.FC<HomePageProps> = ({ onClose }) => {
           <div className="welcome-section">
             <div className="welcome-card">
               <div className="logo-section">
-                <div className="app-logo">💧</div>
+                <div className="app-logo">✨</div>
                 <h2>Stella</h2>
-                <p className="tagline">Modern Water Delivery Management</p>
+                <p className="tagline">Modern Business Management Platform</p>
               </div>
 
               <div className="features-preview">
@@ -192,7 +192,7 @@ const HomePage: React.FC<HomePageProps> = ({ onClose }) => {
               ) : (
                 <form className="auth-form" onSubmit={handleSignUp}>
                   <h3>Join Stella Today! 🌟</h3>
-                  <p>Create your water delivery business account</p>
+                  <p>Create your business account</p>
 
                   <div className="form-row">
                     <div className="form-group">
@@ -362,7 +362,7 @@ const HomePage: React.FC<HomePageProps> = ({ onClose }) => {
             </div>
           </div>
           <div className="footer-bottom">
-            <p>&copy; 2025 Stella. All rights reserved. Built with ❤️ for water delivery businesses.</p>
+            <p>&copy; 2025 Stella. All rights reserved. Built with ❤️ for modern businesses.</p>
           </div>
         </div>
       </div>

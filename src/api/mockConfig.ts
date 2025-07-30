@@ -91,7 +91,7 @@ const defaultConfig: AppConfig = {
     messageRetention: 30
   },
   business: {
-    name: 'Stella Water Delivery',
+    name: 'Stella Business',
     address: '123 Business St, City, ST 12345',
     phone: '+1 (555) 123-4567',
     email: 'info@stella.com',

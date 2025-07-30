@@ -216,7 +216,7 @@ interface Product {
   price: number;
   image: string;
   description: string;
-  category: 'water' | 'dispenser' | 'filter' | 'accessory' | 'electronics' | 'wearables' | 'audio';
+  category: 'electronics' | 'accessories' | 'apparel' | 'home' | 'wearables' | 'audio';
   sizes?: string[];
   inStock: boolean;
 }
@@ -649,7 +649,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       price: 49.99,
       image: '�',
       description: 'Fast wireless charging pad for all devices',
-      category: 'accessory',
+      category: 'accessories',
       inStock: true
     },
     {
@@ -658,7 +658,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       price: 29.99,
       image: '📱',
       description: 'Durable protection with elegant design',
-      category: 'accessory',
+      category: 'accessories',
       inStock: true
     }
   ];
@@ -2135,7 +2135,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                       onClick={() => sendProductRecommendation(products[0])}
                       disabled={!selectedConversation}
                     >
-                      🪣 Recommend 5-Gallon Water
+                      📦 Recommend Product A
                     </button>
                     <button 
                       className="recommendation-btn"
@@ -2149,7 +2149,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                       onClick={() => sendProductRecommendation(products[1])}
                       disabled={!selectedConversation}
                     >
-                      🧊 Recommend 1-Gallon Water
+                      📦 Recommend Product B
                     </button>
                   </div>
                   

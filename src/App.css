@@ -108,3 +108,33 @@
     padding-left: 70px; /* Adjust for smaller action bar on mobile */
   }
 }
+
+/* Simplified Main Page */
+.simple-main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 70vh;
+}
+
+.stella-main-title {
+  font-size: 120px;
+  font-weight: bold;
+  color: #2563eb;
+  margin: 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  font-family: 'Arial', sans-serif;
+  letter-spacing: -2px;
+}
+
+@media (max-width: 768px) {
+  .stella-main-title {
+    font-size: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stella-main-title {
+    font-size: 60px;
+  }
+}
