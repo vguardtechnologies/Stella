@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import ActionBar from './components/ActionBar'
@@ -18,6 +18,22 @@ function App() {
   const [showChat, setShowChat] = useState(false)
   const [showContacts, setShowContacts] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
+  const [shopifyStore, setShopifyStore] = useState<any>(null)
+
+  // Load saved Shopify connection on app start
+  useEffect(() => {
+    const savedShopifyStore = localStorage.getItem('shopifyStore')
+    if (savedShopifyStore) {
+      try {
+        const store = JSON.parse(savedShopifyStore)
+        setShopifyStore(store)
+        console.log('✅ Loaded saved Shopify connection:', store.name)
+      } catch (error) {
+        console.error('Error loading saved Shopify store:', error)
+        localStorage.removeItem('shopifyStore')
+      }
+    }
+  }, [])
 
   const handleHomeClick = () => {
     console.log('Home button clicked!')
@@ -49,6 +65,11 @@ function App() {
   const handleChatClick = () => {
     console.log('Chat button clicked!')
     setShowChat(true) // Show ChatPage with integrated WhatsApp features
+  }
+
+  const handleShopifyClick = () => {
+    console.log('Shopify button clicked!')
+    setShowChat(true)
   }
 
   const handleContactsClick = () => {
@@ -91,6 +112,7 @@ function App() {
         onChatClick={handleChatClick}
         onContactsClick={handleContactsClick}
         onLoginClick={handleLoginClick}
+        onShopifyClick={handleShopifyClick}
       />
       <div className="main-content">
         <a href="https://vite.dev" target="_blank">
@@ -141,7 +163,7 @@ function App() {
       )}
 
       {showChat && (
-        <ChatPage onClose={handleCloseChat} />
+        <ChatPage onClose={handleCloseChat} shopifyStore={shopifyStore} />
       )}
 
       {showContacts && (

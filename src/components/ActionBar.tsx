@@ -9,6 +9,7 @@ interface ActionBarProps {
   onChatClick?: () => void;
   onContactsClick?: () => void;
   onLoginClick?: () => void;
+  onShopifyClick?: () => void;
 }
 
 const ActionBar: React.FC<ActionBarProps> = ({ 
@@ -18,7 +19,8 @@ const ActionBar: React.FC<ActionBarProps> = ({
   onOcClick, 
   onChatClick,
   onContactsClick,
-  onLoginClick 
+  onLoginClick,
+  onShopifyClick
 }) => {
   return (
     <div className="action-bar">
@@ -117,6 +119,14 @@ const ActionBar: React.FC<ActionBarProps> = ({
           height="24"
           style={{ objectFit: 'contain' }}
         />
+      </button>
+      
+      <button 
+        className="action-button shopify-button" 
+        title="Shopify Integration"
+        onClick={onShopifyClick || (() => console.log('Shopify functionality'))}
+      >
+        🛒
       </button>
       
       <button className="action-button" title="Menu">

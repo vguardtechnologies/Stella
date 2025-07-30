@@ -162,6 +162,11 @@ const VoiceMessageComponent: React.FC<{
 
 interface ChatPageProps {
   onClose: () => void;
+  shopifyStore?: {
+    shop: string;
+    domain: string;
+    connected: boolean;
+  };
 }
 
 interface Message {
@@ -269,6 +274,37 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const [showTemplateManager, setShowTemplateManager] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
+
+  // Shopify Search State
+  const [shopifySearchQuery, setShopifySearchQuery] = useState('');
+  const [shopifySearchType, setShopifySearchType] = useState('products');
+  const [shopifySearchResults, setShopifySearchResults] = useState<any>(null);
+  const [shopifySearchLoading, setShopifySearchLoading] = useState(false);
+
+  const handleShopifySearch = async () => {
+    if (!shopifySearchQuery && shopifySearchType !== 'profile') return;
+    setShopifySearchLoading(true);
+    setShopifySearchResults(null);
+    try {
+      const params = new URLSearchParams({
+        type: shopifySearchType,
+        q: shopifySearchQuery
+      });
+      const res = await fetch(`/api/shopify/search?${params.toString()}`);
+      const data = await res.json();
+      setShopifySearchResults(data.data || data);
+    } catch (err) {
+      let msg = 'Unknown error';
+      if (err && typeof err === 'object' && 'message' in err) {
+        msg = (err as any).message;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      setShopifySearchResults({ error: msg });
+    } finally {
+      setShopifySearchLoading(false);
+    }
+  };
 
   // Function to open image modal
   const openImageModal = (imageUrl: string, caption?: string) => {
@@ -1961,40 +1997,69 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
 
             <div className="shop-content">
               {activeTab === 'products' && (
-                <div className="products-grid">
-                  {products.map((product) => (
-                    <div key={product.id} className="product-card">
-                      <div className="product-image">{product.image}</div>
-                      <div className="product-info">
-                        <h4>{product.name}</h4>
-                        <p className="product-description">{product.description}</p>
-                        <div className="product-price">${product.price}</div>
-                        {product.sizes && (
-                          <div className="product-sizes">
-                            {product.sizes.map(size => (
-                              <span key={size} className="size-tag">{size}</span>
-                            ))}
+                <div className="products-section">
+                  <div className="products-header">
+                    <h4>📦 Shopify Search</h4>
+                    <p>Search products, orders, profile, locations, prices, etc.</p>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="Search Shopify..."
+                        value={shopifySearchQuery}
+                        onChange={e => setShopifySearchQuery(e.target.value)}
+                        style={{ flex: 1, padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+                      />
+                      <select value={shopifySearchType} onChange={e => setShopifySearchType(e.target.value)} style={{ padding: 6, borderRadius: 4 }}>
+                        <option value="products">Products</option>
+                        <option value="orders">Orders</option>
+                        <option value="profile">Profile</option>
+                        <option value="locations">Locations</option>
+                        <option value="prices">Prices</option>
+                      </select>
+                      <button onClick={handleShopifySearch} style={{ padding: '6px 12px', borderRadius: 4, background: '#5c6bc0', color: 'white', border: 'none' }}>Search</button>
+                    </div>
+                  </div>
+                  {shopifySearchLoading && <div style={{ textAlign: 'center', color: 'white' }}>⏳ Searching Shopify...</div>}
+                  {shopifySearchResults && (
+                    <div style={{ margin: '16px 0' }}>
+                      <pre style={{ background: '#222', color: '#fff', padding: 12, borderRadius: 6, maxHeight: 300, overflow: 'auto', fontSize: 13 }}>{JSON.stringify(shopifySearchResults, null, 2)}</pre>
+                    </div>
+                  )}
+                  <div className="products-grid">
+                    {products.map((product) => (
+                      <div key={product.id} className="product-card">
+                        <div className="product-image">{product.image}</div>
+                        <div className="product-info">
+                          <h4>{product.name}</h4>
+                          <p className="product-description">{product.description}</p>
+                          <div className="product-price">${product.price}</div>
+                          {product.sizes && (
+                            <div className="product-sizes">
+                              {product.sizes.map(size => (
+                                <span key={size} className="size-tag">{size}</span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="product-actions">
+                            <button 
+                              className="add-to-cart-btn"
+                              onClick={() => addToCart(product)}
+                              disabled={!product.inStock}
+                            >
+                              {product.inStock ? 'Add to Cart' : 'Out of Stock'}
+                            </button>
+                            <button 
+                              className="recommend-btn"
+                              onClick={() => sendProductRecommendation(product)}
+                              disabled={!selectedConversation}
+                            >
+                              Recommend
+                            </button>
                           </div>
-                        )}
-                        <div className="product-actions">
-                          <button 
-                            className="add-to-cart-btn"
-                            onClick={() => addToCart(product)}
-                            disabled={!product.inStock}
-                          >
-                            {product.inStock ? 'Add to Cart' : 'Out of Stock'}
-                          </button>
-                          <button 
-                            className="recommend-btn"
-                            onClick={() => sendProductRecommendation(product)}
-                            disabled={!selectedConversation}
-                          >
-                            Recommend
-                          </button>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
 
