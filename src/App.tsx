@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import ActionBar from './components/ActionBar'
 import WhatsAppPage from './components/WhatsAppPage'
 import OptInOutPage from './components/OptInOutPage'
@@ -11,7 +9,6 @@ import ContactsPage from './pages/ContactsPage'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
   const [showWhatsApp, setShowWhatsApp] = useState(false)
   const [showOptInOut, setShowOptInOut] = useState(false)
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false)
@@ -37,7 +34,6 @@ function App() {
 
   const handleHomeClick = () => {
     console.log('Home button clicked!')
-    setCount(0)
     // Close all other pages and return to main view
     setShowWhatsApp(false)
     setShowOptInOut(false)
