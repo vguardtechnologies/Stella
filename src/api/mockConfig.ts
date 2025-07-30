@@ -257,7 +257,7 @@ export const mockConfigAPI = {
     const config = await this.getConfig();
     
     switch (type) {
-      case 'whatsapp':
+      case 'whatsapp': {
         const whatsapp = config.integrations.whatsapp;
         if (!whatsapp.enabled || !whatsapp.apiKey || !whatsapp.phoneNumberId) {
           throw new Error('WhatsApp integration not configured');
@@ -272,8 +272,9 @@ export const mockConfigAPI = {
         } else {
           throw new Error('Invalid WhatsApp credentials');
         }
+      }
         
-      case 'email':
+      case 'email': {
         const email = config.integrations.email;
         if (!email.enabled || !email.apiKey || !email.fromEmail) {
           throw new Error('Email integration not configured');
@@ -287,8 +288,9 @@ export const mockConfigAPI = {
         } else {
           throw new Error('Invalid email credentials');
         }
+      }
         
-      case 'analytics':
+      case 'analytics': {
         const analytics = config.integrations.analytics;
         if (!analytics.enabled || !analytics.trackingId) {
           throw new Error('Analytics integration not configured');
@@ -298,6 +300,7 @@ export const mockConfigAPI = {
           success: true,
           message: 'Analytics tracking active'
         };
+      }
         
       default:
         throw new Error('Unknown integration type');
@@ -361,12 +364,13 @@ export const mockConfigAPI = {
       }
       
       return await this.updateConfig(config);
-    } catch (error) {
+    } catch {
       throw new Error('Failed to parse configuration backup');
     }
   },
 
   // Helper methods
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   deepMerge(target: any, source: any): any {
     const result = { ...target };
     
@@ -388,7 +392,7 @@ export const mockConfigAPI = {
 
   isValidPhone(phone: string): boolean {
     const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+    const cleanPhone = phone.replace(/[\s\-()]/g, '');
     return phoneRegex.test(cleanPhone);
   },
 
@@ -401,6 +405,7 @@ export const mockConfigAPI = {
     }
   },
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   isValidConfig(config: any): boolean {
     // Basic validation of config structure
     return (

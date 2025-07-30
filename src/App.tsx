@@ -15,7 +15,7 @@ function App() {
   const [showChat, setShowChat] = useState(false)
   const [showContacts, setShowContacts] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
-  const [shopifyStore, setShopifyStore] = useState<any>(null)
+  const [shopifyStore, setShopifyStore] = useState<{ shop: string; domain: string; connected: boolean } | undefined>(undefined)
 
   // Load saved Shopify connection on app start
   useEffect(() => {

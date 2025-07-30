@@ -2,8 +2,16 @@ import React, { useState } from 'react';
 import { Bell, Palette, Shield, Building, MessageSquare, Save, RefreshCw } from 'lucide-react';
 import './Settings.css';
 
+interface AllSettings {
+  business: BusinessSettings;
+  whatsapp: WhatsAppSettings;
+  notifications: NotificationSettings;
+  security: SecuritySettings;
+  appearance: AppearanceSettings;
+}
+
 interface SettingsProps {
-  onSave?: (settings: any) => void;
+  onSave?: (settings: AllSettings) => void;
   onCancel?: () => void;
 }
 

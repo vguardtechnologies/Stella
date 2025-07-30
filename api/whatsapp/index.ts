@@ -72,7 +72,7 @@ class WhatsAppAPI {
         },
       });
       return response.ok;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -120,7 +120,7 @@ async function handleConfigure(req: VercelRequest, res: VercelResponse, user: an
       return res.status(400).json({
         error: 'Validation Error',
         message: 'Invalid configuration data',
-        details: validation.error.errors
+        details: validation.error.issues
       });
     }
 
@@ -272,7 +272,7 @@ async function handleSendMessage(req: VercelRequest, res: VercelResponse, user: 
       return res.status(400).json({
         error: 'Validation Error',
         message: 'Invalid message data',
-        details: validation.error.errors
+        details: validation.error.issues
       });
     }
 
@@ -327,7 +327,7 @@ async function handleSendMessage(req: VercelRequest, res: VercelResponse, user: 
 }
 
 // Get messages for a conversation
-async function handleGetMessages(req: VercelRequest, res: VercelResponse, user: any) {
+async function handleGetMessages(req: VercelRequest, res: VercelResponse) {
   try {
     const { conversation_id } = req.query;
     

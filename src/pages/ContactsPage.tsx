@@ -69,7 +69,7 @@ const ContactsPage: React.FC<ContactsPageProps> = ({ onClose }) => {
     setShowContactManager(true);
   };
 
-  const handleContactSaved = (_updatedContact: any) => {
+  const handleContactSaved = () => {
     // Refresh contacts list
     fetchContacts();
     setShowContactManager(false);

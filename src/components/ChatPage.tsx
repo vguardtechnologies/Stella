@@ -701,7 +701,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     if (!newMessage.trim() || !selectedConversation) return;
 
     // Extract phone number from conversation ID
-    let conversation = whatsappConversations.find(c => c.id === selectedConversation);
+    const conversation = whatsappConversations.find(c => c.id === selectedConversation);
     
     // If conversation not found in the list, try to extract phone from the conversation ID
     let phoneNumber: string;

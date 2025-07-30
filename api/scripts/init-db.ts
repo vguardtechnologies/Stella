@@ -17,7 +17,7 @@ async function initializeDatabase() {
         );
         console.log('Test user created:', testUser.email);
       } catch (error) {
-        if ((error as any).code === '23505') { // Unique constraint violation
+        if ((error as { code?: string }).code === '23505') { // Unique constraint violation
           console.log('Test user already exists');
         } else {
           throw error;

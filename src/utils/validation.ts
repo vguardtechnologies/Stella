@@ -5,15 +5,15 @@ export interface ValidationResult {
   errors: string[];
 }
 
-export interface ValidationRule<T = any> {
+export interface ValidationRule<T = unknown> {
   name: string;
-  validator: (value: T, allValues?: Record<string, any>) => boolean;
+  validator: (value: T, allValues?: Record<string, unknown>) => boolean;
   message: string;
 }
 
 // Common validation functions
 export const validators = {
-  required: (value: any): boolean => {
+  required: (value: unknown): boolean => {
     if (typeof value === 'string') return value.trim().length > 0;
     if (Array.isArray(value)) return value.length > 0;
     return value !== null && value !== undefined;
@@ -27,13 +27,13 @@ export const validators = {
   phone: (phone: string): boolean => {
     // International phone number format
     const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+    const cleanPhone = phone.replace(/[\s\-()]/g, '');
     return phoneRegex.test(cleanPhone);
   },
 
   whatsappPhone: (phone: string): boolean => {
     // WhatsApp phone number (without + but with country code)
-    const cleanPhone = phone.replace(/[\s\-\(\)\+]/g, '');
+    const cleanPhone = phone.replace(/[\s\-()+]/g, '');
     return /^[1-9]\d{7,14}$/.test(cleanPhone);
   },
 
@@ -84,13 +84,13 @@ export const validators = {
     return regex.test(value);
   },
 
-  matches: (fieldName: string) => (value: string, allValues?: Record<string, any>): boolean => {
+  matches: (fieldName: string) => (value: string, allValues?: Record<string, unknown>): boolean => {
     return allValues ? value === allValues[fieldName] : false;
   },
 
   businessName: (name: string): boolean => {
     // Business name should be 2-100 characters, allow letters, numbers, spaces, basic punctuation
-    const businessNameRegex = /^[a-zA-Z0-9\s\.\,\'\-\&]{2,100}$/;
+    const businessNameRegex = /^[a-zA-Z0-9\s.,'&-]{2,100}$/;
     return businessNameRegex.test(name.trim());
   },
 
@@ -275,11 +275,11 @@ export const errorMessages = {
 // Sanitization functions
 export const sanitizers = {
   phone: (phone: string): string => {
-    return phone.replace(/[\s\-\(\)]/g, '');
+    return phone.replace(/[\s\-()]/g, '');
   },
 
   whatsappPhone: (phone: string): string => {
-    return phone.replace(/[\s\-\(\)\+]/g, '');
+    return phone.replace(/[\s\-()+]/g, '');
   },
 
   email: (email: string): string => {

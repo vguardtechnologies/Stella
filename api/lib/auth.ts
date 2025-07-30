@@ -1,5 +1,5 @@
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
+import * as bcrypt from 'bcryptjs';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
 export interface AuthUser {
@@ -26,7 +26,7 @@ export class AuthService {
     try {
       const decoded = jwt.verify(token, this.JWT_SECRET) as AuthUser;
       return decoded;
-    } catch (error) {
+    } catch {
       return null;
     }
   }
