@@ -94,7 +94,7 @@ const VoiceMessageComponent: React.FC<{
         onMouseDown={(e) => e.preventDefault()}
       >
         <span style={{ color: 'white', fontSize: '12px', userSelect: 'none' }}>
-          {isPlaying ? '⏸️' : '▶️'}
+          {isPlaying ? 'Pause' : 'Play'}
         </span>
       </button>
       
@@ -323,32 +323,32 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   // Fetch WhatsApp conversations from the database
   const fetchWhatsAppConversations = async () => {
     try {
-      console.log('🔄 Fetching WhatsApp conversations from:', `${API_BASE}/api/messages/conversations`);
+      console.log('Fetching WhatsApp conversations from:', `${API_BASE}/api/messages/conversations`);
       const response = await fetch(`${API_BASE}/api/messages/conversations`);
       
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
-        console.error('❌ HTTP error:', response.status, response.statusText);
+        console.error('HTTP error:', response.status, response.statusText);
         const errorText = await response.text();
-        console.error('❌ Error response body:', errorText);
+        console.error('Error response body:', errorText);
         return;
       }
 
       const responseText = await response.text();
-      console.log('📄 Raw response:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+      console.log('Raw response:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
       
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('❌ JSON parsing failed:', parseError);
-        console.error('❌ Response was not valid JSON:', responseText);
+        console.error('JSON parsing failed:', parseError);
+        console.error('Response was not valid JSON:', responseText);
         return;
       }
 
-      console.log('✅ Parsed data:', data);
+      console.log('Parsed data:', data);
       
       if (data.success) {
         const convertedConversations = data.data.map((conv: any) => ({
@@ -372,31 +372,31 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   };  // Fetch WhatsApp messages for a specific conversation
   const fetchWhatsAppMessages = async (phoneNumber: string, isAutoRefresh = false) => {
     try {
-      console.log('🔄 Fetching messages for phone:', phoneNumber);
+      console.log('Fetching messages for phone:', phoneNumber);
       const response = await fetch(`${API_BASE}/api/messages/conversations/${phoneNumber}`);
       
-      console.log('📡 Messages response status:', response.status);
+      console.log('Messages response status:', response.status);
       
       if (!response.ok) {
-        console.error('❌ HTTP error:', response.status, response.statusText);
+        console.error('HTTP error:', response.status, response.statusText);
         const errorText = await response.text();
-        console.error('❌ Error response body:', errorText);
+        console.error('Error response body:', errorText);
         return;
       }
 
       const responseText = await response.text();
-      console.log('📄 Raw messages response:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+      console.log('Raw messages response:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
       
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('❌ JSON parsing failed for messages:', parseError);
-        console.error('❌ Response was not valid JSON:', responseText);
+        console.error('JSON parsing failed for messages:', parseError);
+        console.error('Response was not valid JSON:', responseText);
         return;
       }
 
-      console.log('✅ Parsed messages data:', data);
+      console.log('Parsed messages data:', data);
       
       if (data.success) {
         const convertedMessages = data.data.map((msg: any) => {
@@ -429,8 +429,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
             failureReason: msg.failure_reason as '24_hour_rule' | 'general_error' | undefined
           };
         });
-        console.log('✅ Converted messages:', convertedMessages);
-        console.log('📊 Message types found:', [...new Set(convertedMessages.map((m: any) => m.type))]);
+        console.log('Converted messages:', convertedMessages);
+        console.log('Message types found:', [...new Set(convertedMessages.map((m: any) => m.type))]);
         
         // Check if there are new messages during auto-refresh
         if (isAutoRefresh && messages.length > 0) {
@@ -467,10 +467,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
         
         setMessages(convertedMessages.reverse());
       } else {
-        console.warn('⚠️ Messages fetch was not successful:', data);
+        console.warn('Messages fetch was not successful:', data);
       }
     } catch (error) {
-      console.error('❌ Error fetching WhatsApp messages:', error);
+      console.error('Error fetching WhatsApp messages:', error);
     }
   };
 
@@ -491,7 +491,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
         }
       }
       
-      console.log('🔄 Fetching messages for conversation ID:', conversationId, 'Phone:', phoneNumber);
+      console.log('Fetching messages for conversation ID:', conversationId, 'Phone:', phoneNumber);
       await fetchWhatsAppMessages(phoneNumber.replace(/[^\d]/g, ''), isAutoRefresh);
     }
     // Can add other conversation types here in the future
@@ -535,32 +535,32 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
 
   const handleContactSelect = () => {
     // TODO: Implement contact sharing
-    console.log('📞 Contact sharing selected');
+    console.log('Contact sharing selected');
     setShowAttachmentMenu(false);
   };
 
   const handlePollSelect = () => {
     // TODO: Implement poll creation
-    console.log('📊 Poll creation selected');
+    console.log('Poll creation selected');
     setShowAttachmentMenu(false);
   };
 
   const handleEventSelect = () => {
     // TODO: Implement event creation
-    console.log('📅 Event creation selected');
+    console.log('Event creation selected');
     setShowAttachmentMenu(false);
   };
 
   const handleLocationSelect = () => {
     // TODO: Implement location sharing
-    console.log('📍 Location sharing selected');
+    console.log('Location sharing selected');
     setShowAttachmentMenu(false);
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      console.log('📄 File selected:', file.name, file.type);
+      console.log('File selected:', file.name, file.type);
       // TODO: Implement file upload to WhatsApp
     }
   };
@@ -568,7 +568,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   const handleImageVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      console.log('🖼️ Image/Video selected:', file.name, file.type);
+      console.log('Image/Video selected:', file.name, file.type);
       // TODO: Implement image/video upload to WhatsApp
     }
   };
@@ -579,7 +579,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     
     // Simple auto-refresh - fetch conversations every 30 seconds
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing conversations');
+      console.log('Auto-refreshing conversations');
       fetchWhatsAppConversations();
     }, 30000);
     
@@ -598,7 +598,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     if (!selectedConversation) return;
 
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing messages for selected conversation');
+      console.log('Auto-refreshing messages for selected conversation');
       
       fetchMessages(selectedConversation, true); // Pass true for isAutoRefresh
     }, 15000); // Refresh messages every 15 seconds
@@ -656,7 +656,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       id: 'p5',
       name: 'Premium Phone Case',
       price: 29.99,
-      image: '📱',
+      image: 'phone-case.jpg',
       description: 'Durable protection with elegant design',
       category: 'accessories',
       inStock: true
@@ -706,12 +706,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     // If conversation not found in the list, try to extract phone from the conversation ID
     let phoneNumber: string;
     if (!conversation) {
-      console.warn('⚠️ Conversation not found in list, extracting from ID:', selectedConversation);
+      console.warn('Conversation not found in list, extracting from ID:', selectedConversation);
       // Extract phone number from wa_<phone> format
       if (selectedConversation.startsWith('wa_')) {
         phoneNumber = '+' + selectedConversation.replace('wa_', '');
       } else {
-        console.error('❌ No conversation found for ID:', selectedConversation);
+        console.error('No conversation found for ID:', selectedConversation);
         return;
       }
     } else {
@@ -757,7 +757,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       const result = await response.json();
       
       if (result.success) {
-        console.log('✅ Message sent successfully:', result);
+        console.log('Message sent successfully:', result);
         
         // Update message status to sent
         setMessages(prev => prev.map(msg => 
@@ -776,7 +776,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
         }, 1000);
 
       } else {
-        console.error('❌ Failed to send message:', result);
+        console.error('Failed to send message:', result);
         
         // Check if it's a 24-hour rule violation
         const isReEngagementError = result.error && 
@@ -800,7 +800,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
         }
       }
     } catch (error) {
-      console.error('❌ Error sending message:', error);
+      console.error('Error sending message:', error);
       
       // Show error to user with more context
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -859,7 +859,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
 
     const message: Message = {
       id: `m${Date.now()}`,
-      text: `I recommend this product for you: 💡`,
+      text: `I recommend this product for you:`,
       sender: 'agent',
       timestamp: new Date(),
       type: 'product',
@@ -920,7 +920,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       )
     );
 
-    console.log('✅ Contact saved successfully:', contactInfo);
+    console.log('Contact saved successfully:', contactInfo);
   };
 
   // Handle starting a new WhatsApp conversation
@@ -960,7 +960,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
         unreadCount: 0,
         status: 'active',
         isWhatsApp: true,
-        avatar: '📱'
+        avatar: 'user-avatar.png'
       };
 
       // Add to conversations list
@@ -972,9 +972,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
       // Reset the input to the prefix
       setNewConversationPhone('+1 (868) ');
       
-      console.log('✅ New WhatsApp conversation started for:', cleanedPhone);
+      console.log('New WhatsApp conversation started for:', cleanedPhone);
     } catch (error) {
-      console.error('❌ Error starting new conversation:', error);
+      console.error('Error starting new conversation:', error);
     }
   };
 
@@ -1038,9 +1038,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
           : conv
       ));
 
-      console.log('✅ Template message sent successfully:', result);
+      console.log('Template message sent successfully:', result);
     } catch (error) {
-      console.error('❌ Error sending template:', error);
+      console.error('Error sending template:', error);
       alert('Failed to send template message. Please try again.');
     }
   };
@@ -1172,7 +1172,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     // Send order confirmation message
     const orderMessage: Message = {
       id: `m${Date.now()}`,
-      text: `Order placed successfully! 🎉`,
+      text: `Order placed successfully!`,
       sender: 'agent',
       timestamp: new Date(),
       type: 'order',
@@ -1200,11 +1200,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
 
   const getStatusIcon = (status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed') => {
     switch (status) {
-      case 'sending': return '🔄';
-      case 'sent': return '✓';
-      case 'delivered': return '✓✓';
-      case 'read': return '✓✓';
-      case 'failed': return '❌';
+      case 'sending': return 'Sending...';
+      case 'sent': return 'Sent';
+      case 'delivered': return 'Delivered';
+      case 'read': return 'Read';
+      case 'failed': return 'Failed';
       default: return '';
     }
   };
@@ -1220,8 +1220,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
     }
   };
 
-  // WhatsApp emoji categories (organized like the latest WhatsApp)
-  const recentEmojis = ['😊', '👍', '❤️', '😂', '😢', '😮', '😡', '🎉'];
+  // WhatsApp emoji categories (simplified for remake)
+  const recentEmojis: string[] = []; // Disabled for complete remake
   
   // const frequentlyUsed = [
   //   '�', '😃', '😄', '😁', '�😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰',
@@ -1235,11 +1235,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   //   '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
   // ];
 
-  const businessEmojis = [
-    '💼', '📦', '🚚', '🏪', '🛍️', '💎', '👤', '👨‍👩‍👧‍👦', 
-    '💼', '📞', '📱', '⏰', '📍', '🎯', '✅', '❌', '⭐', '💯', '🔥', '👌',
-    '💪', '🙌', '👏', '🤝', '🤞', '✌️', '🤟', '🤘', '👍', '👎', '👊', '✊'
-  ];
+  const businessEmojis: string[] = []; // Disabled for complete remake
 
   // Combine all emojis for easy access
   // const allEmojis = [...new Set([...recentEmojis, ...frequentlyUsed, ...businessEmojis])];
@@ -1295,7 +1291,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
           {/* Conversation List */}
           <div className="conversations-panel">
             <div className="panel-header">
-              <h3>💬 Conversations</h3>
+              <h3>Conversations</h3>
               <div className="search-box">
                 <div className="search-input-wrapper">
                   <input
@@ -1868,7 +1864,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                     <div className="emoji-picker">
                       <div className="emoji-categories">
                         <div className="emoji-category">
-                          <div className="emoji-category-title">😊 Recent</div>
+                          <div className="emoji-category-title">Recent</div>
                           <div className="emoji-grid">
                             {recentEmojis.map((emoji, index) => (
                               <button
@@ -1882,7 +1878,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                           </div>
                         </div>
                         <div className="emoji-category">
-                          <div className="emoji-category-title">💼 Business</div>
+                          <div className="emoji-category-title">Business</div>
                           <div className="emoji-grid">
                             {businessEmojis.map((emoji, index) => (
                               <button
@@ -1896,7 +1892,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                           </div>
                         </div>
                         <div className="emoji-category">
-                          <div className="emoji-category-title">😀 Smileys</div>
+                          <div className="emoji-category-title">Smileys</div>
                           <div className="emoji-grid">
                             {recentEmojis.map((emoji, index) => (
                               <button
