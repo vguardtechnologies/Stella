@@ -1221,7 +1221,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   };
 
   // WhatsApp emoji categories (simplified for remake)
-  const recentEmojis: string[] = []; // Disabled for complete remake
+  // const recentEmojis: string[] = []; // Disabled for complete remake
   
   // const frequentlyUsed = [
   //   '�', '😃', '😄', '😁', '�😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰',
@@ -1235,15 +1235,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
   //   '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
   // ];
 
-  const businessEmojis: string[] = []; // Disabled for complete remake
+  // const businessEmojis: string[] = []; // Disabled for complete remake
 
   // Combine all emojis for easy access
   // const allEmojis = [...new Set([...recentEmojis, ...frequentlyUsed, ...businessEmojis])];
 
-  const addEmoji = (emoji: string) => {
-    setNewMessage(prev => prev + emoji);
-    setShowEmojiPicker(false);
-  };
+  // const addEmoji = (emoji: string) => {
+  //   setNewMessage(prev => prev + emoji);
+  //   setShowEmojiPicker(false);
+  // };
 
   // Close attachment menu when clicking outside
   useEffect(() => {
@@ -1860,54 +1860,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                     </div>
                   )}
 
-                  {showEmojiPicker && (
-                    <div className="emoji-picker">
-                      <div className="emoji-categories">
-                        <div className="emoji-category">
-                          <div className="emoji-category-title">Recent</div>
-                          <div className="emoji-grid">
-                            {recentEmojis.map((emoji, index) => (
-                              <button
-                                key={`recent-${index}`}
-                                className="emoji-button"
-                                onClick={() => addEmoji(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="emoji-category">
-                          <div className="emoji-category-title">Business</div>
-                          <div className="emoji-grid">
-                            {businessEmojis.map((emoji, index) => (
-                              <button
-                                key={`business-${index}`}
-                                className="emoji-button"
-                                onClick={() => addEmoji(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="emoji-category">
-                          <div className="emoji-category-title">Smileys</div>
-                          <div className="emoji-grid">
-                            {recentEmojis.map((emoji, index) => (
-                              <button
-                                key={`smiley-${index}`}
-                                className="emoji-button"
-                                onClick={() => addEmoji(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {/* Emoji picker disabled for remake */}
                   
                   <div className="message-input-wrapper">
                     <button 
@@ -1916,12 +1869,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                       title="Attach files"
                     >
                       📎
-                    </button>
-                    <button 
-                      className="emoji-btn"
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    >
-                      😊
                     </button>
                     <textarea
                       value={newMessage}
