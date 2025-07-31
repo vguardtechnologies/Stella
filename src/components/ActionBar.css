@@ -3,51 +3,59 @@
   left: 0;
   top: 0;
   height: 100vh;
-  width: 60px;
-  background: rgba(23, 23, 23, 0.95);
-  backdrop-filter: blur(10px);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  width: 65px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem 0;
+  padding: 1.5rem 0;
   z-index: 1000;
-  transition: width 0.3s ease;
+  transition: all 0.3s ease;
+  box-shadow: 4px 0 20px rgba(249, 168, 212, 0.1);
 }
 
 .action-bar:hover {
-  width: 70px;
+  width: 75px;
+  background: rgba(255, 228, 230, 0.9);
 }
 
 .action-button {
-  width: 40px;
-  height: 40px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #ffffff;
+  width: 45px;
+  height: 45px;
+  background: rgba(249, 168, 212, 0.1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  color: var(--accent-purple);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1rem;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   position: relative;
+  backdrop-filter: blur(8px);
+  font-size: 1.1rem;
 }
 
 .action-button:hover {
-  background: rgba(100, 108, 255, 0.2);
-  border-color: rgba(100, 108, 255, 0.4);
-  transform: scale(1.05);
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  color: white;
+  border-color: transparent;
+  transform: scale(1.1);
+  box-shadow: var(--shadow-hover);
 }
 
 .action-button:active {
-  transform: scale(0.95);
+  transform: scale(1.05);
 }
 
 .home-button {
-  background: rgba(100, 108, 255, 0.1);
-  border-color: rgba(100, 108, 255, 0.3);
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  color: white;
+  border-color: transparent;
+  box-shadow: var(--shadow-soft);
   margin-bottom: 1rem;
 }
 

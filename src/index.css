@@ -1,68 +1,238 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  /* Feminine Pastel Color Palette */
+  --pastel-rose: #FFE4E6;
+  --pastel-lavender: #E6E6FA;
+  --pastel-blush: #FDF2F8;
+  --pastel-mauve: #F3E8FF;
+  --pastel-powder: #FCE7F3;
+  --pastel-lilac: #F5F3FF;
+  --pastel-orchid: #FAF5FF;
+  --pastel-pearl: #FEFCFF;
+  
+  /* Accent Colors for Interactive Elements */
+  --accent-rose: #F9A8D4;
+  --accent-purple: #C084FC;
+  --accent-pink: #F472B6;
+  --accent-lavender: #A78BFA;
+  
+  /* Text Colors */
+  --text-primary: #4C1D4B;
+  --text-secondary: #7C3AED;
+  --text-muted: #A855F7;
+  --text-light: #C4B5FD;
+  
+  /* Glass Effect Variables */
+  --glass-bg: rgba(255, 228, 230, 0.8);
+  --glass-border: rgba(249, 168, 212, 0.2);
+  --glass-blur: blur(12px);
+  
+  /* Shadow Variables */
+  --shadow-soft: 0 4px 20px rgba(249, 168, 212, 0.15);
+  --shadow-hover: 0 8px 32px rgba(249, 168, 212, 0.25);
+  --shadow-focus: 0 0 0 3px rgba(192, 132, 252, 0.3);
+  
+  /* Border Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  color: var(--text-primary);
+  
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* Global Styles */
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  padding: 0;
   min-height: 100vh;
+  background: linear-gradient(135deg, 
+    var(--pastel-blush) 0%,
+    var(--pastel-orchid) 50%,
+    var(--pastel-lilac) 100%
+  );
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+/* Glass Container Base */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-soft);
+  transition: all 0.3s ease;
+}
+
+.glass:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 1rem 0;
 }
 
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  font-size: 2.5rem;
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+h2 {
+  font-size: 2rem;
+  color: var(--text-secondary);
+}
+
+h3 {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+}
+
+p {
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+/* Links */
+a {
+  color: var(--accent-purple);
+  text-decoration: none;
   font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: all 0.3s ease;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
+a:hover {
+  color: var(--accent-pink);
+  text-shadow: 0 0 8px rgba(244, 114, 182, 0.3);
+}
+
+/* Button Styles */
+button {
+  border-radius: var(--radius-lg);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Primary Button */
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  color: white;
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary Button */
+.btn-secondary {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 228, 230, 0.9);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Ghost Button */
+.btn-ghost {
+  background: transparent;
+  color: var(--accent-purple);
+  border: 1px solid var(--accent-purple);
+}
+
+.btn-ghost:hover {
+  background: var(--pastel-mauve);
+  transform: translateY(-1px);
+}
+
+/* Focus States */
+button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* Input Styles */
+input, textarea, select {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  backdrop-filter: var(--glass-blur);
+  transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+  box-shadow: var(--shadow-focus);
+  background: rgba(255, 228, 230, 0.9);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Utility Classes */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-2xl { border-radius: var(--radius-2xl); }
+
+.shadow-soft { box-shadow: var(--shadow-soft); }
+.shadow-hover { box-shadow: var(--shadow-hover); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+  
   button {
-    background-color: #f9f9f9;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.9rem;
   }
 }
