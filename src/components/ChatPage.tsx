@@ -273,37 +273,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
 
-  // Shopify Search State
-  const [shopifySearchQuery, setShopifySearchQuery] = useState('');
-  const [shopifySearchType, setShopifySearchType] = useState('products');
-  const [shopifySearchResults, setShopifySearchResults] = useState<any>(null);
-  const [shopifySearchLoading, setShopifySearchLoading] = useState(false);
-
-  const handleShopifySearch = async () => {
-    if (!shopifySearchQuery && shopifySearchType !== 'profile') return;
-    setShopifySearchLoading(true);
-    setShopifySearchResults(null);
-    try {
-      const params = new URLSearchParams({
-        type: shopifySearchType,
-        q: shopifySearchQuery
-      });
-      const res = await fetch(`/api/shopify/search?${params.toString()}`);
-      const data = await res.json();
-      setShopifySearchResults(data.data || data);
-    } catch (err) {
-      let msg = 'Unknown error';
-      if (err && typeof err === 'object' && 'message' in err) {
-        msg = (err as any).message;
-      } else if (typeof err === 'string') {
-        msg = err;
-      }
-      setShopifySearchResults({ error: msg });
-    } finally {
-      setShopifySearchLoading(false);
-    }
-  };
-
   // Function to open image modal
   const openImageModal = (imageUrl: string, caption?: string) => {
     setModalImageUrl(imageUrl);
@@ -610,57 +579,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const allConversations = whatsappConversations
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-  // Mock products
-  const products: Product[] = [
-    {
-      id: 'p1',
-      name: 'Premium Wireless Headphones',
-      price: 199.99,
-      image: '🎧',
-      description: 'High-quality wireless headphones with noise cancellation',
-      category: 'electronics',
-      sizes: ['One Size'],
-      inStock: true
-    },
-    {
-      id: 'p2',
-      name: 'Smart Fitness Watch',
-      price: 299.99,
-      image: '⌚',
-      description: 'Advanced fitness tracking with heart rate monitor',
-      category: 'wearables',
-      sizes: ['S', 'M', 'L'],
-      inStock: true
-    },
-    {
-      id: 'p3',
-      name: 'Portable Bluetooth Speaker',
-      price: 79.99,
-      image: '�',
-      description: 'Waterproof portable speaker with rich sound',
-      category: 'audio',
-      inStock: true
-    },
-    {
-      id: 'p4',
-      name: 'Wireless Phone Charger',
-      price: 49.99,
-      image: '�',
-      description: 'Fast wireless charging pad for all devices',
-      category: 'accessories',
-      inStock: true
-    },
-    {
-      id: 'p5',
-      name: 'Premium Phone Case',
-      price: 29.99,
-      image: 'phone-case.jpg',
-      description: 'Durable protection with elegant design',
-      category: 'accessories',
-      inStock: true
-    }
-  ];
-
   // Smart scroll behavior - only scroll to bottom when appropriate
   useEffect(() => {
     if (shouldAutoScroll && isNearBottom) {
@@ -828,51 +746,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  const addToCart = (product: Product, quantity: number = 1, size?: string) => {
-    const item: OrderItem = {
-      productId: product.id,
-      productName: product.name,
-      quantity,
-      price: product.price,
-      size
-    };
-
-    setCurrentOrder(prev => {
-      const existingIndex = prev.findIndex(item => 
-        item.productId === product.id && item.size === size
-      );
-      
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex].quantity += quantity;
-        return updated;
-      } else {
-        return [...prev, item];
-      }
-    });
-  };
-
-  const sendProductRecommendation = (product: Product) => {
-    if (!selectedConversation) return;
-
-    const message: Message = {
-      id: `m${Date.now()}`,
-      text: `I recommend this product for you:`,
-      sender: 'agent',
-      timestamp: new Date(),
-      type: 'product',
-      productData: product,
-      status: 'sending'
-    };
-
-    setMessages(prev => [...prev, message]);
-
-    // Simulate delivery status
-    setTimeout(() => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === message.id ? { ...msg, status: 'delivered' } : msg
-      ));
-    }, 1000);
+  const addToCart = (product: Product, _quantity: number = 1, _size?: string) => {
+    // Placeholder for potential future e-commerce functionality
+    console.log('Product added to cart:', product.name);
   };
 
   // Contact Management Functions
@@ -1130,58 +1006,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     loadSavedContacts();
   }, [API_BASE]);
-
-  const removeFromCart = (index: number) => {
-    setCurrentOrder(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const updateQuantity = (index: number, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(index);
-      return;
-    }
-
-    setCurrentOrder(prev => {
-      const updated = [...prev];
-      updated[index].quantity = quantity;
-      return updated;
-    });
-  };
-
-  const getTotalPrice = () => {
-    return currentOrder.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
-
-  const placeOrder = () => {
-    if (currentOrder.length === 0) {
-      alert('Please add items to your cart first');
-      return;
-    }
-
-    const order: Order = {
-      id: `ORD${Date.now()}`,
-      customerId: selectedConversation || '',
-      items: currentOrder,
-      total: getTotalPrice(),
-      status: 'pending',
-      createdAt: new Date()
-    };
-
-    // Send order confirmation message
-    const orderMessage: Message = {
-      id: `m${Date.now()}`,
-      text: `Order placed successfully!`,
-      sender: 'agent',
-      timestamp: new Date(),
-      type: 'order',
-      orderData: order,
-      status: 'delivered'
-    };
-
-    setMessages(prev => [...prev, orderMessage]);
-    setCurrentOrder([]);
-    alert(`Order #${order.id} placed successfully! Total: $${order.total.toFixed(2)}`);
-  };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
