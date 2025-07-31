@@ -30,7 +30,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-hover);
+  box-shadow: var(--shadow-hover), 0 0 40px rgba(249, 168, 212, 0.15);
   transition: all 0.3s ease;
 }
 
@@ -91,7 +91,7 @@
 
 /* Conversations Panel */
 .conversations-panel {
-  background: var(--glass-bg);
+  background: rgba(255, 228, 230, 0.85);
   backdrop-filter: var(--glass-blur);
   display: flex;
   flex-direction: column;
@@ -185,24 +185,26 @@
   width: 100%;
   padding: 10px 15px;
   padding-right: 50px;
-  background: rgba(37, 211, 102, 0.1);
-  border: 1px solid rgba(37, 211, 102, 0.3);
+  background: rgba(37, 211, 102, 0.15);
+  border: 1px solid rgba(37, 211, 102, 0.4);
   border-radius: 10px;
-  color: white;
+  color: var(--text-primary);
   font-size: 14px;
   box-sizing: border-box;
   transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
 }
 
 .starter-input::placeholder {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
 }
 
 .starter-input:focus {
   outline: none;
-  border-color: rgba(37, 211, 102, 0.6);
-  background: rgba(37, 211, 102, 0.15);
+  border-color: rgba(37, 211, 102, 0.7);
+  background: rgba(37, 211, 102, 0.2);
   box-shadow: 0 0 10px rgba(37, 211, 102, 0.3);
+  color: var(--text-primary);
 }
 
 .start-chat-btn {
@@ -237,18 +239,18 @@
 .no-conversations-found {
   text-align: center;
   padding: 40px 20px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
 }
 
 .no-conversations-found p {
-  color: white;
+  color: var(--text-primary);
   font-size: 16px;
   margin: 0 0 8px 0;
   font-weight: 500;
 }
 
 .no-conversations-found span {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -265,27 +267,28 @@ mark {
   display: flex;
   padding: 15px;
   margin-bottom: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.4);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
-  border: 1px solid transparent;
+  border: 1px solid rgba(249, 168, 212, 0.15);
 }
 
 .conversation-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.6);
   transform: translateY(-2px);
+  border-color: var(--accent-rose);
 }
 
 .conversation-item.selected {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(192, 132, 252, 0.15);
+  border-color: var(--accent-purple);
 }
 
 .conversation-avatar {
   width: 45px;
   height: 45px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-lavender));
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -295,6 +298,7 @@ mark {
   font-size: 18px;
   margin-right: 15px;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(192, 132, 252, 0.3);
 }
 
 .conversation-info {
@@ -310,18 +314,18 @@ mark {
 }
 
 .customer-name {
-  color: white;
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 16px;
 }
 
 .timestamp {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .last-message {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
   font-size: 14px;
   margin-bottom: 8px;
   overflow: hidden;
@@ -354,11 +358,12 @@ mark {
 
 /* Chat Panel */
 .chat-panel {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 228, 230, 0.75);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  backdrop-filter: var(--glass-blur);
 }
 
 .chat-header-info {
@@ -366,18 +371,19 @@ mark {
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: var(--glass-blur);
 }
 
 .customer-details h3 {
-  color: white;
+  color: var(--text-primary);
   margin: 0 0 5px 0;
   font-size: 18px;
 }
 
 .customer-details span {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -387,19 +393,23 @@ mark {
 }
 
 .action-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
   padding: 8px 15px;
   border-radius: 8px;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
 }
 
 .action-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  color: white;
+  border-color: transparent;
   transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
 }
 
 .messages-container {
@@ -498,18 +508,20 @@ mark {
 
 .message-timestamp {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   margin-top: 5px;
 }
 
 .user-message .message-timestamp {
   align-self: flex-start;
   text-align: left;
+  color: var(--text-muted);
 }
 
 .agent-message .message-timestamp {
   align-self: flex-end;
   text-align: right;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .product-message,
@@ -539,13 +551,13 @@ mark {
 }
 
 .product-details h4 {
-  color: white;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
   font-size: 16px;
 }
 
 .product-details p {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
   margin: 0 0 10px 0;
   font-size: 14px;
 }
@@ -574,11 +586,12 @@ mark {
 }
 
 .order-confirmation {
-  background: rgba(76, 175, 80, 0.2);
+  background: rgba(76, 175, 80, 0.15);
   border: 1px solid rgba(76, 175, 80, 0.4);
   border-radius: 12px;
   padding: 15px;
-  color: white;
+  color: var(--text-primary);
+  backdrop-filter: blur(8px);
 }
 
 .order-confirmation h4 {
@@ -589,6 +602,7 @@ mark {
 .order-confirmation p {
   margin: 5px 0;
   font-size: 14px;
+  color: var(--text-secondary);
 }
 
 .no-conversation-selected {
@@ -602,13 +616,13 @@ mark {
 }
 
 .no-conversation-selected h3 {
-  color: white;
+  color: var(--text-primary);
   margin-bottom: 15px;
   font-size: 24px;
 }
 
 .no-conversation-selected p {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
   font-size: 16px;
   line-height: 1.5;
 }
@@ -621,7 +635,7 @@ mark {
 }
 
 .typing-bubble {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 18px;
   border-bottom-left-radius: 6px;
   padding: 12px 16px;
@@ -629,6 +643,7 @@ mark {
   align-items: center;
   gap: 8px;
   backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
 }
 
 .typing-bubble.client-typing {
@@ -653,7 +668,7 @@ mark {
 .typing-dots span {
   width: 6px;
   height: 6px;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--accent-purple);
   border-radius: 50%;
   animation: typing 1.4s infinite ease-in-out;
 }
@@ -667,7 +682,7 @@ mark {
 }
 
 .typing-text {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-muted);
   font-size: 12px;
   font-style: italic;
 }
@@ -793,8 +808,8 @@ mark {
 }
 
 .emoji-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(249, 168, 212, 0.2);
+  border: 1px solid var(--glass-border);
   border-radius: 50%;
   width: 40px;
   height: 40px;
@@ -805,16 +820,20 @@ mark {
   font-size: 18px;
   transition: all 0.3s ease;
   flex-shrink: 0;
+  color: var(--accent-purple);
+  backdrop-filter: blur(8px);
 }
 
 .emoji-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  color: white;
   transform: scale(1.1);
+  box-shadow: var(--shadow-soft);
 }
 
 .multimedia-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(249, 168, 212, 0.2);
+  border: 1px solid var(--glass-border);
   border-radius: 50%;
   width: 40px;
   height: 40px;
@@ -825,12 +844,15 @@ mark {
   font-size: 18px;
   transition: all 0.3s ease;
   flex-shrink: 0;
-  color: white;
+  color: var(--accent-purple);
+  backdrop-filter: blur(8px);
 }
 
 .multimedia-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  color: white;
   transform: scale(1.1);
+  box-shadow: var(--shadow-soft);
 }
 
 /* Multimedia Message Styles */
@@ -872,27 +894,29 @@ mark {
   display: inline-block;
   margin-top: 8px;
   padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(192, 132, 252, 0.2);
   border-radius: 6px;
-  color: white;
+  color: var(--text-primary);
   text-decoration: none;
   font-size: 12px;
   transition: background 0.3s ease;
+  border: 1px solid var(--accent-purple);
 }
 
 .document-link:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--accent-purple);
+  color: white;
 }
 
 .caption, .filename {
   margin-top: 4px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-muted);
 }
 
 .media-id {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
@@ -951,10 +975,11 @@ mark {
 
 /* Shopify Panel */
 .shopify-panel {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 228, 230, 0.75);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  backdrop-filter: var(--glass-blur);
 }
 
 .shop-tabs {
@@ -964,25 +989,28 @@ mark {
 }
 
 .tab-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
   transition: all 0.3s ease;
   flex: 1;
+  backdrop-filter: blur(8px);
 }
 
 .tab-btn.active {
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-lavender));
   color: white;
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: transparent;
+  box-shadow: var(--shadow-soft);
 }
 
 .tab-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--accent-rose);
 }
 
 .shop-content {
@@ -998,16 +1026,18 @@ mark {
 }
 
 .product-card {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 12px;
   padding: 15px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--glass-border);
   transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
 }
 
 .product-card:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.8);
   transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
 }
 
 .product-card .product-image {
@@ -1017,13 +1047,13 @@ mark {
 }
 
 .product-info h4 {
-  color: white;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
   font-size: 14px;
 }
 
 .product-description {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
   font-size: 12px;
   margin: 0 0 10px 0;
   line-height: 1.3;
@@ -1041,12 +1071,13 @@ mark {
 }
 
 .size-tag {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(192, 132, 252, 0.2);
+  color: var(--text-primary);
   font-size: 10px;
   padding: 3px 6px;
   border-radius: 6px;
   margin-right: 5px;
+  border: 1px solid var(--accent-purple);
 }
 
 .product-actions {
@@ -1089,11 +1120,11 @@ mark {
 .empty-cart {
   text-align: center;
   padding: 40px 20px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
 }
 
 .empty-cart h4 {
-  color: white;
+  color: var(--text-primary);
   margin-bottom: 10px;
 }
 
@@ -1104,21 +1135,22 @@ mark {
 }
 
 .cart-item {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 10px;
   padding: 15px;
   margin-bottom: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px);
 }
 
 .item-info h4 {
-  color: white;
+  color: var(--text-primary);
   margin: 0 0 5px 0;
   font-size: 14px;
 }
 
 .item-size {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -1136,9 +1168,9 @@ mark {
 }
 
 .qty-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
+  background: rgba(192, 132, 252, 0.2);
+  border: 1px solid var(--accent-purple);
+  color: var(--text-primary);
   width: 25px;
   height: 25px;
   border-radius: 50%;
@@ -1147,14 +1179,16 @@ mark {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.3s ease;
 }
 
 .qty-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--accent-purple);
+  color: white;
 }
 
 .quantity {
-  color: white;
+  color: var(--text-primary);
   font-weight: 600;
   min-width: 20px;
   text-align: center;
@@ -1185,15 +1219,20 @@ mark {
 }
 
 .cart-summary {
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid var(--glass-border);
   padding-top: 15px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  margin: 0 -15px -15px -15px;
+  padding: 15px;
 }
 
 .total-price {
-  color: white;
+  color: var(--text-primary);
   font-size: 18px;
   margin-bottom: 15px;
   text-align: center;
+  font-weight: 600;
 }
 
 .place-order-btn {
@@ -1220,12 +1259,13 @@ mark {
 }
 
 .recommendations-container {
-  color: white;
+  color: var(--text-primary);
 }
 
 .recommendations-container h4 {
   margin: 0 0 20px 0;
   font-size: 16px;
+  color: var(--text-primary);
 }
 
 .recommendation-actions {
@@ -1258,29 +1298,31 @@ mark {
 }
 
 .size-guide-preview {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 10px;
   padding: 15px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px);
 }
 
 .size-guide-preview h5 {
   margin: 0 0 15px 0;
   font-size: 14px;
-  color: white;
+  color: var(--text-primary);
 }
 
 .size-option {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(192, 132, 252, 0.1);
   padding: 8px 12px;
   border-radius: 6px;
   margin-bottom: 8px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-secondary);
+  border: 1px solid rgba(192, 132, 252, 0.2);
 }
 
 .size-option strong {
-  color: white;
+  color: var(--text-primary);
 }
 
 /* Responsive Design */
@@ -1328,7 +1370,7 @@ mark {
 .messages-container::-webkit-scrollbar-track,
 .shop-content::-webkit-scrollbar-track,
 .cart-items::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(249, 168, 212, 0.1);
   border-radius: 3px;
 }
 
@@ -1336,7 +1378,7 @@ mark {
 .messages-container::-webkit-scrollbar-thumb,
 .shop-content::-webkit-scrollbar-thumb,
 .cart-items::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--accent-rose);
   border-radius: 3px;
 }
 
@@ -1344,7 +1386,7 @@ mark {
 .messages-container::-webkit-scrollbar-thumb:hover,
 .shop-content::-webkit-scrollbar-thumb:hover,
 .cart-items::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--accent-purple);
 }
 
 /* WhatsApp Message Styles */
@@ -1360,10 +1402,10 @@ mark {
 
 .whatsapp-message .media-id {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.8);
   margin-top: 8px;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.3);
   border-radius: 6px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   letter-spacing: 0.5px;
@@ -1374,9 +1416,9 @@ mark {
 .whatsapp-message .location-data {
   margin-top: 8px;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
   padding: 4px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* Voice Message */
@@ -1560,7 +1602,7 @@ mark {
   gap: 6px;
   margin-top: 5px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-muted);
 }
 
 .live-dot {
@@ -1597,13 +1639,13 @@ mark {
   position: absolute;
   bottom: 100%;
   left: 10px;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 228, 230, 0.98);
   backdrop-filter: blur(20px);
   border-radius: 12px;
   padding: 8px;
   margin-bottom: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(249, 168, 212, 0.3);
+  border: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1620,13 +1662,14 @@ mark {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 500;
 }
 
 .attachment-option:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+  color: white;
   transform: translateX(4px);
 }
 
