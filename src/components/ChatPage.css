@@ -185,8 +185,8 @@
   width: 100%;
   padding: 10px 15px;
   padding-right: 50px;
-  background: rgba(37, 211, 102, 0.15);
-  border: 1px solid rgba(37, 211, 102, 0.4);
+  background: rgba(37, 211, 102, 0.08);
+  border: 1px solid rgba(37, 211, 102, 0.2);
   border-radius: 10px;
   color: var(--text-primary);
   font-size: 14px;
@@ -201,16 +201,16 @@
 
 .starter-input:focus {
   outline: none;
-  border-color: rgba(37, 211, 102, 0.7);
-  background: rgba(37, 211, 102, 0.2);
-  box-shadow: 0 0 10px rgba(37, 211, 102, 0.3);
+  border-color: rgba(37, 211, 102, 0.4);
+  background: rgba(37, 211, 102, 0.12);
+  box-shadow: 0 0 10px rgba(37, 211, 102, 0.15);
   color: var(--text-primary);
 }
 
 .start-chat-btn {
   position: absolute;
   right: 8px;
-  background: rgba(37, 211, 102, 0.8);
+  background: rgba(37, 211, 102, 0.5);
   border: none;
   color: white;
   width: 28px;
@@ -225,9 +225,9 @@
 }
 
 .start-chat-btn:hover {
-  background: rgba(37, 211, 102, 1);
+  background: rgba(37, 211, 102, 0.7);
   transform: scale(1.1);
-  box-shadow: 0 0 10px rgba(37, 211, 102, 0.5);
+  box-shadow: 0 0 10px rgba(37, 211, 102, 0.25);
 }
 
 .conversations-list {
@@ -370,26 +370,45 @@ mark {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 20px 25px;
   border-bottom: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 228, 230, 0.3);
   backdrop-filter: var(--glass-blur);
+  min-height: 80px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.customer-details {
+  flex: 1;
+  min-width: 200px;
+  overflow: hidden;
 }
 
 .customer-details h3 {
   color: var(--text-primary);
   margin: 0 0 5px 0;
   font-size: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .customer-details span {
   color: var(--text-muted);
   font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .chat-actions {
   display: flex;
   gap: 10px;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 .action-btn {
@@ -1357,6 +1376,29 @@ mark {
   .conversations-panel,
   .shopify-panel {
     max-height: 200px;
+  }
+  
+  .chat-header-info {
+    padding: 15px 20px;
+    min-height: auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .customer-details {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .chat-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .action-btn {
+    font-size: 12px;
+    padding: 6px 12px;
   }
 }
 
