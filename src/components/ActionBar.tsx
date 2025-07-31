@@ -10,6 +10,7 @@ interface ActionBarProps {
   onContactsClick?: () => void;
   onLoginClick?: () => void;
   onShopifyClick?: () => void;
+  onFacebookClick?: () => void;
 }
 
 const ActionBar: React.FC<ActionBarProps> = ({ 
@@ -20,7 +21,8 @@ const ActionBar: React.FC<ActionBarProps> = ({
   onChatClick,
   onContactsClick,
   onLoginClick,
-  onShopifyClick
+  onShopifyClick,
+  onFacebookClick
 }) => {
   return (
     <div className="action-bar">
@@ -127,6 +129,14 @@ const ActionBar: React.FC<ActionBarProps> = ({
         onClick={onShopifyClick || (() => console.log('Shopify functionality'))}
       >
         🛒
+      </button>
+      
+      <button 
+        className="action-button facebook-button" 
+        title="Facebook & Instagram Integration"
+        onClick={onFacebookClick || (() => console.log('Facebook Integration functionality'))}
+      >
+        📘
       </button>
       
       <button className="action-button" title="Menu">

@@ -3,6 +3,7 @@ import VideoMessage from './VideoMessage';
 import ContactManager from './ContactManager';
 import ImageModal from './ImageModal';
 import WhatsAppTemplateManager from './WhatsAppTemplateManager';
+import MediaBrowser from './MediaBrowser';
 import './ChatPage.css';
 
 // Template interface for WhatsApp templates
@@ -277,6 +278,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // Template Management State
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  
+  // Media Browser State
+  const [showMediaBrowser, setShowMediaBrowser] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -543,9 +547,26 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   };
 
   const handleMediaSelect = () => {
-    // TODO: Implement media gallery/library access
     console.log('Media gallery selected');
     setShowAttachmentMenu(false);
+    setShowMediaBrowser(true);
+  };
+
+  const handleMediaFromBrowser = (mediaUrl: string, caption?: string) => {
+    console.log('Media selected from browser:', mediaUrl);
+    
+    // Create a fake message with the selected media
+    const newMessage = {
+      id: Date.now().toString(),
+      text: caption || 'Shared media from social account',
+      sender: 'agent' as const,
+      timestamp: new Date(),
+      mediaUrl: mediaUrl,
+      mediaType: mediaUrl.includes('.mp4') || mediaUrl.includes('video') ? 'video' : 'image'
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setShowMediaBrowser(false);
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2051,6 +2072,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         onClose={() => setShowTemplateManager(false)}
         onUseTemplate={handleUseTemplate}
       />
+
+      {/* Media Browser */}
+      {showMediaBrowser && (
+        <MediaBrowser
+          onClose={() => setShowMediaBrowser(false)}
+          onSelectMedia={handleMediaFromBrowser}
+        />
+      )}
     </div>
   );
 };

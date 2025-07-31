@@ -56,9 +56,13 @@ try {
   app.use('/api/contacts', contactsHandler);
   console.log('✅ Contacts routes loaded');
 
-  const shopifyHandler = require('./api/shopify.js');
-  app.use('/api/shopify', shopifyHandler);
-  console.log('✅ Shopify routes loaded');
+  // const shopifyHandler = require('./api/shopify.js');
+  // app.use('/api/shopify', shopifyHandler);
+  // console.log('✅ Shopify routes loaded');
+
+  const facebookHandler = require('./api/facebook.js');
+  app.use('/api/facebook', facebookHandler);
+  console.log('✅ Facebook routes loaded');
   
 } catch (error) {
   console.log('⚠️ API routes error:', error.message);
