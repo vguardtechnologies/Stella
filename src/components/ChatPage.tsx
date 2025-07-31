@@ -1851,10 +1851,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       
                       {/* Separator line */}
                       <div style={{ 
-                        height: '1px', 
-                        backgroundColor: '#e1e8ed', 
-                        margin: '8px 12px',
-                        opacity: 0.7
+                        height: '2px', 
+                        backgroundColor: '#d1d7db', 
+                        margin: '12px 8px',
+                        borderRadius: '1px',
+                        opacity: 1,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                       }}></div>
                       
                       {/* Media section */}
