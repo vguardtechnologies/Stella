@@ -268,10 +268,28 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // File Preview State
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
+
+  // Privacy Configuration - can be controlled via environment variable
+  const PRIVACY_MODE = import.meta.env.VITE_PRIVACY_MODE === 'true' || true; // Default to privacy-enabled
+
   // Template Management State
   const [showTemplateManager, setShowTemplateManager] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
+
+  // Function to generate privacy-safe file description
+  // When PRIVACY_MODE is enabled, file names are never exposed in messages or logs
+  // This protects user privacy by only showing generic file type descriptions
+  const getFileDescription = (file: File): string => {
+    if (!PRIVACY_MODE) return file.name;
+    
+    if (file.type.startsWith('image/')) return 'Image';
+    if (file.type.startsWith('video/')) return 'Video';
+    return 'Document';
+  };
 
   // Function to open image modal
   const openImageModal = (imageUrl: string, caption?: string) => {
@@ -525,19 +543,62 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      console.log('File selected:', file.name, file.type);
-      // TODO: Implement file upload to WhatsApp
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      console.log('Files selected:', PRIVACY_MODE ? `${files.length} files` : files.map(f => f.name));
+      
+      // Add new files to existing selection
+      setSelectedFiles(prev => [...prev, ...files]);
+      
+      // Create preview URLs for images and videos
+      const newPreviewUrls: string[] = [];
+      files.forEach(file => {
+        if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+          const previewUrl = URL.createObjectURL(file);
+          newPreviewUrls.push(previewUrl);
+        } else {
+          newPreviewUrls.push(''); // Empty string for non-media files
+        }
+      });
+      
+      setFilePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+      setShowAttachmentMenu(false);
     }
   };
 
   const handleImageVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      console.log('Image/Video selected:', file.name, file.type);
-      // TODO: Implement image/video upload to WhatsApp
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      console.log('Images/Videos selected:', PRIVACY_MODE ? `${files.length} files` : files.map(f => f.name));
+      
+      // Add new files to existing selection
+      setSelectedFiles(prev => [...prev, ...files]);
+      
+      // Create preview URLs for all files
+      const newPreviewUrls = files.map(file => URL.createObjectURL(file));
+      setFilePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+      setShowAttachmentMenu(false);
     }
+  };
+
+  const clearFilePreview = () => {
+    // Revoke all object URLs to free memory
+    filePreviewUrls.forEach(url => {
+      if (url) URL.revokeObjectURL(url);
+    });
+    setSelectedFiles([]);
+    setFilePreviewUrls([]);
+  };
+
+  const removeFile = (index: number) => {
+    // Revoke the specific URL
+    if (filePreviewUrls[index]) {
+      URL.revokeObjectURL(filePreviewUrls[index]);
+    }
+    
+    // Remove the file and its preview URL
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setFilePreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   // Load WhatsApp data on component mount
@@ -614,7 +675,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+    if ((!newMessage.trim() && selectedFiles.length === 0) || !selectedConversation) return;
 
     // Extract phone number from conversation ID
     const conversation = whatsappConversations.find(c => c.id === selectedConversation);
@@ -636,19 +697,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     console.log('📤 Sending message to:', phoneNumber);
 
-    const message: Message = {
-      id: `m${Date.now()}`,
-      text: newMessage,
-      sender: 'agent',
-      timestamp: new Date(),
-      type: 'text',
-      status: 'sending'
-    };
-
-    // Add message to UI immediately (optimistic update)
-    setMessages(prev => [...prev, message]);
+    // Store values before clearing
     const messageToSend = newMessage;
+    const filesToSend = [...selectedFiles];
+    
+    // Clear input and file preview immediately
     setNewMessage('');
+    clearFilePreview();
     setShowEmojiPicker(false);
 
     // Enable auto-scroll and force scroll to bottom when sending a message
@@ -657,85 +712,202 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setTimeout(() => scrollToBottom(), 100);
 
     try {
-      // Send message via WhatsApp API
-      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: phoneNumber.replace(/[^\d]/g, ''), // Send only digits to the API
-          message: messageToSend,
-          type: 'text'
-        }),
-      });
+      // If there are files, send them first
+      if (filesToSend.length > 0) {
+        for (let i = 0; i < filesToSend.length; i++) {
+          const file = filesToSend[i];
+          const isLastFile = i === filesToSend.length - 1;
+          
+          // Create a message for each file
+          const fileMessage: Message = {
+            id: `m${Date.now()}_${i}`,
+            text: `[${getFileDescription(file)}]`,
+            sender: 'agent',
+            timestamp: new Date(),
+            type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document',
+            status: 'sending',
+            media_url: filePreviewUrls[i] || undefined
+          };
 
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log('Message sent successfully:', result);
-        
-        // Update message status to sent
-        setMessages(prev => prev.map(msg => 
-          msg.id === message.id ? { 
-            ...msg, 
-            status: 'sent',
-            whatsapp_message_id: result.messageId 
-          } : msg
-        ));
+          // Add message to UI immediately (optimistic update)
+          setMessages(prev => [...prev, fileMessage]);
 
-        // Update to delivered after a short delay
-        setTimeout(() => {
-          setMessages(prev => prev.map(msg => 
-            msg.id === message.id ? { ...msg, status: 'delivered' } : msg
-          ));
-        }, 1000);
+          // Send file via WhatsApp API
+          const formData = new FormData();
+          formData.append('to', phoneNumber.replace(/[^\d]/g, ''));
+          formData.append('file', file);
+          
+          // Add caption only to the last file if there's a text message
+          if (isLastFile && messageToSend) {
+            formData.append('caption', messageToSend);
+          }
 
-      } else {
-        console.error('Failed to send message:', result);
-        
-        // Check if it's a 24-hour rule violation
-        const isReEngagementError = result.error && 
-          (result.error.includes('24 hours') || 
-           result.error.includes('Re-engagement') ||
-           result.error.includes('131047'));
-        
-        // Update message status to failed with failure reason
-        setMessages(prev => prev.map(msg => 
-          msg.id === message.id ? { 
-            ...msg, 
-            status: 'failed',
-            failureReason: isReEngagementError ? '24_hour_rule' : 'general_error'
-          } : msg
-        ));
-        
-        if (isReEngagementError) {
-          alert('⏰ Cannot send message: WhatsApp Business policy requires customers to message first or you must wait for them to reply within 24 hours. The customer needs to send you a message before you can respond.');
-        } else {
-          alert('Failed to send message: ' + (result.error || 'Unknown error'));
+          const response = await fetch(`${API_BASE}/api/whatsapp/send-media`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          const result = await response.json();
+          console.log('Media upload result:', result);
+          
+          if (result.success) {
+            console.log('Media sent successfully:', result);
+            
+            // Update message status to sent
+            setMessages(prev => prev.map(msg => 
+              msg.id === fileMessage.id ? { 
+                ...msg, 
+                status: 'sent',
+                whatsapp_message_id: result.messageId 
+              } : msg
+            ));
+
+            // Update to delivered after a short delay
+            setTimeout(() => {
+              setMessages(prev => prev.map(msg => 
+                msg.id === fileMessage.id ? { ...msg, status: 'delivered' } : msg
+              ));
+            }, 1000);
+
+          } else {
+            console.error('Failed to send media:', result);
+            
+            // Update message status to failed
+            setMessages(prev => prev.map(msg => 
+              msg.id === fileMessage.id ? { 
+                ...msg, 
+                status: 'failed',
+                failureReason: 'general_error'
+              } : msg
+            ));
+            
+            alert('Failed to send file: ' + (result.error || 'Unknown error'));
+          }
         }
+        
+        // If there's a text message and it wasn't sent as caption, send it separately
+        if (messageToSend && filesToSend.length > 1) {
+          const textMessage: Message = {
+            id: `m${Date.now()}_text`,
+            text: messageToSend,
+            sender: 'agent',
+            timestamp: new Date(),
+            type: 'text',
+            status: 'sending'
+          };
+
+          setMessages(prev => [...prev, textMessage]);
+
+          const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: phoneNumber.replace(/[^\d]/g, ''),
+              message: messageToSend,
+              type: 'text'
+            }),
+          });
+
+          const result = await response.json();
+          
+          if (result.success) {
+            setMessages(prev => prev.map(msg => 
+              msg.id === textMessage.id ? { 
+                ...msg, 
+                status: 'sent',
+                whatsapp_message_id: result.messageId 
+              } : msg
+            ));
+
+            setTimeout(() => {
+              setMessages(prev => prev.map(msg => 
+                msg.id === textMessage.id ? { ...msg, status: 'delivered' } : msg
+              ));
+            }, 1000);
+          } else {
+            setMessages(prev => prev.map(msg => 
+              msg.id === textMessage.id ? { 
+                ...msg, 
+                status: 'failed',
+                failureReason: 'general_error'
+              } : msg
+            ));
+            alert('Failed to send text message: ' + (result.error || 'Unknown error'));
+          }
+        }
+        
+      } else if (messageToSend) {
+        // Handle text-only message
+        const textMessage: Message = {
+          id: `m${Date.now()}`,
+          text: messageToSend,
+          sender: 'agent',
+          timestamp: new Date(),
+          type: 'text',
+          status: 'sending'
+        };
+
+        setMessages(prev => [...prev, textMessage]);
+
+        const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: phoneNumber.replace(/[^\d]/g, ''),
+            message: messageToSend,
+            type: 'text'
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          setMessages(prev => prev.map(msg => 
+            msg.id === textMessage.id ? { 
+              ...msg, 
+              status: 'sent',
+              whatsapp_message_id: result.messageId 
+            } : msg
+          ));
+
+          setTimeout(() => {
+            setMessages(prev => prev.map(msg => 
+              msg.id === textMessage.id ? { ...msg, status: 'delivered' } : msg
+            ));
+          }, 1000);
+        } else {
+          console.error('Failed to send message:', result);
+          
+          const isReEngagementError = result.error && 
+            (result.error.includes('24 hours') || 
+             result.error.includes('Re-engagement') ||
+             result.error.includes('131047'));
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === textMessage.id ? { 
+              ...msg, 
+              status: 'failed',
+              failureReason: isReEngagementError ? '24_hour_rule' : 'general_error'
+            } : msg
+          ));
+          
+          if (isReEngagementError) {
+            alert('⏰ Cannot send message: WhatsApp Business policy requires customers to message first or you must wait for them to reply within 24 hours. The customer needs to send you a message before you can respond.');
+          } else {
+            alert('Failed to send message: ' + (result.error || 'Unknown error'));
+          }
+        }
+
       }
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Show error to user with more context
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const is24HourError = errorMessage.includes('24 hours') || errorMessage.includes('Re-engagement');
-      
-      // Update message status to failed with failure reason
-      setMessages(prev => prev.map(msg => 
-        msg.id === message.id ? { 
-          ...msg, 
-          status: 'failed',
-          failureReason: is24HourError ? '24_hour_rule' : 'general_error'
-        } : msg
-      ));
-      
-      if (is24HourError) {
-        alert('⏰ Cannot send message: WhatsApp Business policy requires customers to message first or you must wait for them to reply within 24 hours.');
-      } else {
-        alert('Error sending message: ' + errorMessage);
-      }
+      alert('Error sending message: ' + errorMessage);
     }
   };
 
@@ -1675,6 +1847,102 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
                   {/* Emoji picker disabled for remake */}
                   
+                  {/* File Preview */}
+                  {selectedFiles.length > 0 && (
+                    <div className="file-preview-container">
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                        {selectedFiles.map((file, index) => (
+                          <div key={index} className="file-preview" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+                            {filePreviewUrls[index] && file.type.startsWith('image/') && (
+                              <div className="preview-image">
+                                <img 
+                                  src={filePreviewUrls[index]} 
+                                  alt={file.name}
+                                  style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    objectFit: 'cover',
+                                    borderRadius: '8px'
+                                  }}
+                                />
+                              </div>
+                            )}
+                            {filePreviewUrls[index] && file.type.startsWith('video/') && (
+                              <div className="preview-video">
+                                <video 
+                                  src={filePreviewUrls[index]} 
+                                  controls
+                                  style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    objectFit: 'cover',
+                                    borderRadius: '8px'
+                                  }}
+                                />
+                              </div>
+                            )}
+                            {!filePreviewUrls[index] && (
+                              <div className="preview-document">
+                                <div 
+                                  className="document-icon"
+                                  style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#f0f0f0',
+                                    borderRadius: '8px',
+                                    fontSize: '32px'
+                                  }}
+                                >
+                                  📄
+                                </div>
+                              </div>
+                            )}
+                            <div className="file-info" style={{ flex: 1, minWidth: '120px' }}>
+                              <div className="file-name" style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '2px' }}>{file.name}</div>
+                              <div className="file-size" style={{ fontSize: '11px', color: '#666' }}>
+                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                              </div>
+                            </div>
+                            <button 
+                              className="remove-file-btn"
+                              onClick={() => removeFile(index)}
+                              title="Remove file"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                fontSize: '18px',
+                                cursor: 'pointer',
+                                color: '#999',
+                                padding: '2px 6px'
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#666' }}>
+                        <span>📎 {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected</span>
+                        <button 
+                          onClick={clearFilePreview}
+                          style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            color: '#007bff', 
+                            cursor: 'pointer', 
+                            fontSize: '12px',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="message-input-wrapper">
                     <button 
                       className="attachment-btn"
@@ -1694,7 +1962,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     <button 
                       className="send-btn"
                       onClick={handleSendMessage}
-                      disabled={!newMessage.trim()}
+                      disabled={!newMessage.trim() && selectedFiles.length === 0}
                     >
                       Send
                     </button>
@@ -1704,6 +1972,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   <input
                     ref={fileInputRef}
                     type="file"
+                    multiple
                     style={{ display: 'none' }}
                     onChange={handleFileUpload}
                     accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
@@ -1711,6 +1980,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   <input
                     ref={imageInputRef}
                     type="file"
+                    multiple
                     style={{ display: 'none' }}
                     onChange={handleImageVideoUpload}
                     accept="image/*,video/*"
