@@ -542,6 +542,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setShowAttachmentMenu(false);
   };
 
+  const handleMediaSelect = () => {
+    // TODO: Implement media gallery/library access
+    console.log('Media gallery selected');
+    setShowAttachmentMenu(false);
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length > 0) {
@@ -1841,6 +1847,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       <div className="attachment-option" onClick={handleLocationSelect}>
                         <div className="attachment-icon">📍</div>
                         <span>Location</span>
+                      </div>
+                      
+                      {/* Separator line */}
+                      <div style={{ 
+                        height: '1px', 
+                        backgroundColor: '#e1e8ed', 
+                        margin: '8px 12px',
+                        opacity: 0.7
+                      }}></div>
+                      
+                      {/* Media section */}
+                      <div className="attachment-option" onClick={handleMediaSelect}>
+                        <div className="attachment-icon">🎬</div>
+                        <span>Media</span>
                       </div>
                     </div>
                   )}
