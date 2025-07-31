@@ -383,6 +383,7 @@ mark {
   flex: 1;
   min-width: 200px;
   overflow: hidden;
+  position: relative;
 }
 
 .customer-details h3 {
@@ -404,6 +405,57 @@ mark {
   display: block;
 }
 
+/* Contact Saved Badge */
+.contact-saved-badge {
+  position: absolute;
+  top: 2px;
+  right: 0px;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+  animation: slideInBounce 0.5s ease-out;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.contact-saved-badge.fade-out {
+  animation: fadeOutUp 2s ease-out forwards;
+}
+
+@keyframes slideInBounce {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeOutUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-15px) scale(0.9);
+  }
+}
+
 .chat-actions {
   display: flex;
   gap: 10px;
@@ -411,20 +463,20 @@ mark {
   align-items: center;
 }
 
-.action-btn {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--glass-border);
+.chat-header-info .action-btn {
+  background: rgba(249, 168, 212, 0.4) !important;
+  border: 1px solid rgba(249, 168, 212, 0.6) !important;
   color: var(--text-primary);
   padding: 8px 15px;
   border-radius: 8px;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
 }
 
-.action-btn:hover {
-  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple));
+.chat-header-info .action-btn:hover {
+  background: linear-gradient(135deg, var(--accent-rose), var(--accent-purple)) !important;
   color: white;
   border-color: transparent;
   transform: translateY(-1px);

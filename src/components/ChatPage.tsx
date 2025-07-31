@@ -1424,10 +1424,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                       allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '',
                       allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerName
                     )}</h3>
+                    {savedContacts.has(allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '') && (
+                      <div className="contact-saved-badge">
+                        Contact Saved
+                      </div>
+                    )}
                     <span>{allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone}</span>
                   </div>
                   <div className="chat-actions">
-                    {!savedContacts.has(allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '') ? (
+                    {!savedContacts.has(allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '') && (
                       <button className="action-btn" onClick={handleSaveContact} style={{
                         backgroundColor: '#28a745',
                         color: 'white',
@@ -1442,20 +1447,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose }) => {
                       }}>
                         📇 Save Contact
                       </button>
-                    ) : (
-                      <div style={{
-                        backgroundColor: '#e8f5e8',
-                        color: '#2e7d32',
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        border: '1px solid #4caf50'
-                      }}>
-                        ✅ Contact Saved
-                      </div>
                     )}
                     <button 
                       className="action-btn" 
