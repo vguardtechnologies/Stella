@@ -731,7 +731,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     // Clear input and file preview immediately
     setNewMessage('');
     clearFilePreview();
-    setShowEmojiPicker(false);
 
     // Enable auto-scroll and force scroll to bottom when sending a message
     setShouldAutoScroll(true);
@@ -1241,30 +1240,28 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  // WhatsApp emoji categories (simplified for remake)
-  // const recentEmojis: string[] = []; // Disabled for complete remake
+  // WhatsApp emoji categories
+  const recentEmojis: string[] = [];
   
-  // const frequentlyUsed = [
-  //   '�', '😃', '😄', '😁', '�😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰',
-  //   '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑',
-  //   '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄',
-  //   '😬', '🤥', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
-  //   '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕',
-  //   '😟', '🙁', '☹️', '�', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰',
-  //   '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤',
-  //   '😡', '😠', '🤬', '�', '�', '�', '☠️', '💩', '🤡', '👹', '👺', '👻',
-  //   '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
-  // ];
+  const frequentlyUsed = [
+    '😀', '😃', '😄', '😁', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰',
+    '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑',
+    '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄',
+    '😬', '🤥', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
+    '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕',
+    '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰',
+    '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤',
+    '😡', '😠', '🤬', '👍', '👎', '👏', '☠️', '💩', '🤡', '👹', '👺', '👻',
+    '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
+  ];
 
-  // const businessEmojis: string[] = []; // Disabled for complete remake
+  const businessEmojis: string[] = [
+    '💼', '📊', '💰', '💳', '🛒', '🛍️', '📦', '📈', '📉', '💯', '✅', '❌',
+    '⭐', '🔥', '💎', '🏆', '🎯', '📱', '💻', '🖥️', '⌚', '📷', '🎵', '🎬'
+  ];
 
   // Combine all emojis for easy access
-  // const allEmojis = [...new Set([...recentEmojis, ...frequentlyUsed, ...businessEmojis])];
-
-  // const addEmoji = (emoji: string) => {
-  //   setNewMessage(prev => prev + emoji);
-  //   setShowEmojiPicker(false);
-  // };
+  const allEmojis = [...new Set([...recentEmojis, ...frequentlyUsed, ...businessEmojis])];
 
   // Close attachment menu when clicking outside
   useEffect(() => {
@@ -1272,9 +1269,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       if (showAttachmentMenu || showEmojiPicker) {
         const target = event.target as HTMLElement;
         if (!target.closest('.attachment-menu') && 
-            !target.closest('.attachment-btn') &&
-            !target.closest('.emoji-picker') &&
-            !target.closest('.emoji-btn')) {
+            !target.closest('.attachment-btn')) {
           setShowAttachmentMenu(false);
           setShowEmojiPicker(false);
         }
@@ -1842,7 +1837,104 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   </div>
                 )}
 
-                <div className="message-input-container">
+                {/* File Preview */}
+                {selectedFiles.length > 0 && (
+                  <div className="file-preview-container">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                      {selectedFiles.map((file, index) => (
+                        <div key={index} className="file-preview" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+                          {filePreviewUrls[index] && file.type.startsWith('image/') && (
+                            <div className="preview-image">
+                              <img 
+                                src={filePreviewUrls[index]} 
+                                alt={file.name}
+                                style={{
+                                  width: '80px',
+                                  height: '80px',
+                                  objectFit: 'cover',
+                                  borderRadius: '8px'
+                                }}
+                              />
+                            </div>
+                          )}
+                          {filePreviewUrls[index] && file.type.startsWith('video/') && (
+                            <div className="preview-video">
+                              <video 
+                                src={filePreviewUrls[index]} 
+                                controls
+                                style={{
+                                  width: '80px',
+                                  height: '80px',
+                                  objectFit: 'cover',
+                                  borderRadius: '8px'
+                                }}
+                              />
+                            </div>
+                          )}
+                          {!filePreviewUrls[index] && (
+                            <div className="preview-document">
+                              <div 
+                                className="document-icon"
+                                style={{
+                                  width: '80px',
+                                  height: '80px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: '#f0f0f0',
+                                  borderRadius: '8px',
+                                  fontSize: '32px'
+                                }}
+                              >
+                                📄
+                              </div>
+                            </div>
+                          )}
+                          <div className="file-info" style={{ flex: 1, minWidth: '120px' }}>
+                            <div className="file-name" style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '2px' }}>{file.name}</div>
+                            <div className="file-size" style={{ fontSize: '11px', color: '#666' }}>
+                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                            </div>
+                          </div>
+                          <button 
+                            className="remove-file-btn"
+                            onClick={() => removeFile(index)}
+                            title="Remove file"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              fontSize: '18px',
+                              cursor: 'pointer',
+                              color: '#999',
+                              padding: '2px 6px'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#666' }}>
+                      <span>📎 {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected</span>
+                      <button 
+                        onClick={clearFilePreview}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          color: '#007bff', 
+                          cursor: 'pointer', 
+                          fontSize: '12px',
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="message-input-wrapper" style={{ position: 'relative' }}>
+                  {/* Attachment Menu - moved inside wrapper for proper positioning */}
                   {showAttachmentMenu && (
                     <div className="attachment-menu">
                       <div className="attachment-option" onClick={handleFileSelect}>
@@ -1887,113 +1979,61 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       </div>
                     </div>
                   )}
-
-                  {/* Emoji picker disabled for remake */}
                   
-                  {/* File Preview */}
-                  {selectedFiles.length > 0 && (
-                    <div className="file-preview-container">
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
-                        {selectedFiles.map((file, index) => (
-                          <div key={index} className="file-preview" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-                            {filePreviewUrls[index] && file.type.startsWith('image/') && (
-                              <div className="preview-image">
-                                <img 
-                                  src={filePreviewUrls[index]} 
-                                  alt={file.name}
-                                  style={{
-                                    width: '80px',
-                                    height: '80px',
-                                    objectFit: 'cover',
-                                    borderRadius: '8px'
-                                  }}
-                                />
-                              </div>
-                            )}
-                            {filePreviewUrls[index] && file.type.startsWith('video/') && (
-                              <div className="preview-video">
-                                <video 
-                                  src={filePreviewUrls[index]} 
-                                  controls
-                                  style={{
-                                    width: '80px',
-                                    height: '80px',
-                                    objectFit: 'cover',
-                                    borderRadius: '8px'
-                                  }}
-                                />
-                              </div>
-                            )}
-                            {!filePreviewUrls[index] && (
-                              <div className="preview-document">
-                                <div 
-                                  className="document-icon"
-                                  style={{
-                                    width: '80px',
-                                    height: '80px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: '#f0f0f0',
-                                    borderRadius: '8px',
-                                    fontSize: '32px'
-                                  }}
-                                >
-                                  📄
-                                </div>
-                              </div>
-                            )}
-                            <div className="file-info" style={{ flex: 1, minWidth: '120px' }}>
-                              <div className="file-name" style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '2px' }}>{file.name}</div>
-                              <div className="file-size" style={{ fontSize: '11px', color: '#666' }}>
-                                {(file.size / 1024 / 1024).toFixed(2)} MB
-                              </div>
-                            </div>
-                            <button 
-                              className="remove-file-btn"
-                              onClick={() => removeFile(index)}
-                              title="Remove file"
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                fontSize: '18px',
-                                cursor: 'pointer',
-                                color: '#999',
-                                padding: '2px 6px'
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
+                  <button 
+                    className="attachment-btn"
+                    onClick={handleAttachmentClick}
+                    title="Attach files"
+                  >
+                    📎
+                  </button>
+                  <div className="textarea-wrapper" style={{ position: 'relative' }}>
+                    {/* Second Attachment Menu - positioned relative to textarea wrapper */}
+                    {showEmojiPicker && (
+                      <div className="attachment-menu" style={{ right: '10px', left: 'auto' }}>
+                        <div className="attachment-option" onClick={handleFileSelect}>
+                          <div className="attachment-icon">📄</div>
+                          <span>Document</span>
+                        </div>
+                        <div className="attachment-option" onClick={handlePhotoVideoSelect}>
+                          <div className="attachment-icon">🖼️</div>
+                          <span>Photos & Videos</span>
+                        </div>
+                        <div className="attachment-option" onClick={handleContactSelect}>
+                          <div className="attachment-icon">👤</div>
+                          <span>Contact</span>
+                        </div>
+                        <div className="attachment-option" onClick={handlePollSelect}>
+                          <div className="attachment-icon">📊</div>
+                          <span>Poll</span>
+                        </div>
+                        <div className="attachment-option" onClick={handleEventSelect}>
+                          <div className="attachment-icon">📅</div>
+                          <span>Event</span>
+                        </div>
+                        <div className="attachment-option" onClick={handleLocationSelect}>
+                          <div className="attachment-icon">📍</div>
+                          <span>Location</span>
+                        </div>
+                        
+                        {/* Separator line */}
+                        <div style={{ 
+                          height: '2px', 
+                          backgroundColor: '#d1d7db', 
+                          margin: '12px 8px',
+                          borderRadius: '1px',
+                          opacity: 1,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}></div>
+                        
+                        {/* Media section */}
+                        <div className="attachment-option" onClick={handleMediaSelect}>
+                          <div className="attachment-icon">🎬</div>
+                          <span>Media</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#666' }}>
-                        <span>📎 {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected</span>
-                        <button 
-                          onClick={clearFilePreview}
-                          style={{ 
-                            background: 'none', 
-                            border: 'none', 
-                            color: '#007bff', 
-                            cursor: 'pointer', 
-                            fontSize: '12px',
-                            textDecoration: 'underline'
-                          }}
-                        >
-                          Clear all
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="message-input-wrapper">
-                    <button 
-                      className="attachment-btn"
-                      onClick={handleAttachmentClick}
-                      title="Attach files"
-                    >
-                      📎
-                    </button>
+                    )}
+                    
                     <textarea
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
@@ -2001,34 +2041,55 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       placeholder="Type your message..."
                       className="message-input"
                       rows={2}
+                      style={{ paddingRight: '50px' }}
                     />
                     <button 
-                      className="send-btn"
-                      onClick={handleSendMessage}
-                      disabled={!newMessage.trim() && selectedFiles.length === 0}
+                      className="attachment-btn"
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      title="Attach files"
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '20px',
+                        cursor: 'pointer',
+                        padding: '5px',
+                        borderRadius: '4px',
+                        zIndex: 10
+                      }}
                     >
-                      Send
+                      📎
                     </button>
                   </div>
-
-                  {/* Hidden file inputs */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    style={{ display: 'none' }}
-                    onChange={handleFileUpload}
-                    accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
-                  />
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    multiple
-                    style={{ display: 'none' }}
-                    onChange={handleImageVideoUpload}
-                    accept="image/*,video/*"
-                  />
+                  <button 
+                    className="send-btn"
+                    onClick={handleSendMessage}
+                    disabled={!newMessage.trim() && selectedFiles.length === 0}
+                  >
+                    Send
+                  </button>
                 </div>
+
+                {/* Hidden file inputs */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={handleFileUpload}
+                  accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
+                />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={handleImageVideoUpload}
+                  accept="image/*,video/*"
+                />
               </>
             ) : (
               <div className="no-conversation-selected">

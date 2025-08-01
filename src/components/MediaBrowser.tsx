@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { facebookAPI } from '../api/facebook';
 import type { FacebookPage, InstagramAccount, FacebookMedia, InstagramMedia } from '../api/facebook';
+import { isDemoMode, demoFacebookUser, demoFacebookPages, demoInstagramAccounts, demoInstagramMedia, demoFacebookMedia } from '../api/demoData';
 import './MediaBrowser.css';
 
 interface MediaBrowserProps {
@@ -63,6 +64,21 @@ const MediaBrowser: React.FC<MediaBrowserProps> = ({ onClose, onSelectMedia }) =
   const handleFacebookLogin = async () => {
     setLoading(true);
     try {
+      // Check if we're in demo mode
+      if (isDemoMode()) {
+        // Use demo data instead of real API
+        const account = {
+          user: demoFacebookUser,
+          accessToken: 'demo_access_token',
+          pages: demoFacebookPages,
+          instagram: demoInstagramAccounts
+        };
+
+        setConnectedAccount(account);
+        localStorage.setItem('facebookConnection', JSON.stringify(account));
+        return;
+      }
+
       const code = await facebookAPI.openLoginPopup();
       const authResponse = await facebookAPI.exchangeCode(code);
       
@@ -81,7 +97,19 @@ const MediaBrowser: React.FC<MediaBrowserProps> = ({ onClose, onSelectMedia }) =
 
     } catch (error) {
       console.error('Facebook login error:', error);
-      alert('Failed to connect to Facebook. Please try again.');
+      
+      if (error instanceof Error && error.message.includes('SETUP_REQUIRED')) {
+        alert('⚙️ Facebook App Setup Required\n\n' +
+              'To use Facebook integration, you need to:\n' +
+              '1. Create a Facebook Developer App\n' +
+              '2. Get your App ID from Facebook Developer Console\n' +
+              '3. Add VITE_FACEBOOK_APP_ID=your_real_app_id to your .env file\n' +
+              '4. Restart the development server\n\n' +
+              'Visit: https://developers.facebook.com/apps/\n\n' +
+              '💡 For now, you can use DEMO MODE to see how it works!');
+      } else {
+        alert('Failed to connect to Facebook. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -92,6 +120,15 @@ const MediaBrowser: React.FC<MediaBrowserProps> = ({ onClose, onSelectMedia }) =
     
     setLoadingMedia(true);
     try {
+      if (isDemoMode()) {
+        // Use demo data
+        setTimeout(() => {
+          setMedia(demoInstagramMedia);
+          setLoadingMedia(false);
+        }, 1000); // Simulate loading delay
+        return;
+      }
+
       const response = await facebookAPI.getInstagramReels(instagramId, connectedAccount.accessToken);
       setMedia(response.reels);
     } catch (error) {
@@ -107,6 +144,15 @@ const MediaBrowser: React.FC<MediaBrowserProps> = ({ onClose, onSelectMedia }) =
     
     setLoadingMedia(true);
     try {
+      if (isDemoMode()) {
+        // Use demo data
+        setTimeout(() => {
+          setMedia(demoFacebookMedia);
+          setLoadingMedia(false);
+        }, 1000); // Simulate loading delay
+        return;
+      }
+
       const response = await facebookAPI.getPageMedia(pageId, connectedAccount.accessToken);
       setMedia(response.media);
     } catch (error) {
@@ -143,14 +189,25 @@ const MediaBrowser: React.FC<MediaBrowserProps> = ({ onClose, onSelectMedia }) =
           {!connectedAccount ? (
             <div className="connect-section">
               <div className="connect-prompt">
+                {isDemoMode() && (
+                  <div className="demo-banner">
+                    🎭 DEMO MODE - Try the integration without Facebook app setup!
+                  </div>
+                )}
                 <h3>Connect Your Social Media</h3>
                 <p>Connect your Facebook and Instagram accounts to browse and share your content with customers.</p>
+                {isDemoMode() ? (
+                  <p className="demo-note">
+                    📱 <strong>Demo Mode Active:</strong> Experience the full functionality with sample data. 
+                    To use real accounts, follow the setup guide in FACEBOOK_SETUP_GUIDE.md
+                  </p>
+                ) : null}
                 <button 
                   className="connect-button"
                   onClick={handleFacebookLogin}
                   disabled={loading}
                 >
-                  {loading ? 'Connecting...' : '📘 Connect Facebook & Instagram'}
+                  {loading ? 'Connecting...' : isDemoMode() ? '🎭 Try Demo Mode' : '📘 Connect Facebook & Instagram'}
                 </button>
               </div>
             </div>

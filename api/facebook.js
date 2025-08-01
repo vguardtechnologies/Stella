@@ -65,6 +65,14 @@ function handleGetAuthUrl(res) {
   const appId = process.env.VITE_FACEBOOK_APP_ID || 'your_app_id';
   const redirectUri = process.env.VITE_FACEBOOK_REDIRECT_URI || 'http://localhost:5173/auth/facebook/callback';
   
+  // Check if we have a valid App ID
+  if (!appId || appId === 'your_app_id' || appId === 'your_facebook_app_id_here') {
+    return res.status(400).json({ 
+      error: 'Facebook App ID not configured. Please set VITE_FACEBOOK_APP_ID in your environment variables.',
+      setup_required: true
+    });
+  }
+  
   const scopes = [
     'pages_read_engagement',
     'pages_manage_posts',

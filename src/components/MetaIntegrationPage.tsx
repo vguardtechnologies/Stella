@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { facebookAPI } from '../api/facebook';
+import type { FacebookUser, FacebookPage, InstagramAccount } from '../api/facebook';
 import './MetaIntegrationPage.css';
 import './MetaIntegrationPage.css';
 
@@ -11,6 +13,7 @@ interface FacebookAccount {
   name: string;
   picture: string;
   access_token?: string;
+  connected?: boolean;
 }
 
 interface FacebookPage {
@@ -64,60 +67,63 @@ const MetaIntegrationPage: React.FC<MetaIntegrationPageProps> = ({ onClose }) =>
     setConnectionStatus('connecting');
 
     try {
-      // Initialize Facebook SDK
-      if (typeof window !== 'undefined' && (window as any).FB) {
-        (window as any).FB.login((response: any) => {
-          if (response.authResponse) {
-            handleFacebookResponse(response.authResponse);
-          } else {
-            console.log('Facebook login cancelled');
-            setIsConnecting(false);
-            setConnectionStatus('disconnected');
-          }
-        }, {
-          scope: 'pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish,public_profile'
-        });
-      } else {
-        // Fallback: redirect to Facebook OAuth
-        const clientId = import.meta.env.VITE_FACEBOOK_APP_ID;
-        const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
-        const scope = 'pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish,public_profile';
-        
-        window.location.href = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
-      }
+      const code = await facebookAPI.openLoginPopup();
+      const authResponse = await facebookAPI.exchangeCode(code);
+      
+      // Get Instagram accounts
+      const instagramResponse = await facebookAPI.getInstagramAccounts(authResponse.accessToken);
+      
+      // Update state with connected account info
+      setFacebookAccount({
+        id: authResponse.user.id,
+        name: authResponse.user.name,
+        picture: authResponse.user.picture.data.url,
+        connected: true
+      });
+      
+      // Convert Facebook API pages to local format
+      setFacebookPages(authResponse.pages.map(page => ({
+        id: page.id,
+        name: page.name,
+        picture: page.picture.data.url,
+        access_token: page.access_token,
+        connected: false
+      })));
+      
+      // Convert Instagram accounts to local format
+      setInstagramAccounts(instagramResponse.instagram.map(ig => ({
+        id: ig.id,
+        username: ig.name,
+        profile_picture_url: ig.picture,
+        connected: false
+      })));
+      
+      setConnectionStatus('connected');
+      
+      // Save to localStorage
+      const connectionData = {
+        user: authResponse.user,
+        pages: authResponse.pages,
+        instagram: instagramResponse.instagram,
+        accessToken: authResponse.accessToken
+      };
+      localStorage.setItem('facebookConnection', JSON.stringify(connectionData));
+
     } catch (error) {
       console.error('Facebook login error:', error);
-      setIsConnecting(false);
-      setConnectionStatus('disconnected');
-    }
-  };
-
-  const handleFacebookResponse = async (authResponse: any) => {
-    try {
-      // Send access token to backend for processing
-      const response = await fetch(`${API_BASE}/api/meta/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_token: authResponse.accessToken,
-          user_id: authResponse.userID
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setFacebookAccount(data.facebook_account);
-        setFacebookPages(data.facebook_pages || []);
-        setInstagramAccounts(data.instagram_accounts || []);
-        setConnectionStatus('connected');
+      
+      if (error instanceof Error && error.message.includes('SETUP_REQUIRED')) {
+        alert('⚙️ Facebook App Setup Required\n\n' +
+              'To use Facebook integration, you need to:\n' +
+              '1. Create a Facebook Developer App\n' +
+              '2. Get your App ID from Facebook Developer Console\n' +
+              '3. Add VITE_FACEBOOK_APP_ID=your_real_app_id to your .env file\n' +
+              '4. Restart the development server\n\n' +
+              'Visit: https://developers.facebook.com/apps/');
       } else {
-        console.error('Failed to connect Meta accounts');
-        setConnectionStatus('disconnected');
+        alert('Failed to connect to Facebook. Please try again.');
       }
-    } catch (error) {
-      console.error('Error processing Facebook response:', error);
+      
       setConnectionStatus('disconnected');
     } finally {
       setIsConnecting(false);

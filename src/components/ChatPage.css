@@ -784,14 +784,14 @@ mark {
 .emoji-picker {
   position: absolute;
   bottom: 100%;
-  left: 20px;
+  right: 0px;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
   border-radius: 16px;
   padding: 0;
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
   margin-bottom: 10px;
-  z-index: 100;
+  z-index: 1000;
   border: 1px solid rgba(255, 255, 255, 0.3);
   max-height: 400px;
   overflow-y: auto;
@@ -855,6 +855,32 @@ mark {
   transform: scale(0.95);
 }
 
+.emoji-item {
+  background: none;
+  border: none;
+  font-size: 22px;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  position: relative;
+}
+
+.emoji-item:hover {
+  background: rgba(102, 126, 234, 0.15);
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.emoji-item:active {
+  transform: scale(0.95);
+}
+
 /* Scrollbar styling for emoji picker */
 .emoji-picker::-webkit-scrollbar {
   width: 6px;
@@ -880,21 +906,33 @@ mark {
   align-items: flex-end;
 }
 
+.textarea-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
 .emoji-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   background: rgba(249, 168, 212, 0.2);
   border: 1px solid var(--glass-border);
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
   transition: all 0.3s ease;
   flex-shrink: 0;
   color: var(--accent-purple);
   backdrop-filter: blur(8px);
+  z-index: 10;
 }
 
 .emoji-btn:hover {

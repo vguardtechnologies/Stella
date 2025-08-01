@@ -76,6 +76,10 @@ class FacebookAPIClient {
     const response = await fetch(`${API_BASE_URL}/api/facebook?action=auth-url`);
     
     if (!response.ok) {
+      const error = await response.json();
+      if (error.setup_required) {
+        throw new Error('SETUP_REQUIRED: ' + error.error);
+      }
       throw new Error(`Failed to get auth URL: ${response.statusText}`);
     }
     
