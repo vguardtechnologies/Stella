@@ -1911,7 +1911,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   </div>
                 )}
                 
-                <div className="message-input-wrapper" style={{ position: 'relative' }}>
+                {/* Message Input Container */}
+                <div className="message-input-container">
+                  <div className="message-input-wrapper" style={{ position: 'relative' }}>
                   {/* Attachment Menu - moved inside wrapper for proper positioning */}
                   {showAttachmentMenu && (
                     <div className="attachment-menu">
@@ -2068,6 +2070,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   onChange={handleImageVideoUpload}
                   accept="image/*,video/*"
                 />
+                </div>
               </>
             ) : (
               <div className="no-conversation-selected">
