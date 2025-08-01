@@ -556,13 +556,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     console.log('Media selected from browser:', mediaUrl);
     
     // Create a fake message with the selected media
-    const newMessage = {
+    const newMessage: Message = {
       id: Date.now().toString(),
       text: caption || 'Shared media from social account',
       sender: 'agent' as const,
       timestamp: new Date(),
-      mediaUrl: mediaUrl,
-      mediaType: mediaUrl.includes('.mp4') || mediaUrl.includes('video') ? 'video' : 'image'
+      type: mediaUrl.includes('.mp4') || mediaUrl.includes('video') ? 'video' : 'image',
+      status: 'sent',
+      media_url: mediaUrl
     };
 
     setMessages(prev => [...prev, newMessage]);
@@ -1239,29 +1240,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       default: return '#999';
     }
   };
-
-  // WhatsApp emoji categories
-  const recentEmojis: string[] = [];
-  
-  const frequentlyUsed = [
-    '😀', '😃', '😄', '😁', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰',
-    '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑',
-    '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄',
-    '😬', '🤥', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
-    '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕',
-    '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰',
-    '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤',
-    '😡', '😠', '🤬', '👍', '👎', '👏', '☠️', '💩', '🤡', '👹', '👺', '👻',
-    '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
-  ];
-
-  const businessEmojis: string[] = [
-    '💼', '📊', '💰', '💳', '🛒', '🛍️', '📦', '📈', '📉', '💯', '✅', '❌',
-    '⭐', '🔥', '💎', '🏆', '🎯', '📱', '💻', '🖥️', '⌚', '📷', '🎵', '🎬'
-  ];
-
-  // Combine all emojis for easy access
-  const allEmojis = [...new Set([...recentEmojis, ...frequentlyUsed, ...businessEmojis])];
 
   // Close attachment menu when clicking outside
   useEffect(() => {
