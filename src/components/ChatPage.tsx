@@ -570,6 +570,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setShowMediaBrowser(false);
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    setNewMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length > 0) {
@@ -1972,46 +1977,109 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   <div className="textarea-wrapper" style={{ position: 'relative' }}>
                     {/* Second Attachment Menu - positioned relative to textarea wrapper */}
                     {showEmojiPicker && (
-                      <div className="attachment-menu" style={{ right: '10px', left: 'auto' }}>
-                        <div className="attachment-option" onClick={handleFileSelect}>
-                          <div className="attachment-icon">📄</div>
-                          <span>Document</span>
-                        </div>
-                        <div className="attachment-option" onClick={handlePhotoVideoSelect}>
-                          <div className="attachment-icon">🖼️</div>
-                          <span>Photos & Videos</span>
-                        </div>
-                        <div className="attachment-option" onClick={handleContactSelect}>
-                          <div className="attachment-icon">👤</div>
-                          <span>Contact</span>
-                        </div>
-                        <div className="attachment-option" onClick={handlePollSelect}>
-                          <div className="attachment-icon">📊</div>
-                          <span>Poll</span>
-                        </div>
-                        <div className="attachment-option" onClick={handleEventSelect}>
-                          <div className="attachment-icon">📅</div>
-                          <span>Event</span>
-                        </div>
-                        <div className="attachment-option" onClick={handleLocationSelect}>
-                          <div className="attachment-icon">📍</div>
-                          <span>Location</span>
+                      <div className="emoji-menu">
+                        <div className="emoji-section">
+                          <div className="emoji-section-title">😀 Smileys</div>
+                          <div className="emoji-row">
+                            {['😀', '😂', '😍', '🥰', '😊', '😎'].map((emoji, index) => (
+                              <button
+                                key={index}
+                                className="emoji-button"
+                                onClick={() => handleEmojiSelect(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="emoji-row">
+                            {['🤔', '�', '😢', '😡', '🤩', '😋'].map((emoji, index) => (
+                              <button
+                                key={index}
+                                className="emoji-button"
+                                onClick={() => handleEmojiSelect(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         
-                        {/* Separator line */}
-                        <div style={{ 
-                          height: '2px', 
-                          backgroundColor: '#d1d7db', 
-                          margin: '12px 8px',
-                          borderRadius: '1px',
-                          opacity: 1,
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}></div>
+                        <div className="emoji-section">
+                          <div className="emoji-section-title">❤️ Hearts</div>
+                          <div className="emoji-row">
+                            {['❤️', '💕', '💖', '💗', '💙', '💚'].map((emoji, index) => (
+                              <button
+                                key={index}
+                                className="emoji-button"
+                                onClick={() => handleEmojiSelect(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="emoji-row">
+                            {['�', '🧡', '💜', '🖤', '🤍', '🤎'].map((emoji, index) => (
+                              <button
+                                key={index}
+                                className="emoji-button"
+                                onClick={() => handleEmojiSelect(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         
-                        {/* Media section */}
-                        <div className="attachment-option" onClick={handleMediaSelect}>
-                          <div className="attachment-icon">🎬</div>
-                          <span>Media</span>
+                        <div className="emoji-section">
+                          <div className="emoji-section-title">� Gestures</div>
+                          <div className="emoji-row">
+                            {['👍', '👎', '👌', '✌️', '🤞', '👋'].map((emoji, index) => (
+                              <button
+                                key={index}
+                                className="emoji-button"
+                                onClick={() => handleEmojiSelect(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="emoji-row">
+                            {['�', '🙏', '💪', '🤝', '✋', '🤚'].map((emoji, index) => (
+                              <button
+                                key={index}
+                                className="emoji-button"
+                                onClick={() => handleEmojiSelect(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="emoji-section">
+                          <div className="emoji-section-title">🎉 Objects</div>
+                          <div className="emoji-row">
+                            {['🎉', '🎊', '🎈', '🎁', '⭐', '✨'].map((emoji, index) => (
+                              <button
+                                key={index}
+                                className="emoji-button"
+                                onClick={() => handleEmojiSelect(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="emoji-row">
+                            {['🌟', '💫', '🔥', '💎', '🏆', '🎯'].map((emoji, index) => (
+                              <button
+                                key={index}
+                                className="emoji-button"
+                                onClick={() => handleEmojiSelect(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2028,22 +2096,22 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     <button 
                       className="attachment-btn"
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      title="Attach files"
+                      title="Emojis"
                       style={{
                         position: 'absolute',
                         right: '10px',
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        background: 'none',
+                        background: 'red',
                         border: 'none',
-                        fontSize: '20px',
+                        width: '12px',
+                        height: '12px',
                         cursor: 'pointer',
-                        padding: '5px',
-                        borderRadius: '4px',
+                        padding: '0',
+                        borderRadius: '50%',
                         zIndex: 10
                       }}
                     >
-                      📎
                     </button>
                   </div>
                   <button 
