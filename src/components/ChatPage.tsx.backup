@@ -552,6 +552,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setShowMediaBrowser(true);
   };
 
+  // Emoji handler function
+  const handleEmojiSelect = (emoji: string) => {
+    setNewMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
   const handleMediaFromBrowser = (mediaUrl: string, caption?: string) => {
     console.log('Media selected from browser:', mediaUrl);
     
@@ -568,11 +574,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     setMessages(prev => [...prev, newMessage]);
     setShowMediaBrowser(false);
-  };
-
-  const handleEmojiSelect = (emoji: string) => {
-    setNewMessage(prev => prev + emoji);
-    setShowEmojiPicker(false);
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1975,13 +1976,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     📎
                   </button>
                   <div className="textarea-wrapper" style={{ position: 'relative' }}>
-                    {/* Second Attachment Menu - positioned relative to textarea wrapper */}
+                    {/* Emoji Picker - positioned to the right near the red dot */}
                     {showEmojiPicker && (
                       <div className="emoji-menu">
                         <div className="emoji-section">
                           <div className="emoji-section-title">😀 Smileys</div>
                           <div className="emoji-row">
-                            {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪'].map((emoji, index) => (
+                            {['😀', '😂', '😍', '🥰', '😊', '😎'].map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -1994,9 +1995,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         </div>
                         
                         <div className="emoji-section">
-                          <div className="emoji-section-title">💕 Hearts & Love (36 total)</div>
+                          <div className="emoji-section-title">❤️ Hearts</div>
                           <div className="emoji-row">
-                            {['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️', '💯', '💢', '💥', '💫', '💦', '💨'].map((emoji, index) => (
+                            {['❤️', '💕', '💖', '💗', '💙', '💚'].map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2011,7 +2012,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">👋 Gestures</div>
                           <div className="emoji-row">
-                            {['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👋', '🤚', '🖐️', '✋', '🖖', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾'].map((emoji, index) => (
+                            {['👍', '👎', '👌', '✌️', '🤞', '👋'].map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2024,20 +2025,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         </div>
                         
                         <div className="emoji-section">
-                          <div className="emoji-section-title">🎉 Celebrations & Symbols</div>
+                          <div className="emoji-section-title">🎉 Objects</div>
                           <div className="emoji-row">
-                            {['🎉', '🎊', '🎈', '🎂', '🎁', '🏆', '🥇', '🥈', '🥉', '⭐', '🌟', '✨', '🎯', '💡', '🔥', '💧', '🌈', '☀️', '🌙', '⚡', '💫', '💎', '🔮', '💰', '🗝️', '🎭', '🎪'].map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="emoji-row">
-                            {['🌟', '💫', '🔥', '💎', '🏆', '🎯'].map((emoji, index) => (
+                            {['🎉', '🎊', '🎈', '🎁', '⭐', '✨'].map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2048,94 +2038,64 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             ))}
                           </div>
                         </div>
-                        
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🌮 Food & Drinks</div>
-                          <div className="emoji-row">
-                            {['🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🥝', '🍅', '🥕', '🌽', '🌶️', '🍞', '🥖', '🥨', '🧀', '🥓', '🍳', '🍔', '🍟', '🍕', '🌭', '🥪', '🌮', '🌯', '🥗', '🍝', '🍜', '🍲', '🍱', '🍣', '🍤', '🥟', '🍦', '🍰', '🎂', '🍭', '🍬', '🍫', '🍿', '☕', '🍵', '🥤', '🍺', '🍷', '🥂', '🍾', '🍸'].map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
+                          <div className="emoji-category">
+                            <div className="emoji-category-title">� Smileys & People</div>
+                            <div className="emoji-grid">
+                              {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏'].map((emoji, index) => (
+                                <button
+                                  key={index}
+                                  className="emoji-item"
+                                  onClick={() => handleEmojiSelect(emoji)}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🐶 Animals & Nature</div>
-                          <div className="emoji-row">
-                            {['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦄', '🐝', '🦋', '🐌', '🐛', '🐜', '🌸', '🌺', '🌻', '🌹', '🥀', '🌷', '🌲', '🌳', '🌴', '🌱', '🌿', '☘️'].map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
+                          
+                          <div className="emoji-category">
+                            <div className="emoji-category-title">❤️ Hearts & Emotions</div>
+                            <div className="emoji-grid">
+                              {['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️', '💯', '💢', '💥', '💫', '💦', '💨', '🕳️', '💣', '💬', '👁️‍🗨️', '🗨️', '🗯️'].map((emoji, index) => (
+                                <button
+                                  key={index}
+                                  className="emoji-item"
+                                  onClick={() => handleEmojiSelect(emoji)}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🚗 Travel & Places</div>
-                          <div className="emoji-row">
-                            {['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜', '🏍️', '🚲', '🛴', '🚁', '✈️', '🚀', '🛸', '🚢', '⛵', '🏠', '🏡', '🏢', '🏬', '🏭', '🏰', '🗼', '🌉', '🎡', '🎢', '🎠', '⛱️', '🏖️', '🏝️'].map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
+
+                          <div className="emoji-category">
+                            <div className="emoji-category-title">� Gestures</div>
+                            <div className="emoji-grid">
+                              {['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👋', '🤚', '🖐️', '✋', '🖖', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵'].map((emoji, index) => (
+                                <button
+                                  key={index}
+                                  className="emoji-item"
+                                  onClick={() => handleEmojiSelect(emoji)}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">💼 Work & School</div>
-                          <div className="emoji-row">
-                            {['💼', '👔', '👗', '👠', '👓', '🎓', '📚', '📖', '📝', '✏️', '📌', '📎', '📋', '📊', '📈', '📉', '💰', '💵', '💳', '💎', '⚖️', '🔧', '⚙️', '🔨'].map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🎮 Entertainment</div>
-                          <div className="emoji-row">
-                            {['🎮', '🕹️', '🎲', '🃏', '🎯', '🎪', '🎨', '🎭', '🎵', '🎶', '🎤', '🎧', '📱', '💻', '⌚', '📷', '📺', '🎬', '🎞️', '📽️', '🎸', '🥁', '🎹', '🎺'].map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">⚽ Sports & Activities</div>
-                          <div className="emoji-row">
-                            {['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️‍♂️'].map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
+
+                          <div className="emoji-category">
+                            <div className="emoji-category-title">🎉 Objects & Symbols</div>
+                            <div className="emoji-grid">
+                              {['🎉', '🎊', '🎈', '🎂', '🎁', '🏆', '🥇', '🥈', '🥉', '⭐', '🌟', '✨', '🎯', '🎪', '🎨', '🎭', '🎵', '🎶', '🎤', '🎧', '📱', '💻', '⌚', '📷', '💡', '🔥', '💧', '🌈', '☀️', '⭐', '🌙', '⚡'].map((emoji, index) => (
+                                <button
+                                  key={index}
+                                  className="emoji-item"
+                                  onClick={() => handleEmojiSelect(emoji)}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2152,8 +2112,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     />
                     <button 
                       className="attachment-btn"
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      title="Emojis"
+                      onClick={() => {
+                        console.log('Red dot clicked! Current showEmojiPicker:', showEmojiPicker);
+                        setShowEmojiPicker(!showEmojiPicker);
+                        console.log('Setting showEmojiPicker to:', !showEmojiPicker);
+                      }}
+                      title="Attach files"
                       style={{
                         position: 'absolute',
                         right: '10px',
@@ -2161,14 +2125,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         transform: 'translateY(-50%)',
                         background: 'red',
                         border: 'none',
-                        width: '12px',
-                        height: '12px',
+                        fontSize: '20px',
                         cursor: 'pointer',
-                        padding: '0',
+                        padding: '5px',
                         borderRadius: '50%',
-                        zIndex: 10
+                        zIndex: 10,
+                        width: '12px',
+                        height: '12px'
                       }}
                     >
+                      
                     </button>
                   </div>
                   <button 
