@@ -572,6 +572,29 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setShowMediaBrowser(false);
   };
 
+  // Helper function to wrap emojis in spans for bigger sizing
+  const renderTextWithBiggerEmojis = (text: string) => {
+    // Regex to match emoji characters (most comprehensive emoji regex)
+    const emojiRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Flag_Sequence}|\p{Emoji_Keycap_Sequence}|\p{Emoji_Tag_Sequence}|\p{Emoji_ZWJ_Sequence})/gu;
+    
+    const parts = text.split(emojiRegex);
+    
+    return parts.map((part, index) => {
+      // Create a fresh regex for testing each part to avoid state issues
+      const testRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Flag_Sequence}|\p{Emoji_Keycap_Sequence}|\p{Emoji_Tag_Sequence}|\p{Emoji_ZWJ_Sequence})/gu;
+      // Check if this part is an emoji
+      if (part && testRegex.test(part)) {
+        return (
+          <span key={index} className="emoji-char">
+            {part}
+          </span>
+        );
+      } else {
+        return part;
+      }
+    });
+  };
+
   // Helper function to filter emojis based on search query
   const filterEmojis = (emojiArray: string[], query: string) => {
     if (!query.trim()) return emojiArray;
@@ -2463,7 +2486,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         </div>
                       ) : (
                         <div className="message-content">
-                          <div className="message-text">{message.text}</div>
+                          <div className="message-text">{renderTextWithBiggerEmojis(message.text)}</div>
                           <div className="message-meta">
                             <div className="message-timestamp">
                               {formatTime(message.timestamp)}
@@ -2788,7 +2811,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                     cursor: 'pointer',
                                     background: 'none',
                                     border: 'none',
-                                    fontSize: '20px',
+                                    fontSize: '30px',
                                     padding: '4px',
                                     borderRadius: '4px',
                                     transition: 'background-color 0.2s'
@@ -2818,7 +2841,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                   cursor: 'pointer',
                                   background: 'none',
                                   border: 'none',
-                                  fontSize: '20px',
+                                  fontSize: '30px',
                                   padding: '4px',
                                   borderRadius: '4px',
                                   transition: 'background-color 0.2s'

@@ -565,6 +565,14 @@ mark {
   overflow-wrap: break-word;
 }
 
+/* Emoji characters in messages - bigger size */
+.message-text .emoji-char {
+  font-size: 1.8rem !important;
+  line-height: 1;
+  vertical-align: middle;
+  display: inline-block;
+}
+
 /* User messages: dark text on light background */
 .user-message .message-text {
   color: var(--text-primary);
@@ -873,16 +881,16 @@ mark {
 .emoji-button {
   background: rgba(255, 255, 255, 0.6);
   border: none;
-  font-size: 18px;
-  padding: 6px;
+  font-size: 30px;
+  padding: 8px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 46px;
+  height: 46px;
   backdrop-filter: blur(8px);
 }
 
@@ -1770,6 +1778,13 @@ mark {
   .message-text {
     font-size: 0.85rem;
     line-height: 1.3;
+  }
+
+  .message-text .emoji-char {
+    font-size: 1.8rem !important;
+    line-height: 1;
+    vertical-align: middle;
+    display: inline-block;
   }
 }
 
