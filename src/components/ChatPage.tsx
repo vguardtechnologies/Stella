@@ -681,17 +681,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setSearchQuery(''); // Clear search when emoji is selected
   };
 
-  const handleEmojiPickerClose = () => {
-    setShowEmojiPicker(false);
-    setSearchQuery(''); // Clear search when picker is closed
-  };
-
-  // Helper function to check if a section should be shown
-  const shouldShowSection = (emojiArray: string[]) => {
-    if (!searchQuery.trim()) return true;
-    return filterEmojis(emojiArray, searchQuery).length > 0;
-  };
-
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length > 0) {
