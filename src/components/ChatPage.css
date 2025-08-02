@@ -807,11 +807,13 @@ mark {
   margin-bottom: 8px;
   box-shadow: 0 8px 32px rgba(249, 168, 212, 0.3);
   border: 1px solid var(--glass-border);
-  z-index: 1000;
+  z-index: 1050;
   min-width: 350px;
   max-height: 400px;
   overflow-y: auto;
   animation: emojiMenuSlideUp 0.2s ease-out;
+  /* Ensure menu doesn't get cut off */
+  max-width: calc(100vw - 40px);
 }
 
 .emoji-section {

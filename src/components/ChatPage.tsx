@@ -1369,7 +1369,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       if (showAttachmentMenu || showEmojiPicker) {
         const target = event.target as HTMLElement;
         if (!target.closest('.attachment-menu') && 
-            !target.closest('.attachment-btn')) {
+            !target.closest('.attachment-btn') &&
+            !target.closest('.emoji-menu') &&
+            !target.closest('.emoji-picker-btn')) {
           setShowAttachmentMenu(false);
           setShowEmojiPicker(false);
         }
@@ -2094,7 +2096,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   <div className="textarea-wrapper" style={{ position: 'relative' }}>
                     {/* Second Attachment Menu - positioned relative to textarea wrapper */}
                     {showEmojiPicker && (
-                      <div className="emoji-menu">
+                      <div className="emoji-menu" onClick={(e) => e.stopPropagation()}>
                         {/* Search Section */}
                         <div className="emoji-search-section">
                           <input
@@ -2102,6 +2104,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             placeholder="Search emojis..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onFocus={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
                             className="emoji-search-input"
                             style={{
                               width: '100%',
