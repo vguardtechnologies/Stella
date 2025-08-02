@@ -1697,16 +1697,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       ) : (
                         <div className="message-content">
                           <div className="message-text">{message.text}</div>
-                          {message.sender === 'agent' && (
-                            <div className="message-status">
-                              <span 
-                                className="status-icon"
-                                style={{ color: getStatusIconColor(message.status) }}
-                              >
-                                {getStatusIcon(message.status)}
-                              </span>
+                          <div className="message-meta">
+                            <div className="message-timestamp">
+                              {formatTime(message.timestamp)}
                             </div>
-                          )}
+                            {message.sender === 'agent' && (
+                              <div className="message-status">
+                                <span 
+                                  className="status-icon"
+                                  style={{ color: getStatusIconColor(message.status) }}
+                                >
+                                  {getStatusIcon(message.status)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                           {/* Show helpful note for failed messages due to 24-hour rule */}
                           {message.status === 'failed' && message.failureReason === '24_hour_rule' && (
                             <div style={{
@@ -1765,9 +1770,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           )}
                         </div>
                       )}
-                      <div className="message-timestamp">
-                        {formatTime(message.timestamp)}
-                      </div>
                     </div>
                   ))}
                   
