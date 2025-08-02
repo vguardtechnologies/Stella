@@ -242,3 +242,24 @@
 .action-button:hover svg {
   stroke: #ffffff;
 }
+
+/* Gmail Button Styling */
+.gmail-button {
+  background: rgba(234, 67, 53, 0.1);
+  border-color: rgba(234, 67, 53, 0.3);
+  color: #ea4335;
+}
+
+.gmail-button:hover {
+  background: rgba(234, 67, 53, 0.2);
+  border-color: rgba(234, 67, 53, 0.4);
+  color: #ffffff;
+}
+
+.gmail-button svg {
+  stroke: #ea4335;
+}
+
+.gmail-button:hover svg {
+  stroke: #ffffff;
+}

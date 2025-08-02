@@ -7,6 +7,7 @@ import ChatPage from './components/ChatPage'
 import HomePage from './components/HomePage'
 import ContactsPage from './pages/ContactsPage'
 import MetaIntegrationPage from './components/MetaIntegrationPage'
+import GmailIntegration from './components/GmailIntegration'
 import './App.css'
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
   const [showContacts, setShowContacts] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
   const [showFacebook, setShowFacebook] = useState(false)
+  const [showGmail, setShowGmail] = useState(false)
   const [shopifyStore, setShopifyStore] = useState<{ shop: string; domain: string; connected: boolean } | undefined>(undefined)
 
   // Load saved Shopify connection on app start
@@ -44,6 +46,7 @@ function App() {
     setShowContacts(false)
     setShowLogin(false)
     setShowFacebook(false)
+    setShowGmail(false)
   }
 
   const handleLoginClick = () => {
@@ -86,6 +89,11 @@ function App() {
     setShowFacebook(true)
   }
 
+  const handleGmailClick = () => {
+    console.log('Gmail button clicked!')
+    setShowGmail(true)
+  }
+
   const handleCloseWhatsApp = () => {
     setShowWhatsApp(false)
   }
@@ -110,6 +118,10 @@ function App() {
     setShowFacebook(false)
   }
 
+  const handleCloseGmail = () => {
+    setShowGmail(false)
+  }
+
   return (
     <>
       <ActionBar 
@@ -122,6 +134,7 @@ function App() {
         onLoginClick={handleLoginClick}
         onShopifyClick={handleShopifyClick}
         onFacebookClick={handleFacebookClick}
+        onGmailClick={handleGmailClick}
       />
       <div className="simple-main">
         <h1 className="stella-main-title">Stella</h1>
@@ -153,6 +166,10 @@ function App() {
 
       {showFacebook && (
         <MetaIntegrationPage onClose={handleCloseFacebook} />
+      )}
+
+      {showGmail && (
+        <GmailIntegration onClose={handleCloseGmail} />
       )}
     </>
   )
