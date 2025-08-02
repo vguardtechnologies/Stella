@@ -245,6 +245,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [recentlyUsedEmojis, setRecentlyUsedEmojis] = useState<string[]>([]);
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -570,12 +571,125 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setShowMediaBrowser(false);
   };
 
+  // Helper function to filter emojis based on search query
+  const filterEmojis = (emojiArray: string[], query: string) => {
+    if (!query.trim()) return emojiArray;
+    return emojiArray.filter(emoji => {
+      // Enhanced emoji name mapping for better search
+      const emojiNames: { [key: string]: string[] } = {
+        '😀': ['smile', 'happy', 'grin', 'face'],
+        '😃': ['smile', 'happy', 'joy', 'face'],
+        '😄': ['smile', 'happy', 'laugh', 'face'],
+        '😁': ['grin', 'smile', 'happy', 'face'],
+        '😆': ['laugh', 'happy', 'smile', 'face'],
+        '😅': ['sweat', 'laugh', 'nervous', 'face'],
+        '😂': ['joy', 'laugh', 'tears', 'face'],
+        '🤣': ['rolling', 'laugh', 'floor', 'face'],
+        '😊': ['blush', 'smile', 'happy', 'face'],
+        '😇': ['innocent', 'halo', 'angel', 'face'],
+        '🙂': ['smile', 'happy', 'slight', 'face'],
+        '😉': ['wink', 'smile', 'face'],
+        '😍': ['love', 'heart', 'eyes', 'face'],
+        '🥰': ['love', 'hearts', 'smile', 'face'],
+        '😘': ['kiss', 'love', 'face'],
+        '😋': ['tongue', 'tasty', 'face'],
+        '😎': ['cool', 'sunglasses', 'face'],
+        '🤩': ['star', 'eyes', 'wow', 'face'],
+        '😭': ['cry', 'tears', 'sad', 'face'],
+        '😤': ['angry', 'mad', 'face'],
+        '😠': ['angry', 'mad', 'face'],
+        '😡': ['angry', 'red', 'mad', 'face'],
+        '🥵': ['hot', 'heat', 'face'],
+        '🥶': ['cold', 'freeze', 'face'],
+        '❤️': ['heart', 'love', 'red'],
+        '💙': ['heart', 'blue', 'love'],
+        '💚': ['heart', 'green', 'love'],
+        '💛': ['heart', 'yellow', 'love'],
+        '💜': ['heart', 'purple', 'love'],
+        '🧡': ['heart', 'orange', 'love'],
+        '🤍': ['heart', 'white', 'love'],
+        '🖤': ['heart', 'black', 'love'],
+        '💕': ['hearts', 'love', 'two'],
+        '💞': ['hearts', 'love', 'revolving'],
+        '💓': ['heart', 'beating', 'love'],
+        '💗': ['heart', 'growing', 'love'],
+        '💖': ['heart', 'sparkling', 'love'],
+        '💘': ['heart', 'arrow', 'cupid'],
+        '💝': ['heart', 'gift', 'love'],
+        '👍': ['thumbs', 'up', 'good', 'like'],
+        '👎': ['thumbs', 'down', 'bad', 'dislike'],
+        '👋': ['wave', 'hello', 'goodbye', 'hand'],
+        '🙏': ['pray', 'thanks', 'please', 'hand'],
+        '👏': ['clap', 'applause', 'hand'],
+        '🤝': ['handshake', 'deal', 'hand'],
+        '✌️': ['peace', 'victory', 'hand'],
+        '🤞': ['fingers', 'crossed', 'luck', 'hand'],
+        '🎉': ['party', 'celebration', 'confetti'],
+        '🎊': ['party', 'confetti', 'celebration'],
+        '🎈': ['balloon', 'party', 'celebration'],
+        '🎂': ['cake', 'birthday', 'celebration'],
+        '🎁': ['gift', 'present', 'celebration'],
+        '🔥': ['fire', 'hot', 'flame', 'lit'],
+        '⭐': ['star', 'favorite', 'cool'],
+        '✨': ['sparkles', 'magic', 'shiny'],
+        '💎': ['diamond', 'gem', 'precious'],
+        '🏆': ['trophy', 'winner', 'award'],
+        '🐶': ['dog', 'puppy', 'animal'],
+        '🐱': ['cat', 'kitten', 'animal'],
+        '🐭': ['mouse', 'animal'],
+        '🐹': ['hamster', 'animal'],
+        '🐰': ['rabbit', 'bunny', 'animal'],
+        '🦊': ['fox', 'animal'],
+        '🐻': ['bear', 'animal'],
+        '🐼': ['panda', 'bear', 'animal'],
+        '🚗': ['car', 'vehicle', 'auto'],
+        '🚕': ['taxi', 'car', 'vehicle'],
+        '✈️': ['airplane', 'plane', 'travel'],
+        '🚀': ['rocket', 'space', 'travel'],
+        '🍕': ['pizza', 'food'],
+        '🍔': ['burger', 'food'],
+        '🍟': ['fries', 'food'],
+        '☕': ['coffee', 'drink'],
+        '🍺': ['beer', 'drink'],
+        '⚽': ['soccer', 'football', 'sport'],
+        '🏀': ['basketball', 'sport'],
+        '🎮': ['game', 'gaming', 'controller'],
+        '📱': ['phone', 'mobile', 'device'],
+        '💻': ['laptop', 'computer', 'device'],
+        '💰': ['money', 'cash', 'bag'],
+        '💵': ['money', 'dollar', 'cash']
+      };
+      
+      const names = emojiNames[emoji] || [];
+      return names.some(name => name.toLowerCase().includes(query.toLowerCase()));
+    });
+  };
+
   const handleEmojiSelect = (emoji: string) => {
     console.log('Emoji selected:', emoji);
     console.log('Current newMessage:', newMessage);
     setNewMessage(prev => prev + emoji);
     console.log('New message will be:', newMessage + emoji);
+    
+    // Update recently used emojis
+    setRecentlyUsedEmojis(prev => {
+      const filtered = prev.filter(e => e !== emoji);
+      return [emoji, ...filtered].slice(0, 12); // Keep only 12 most recent
+    });
+    
     setShowEmojiPicker(false);
+    setSearchQuery(''); // Clear search when emoji is selected
+  };
+
+  const handleEmojiPickerClose = () => {
+    setShowEmojiPicker(false);
+    setSearchQuery(''); // Clear search when picker is closed
+  };
+
+  // Helper function to check if a section should be shown
+  const shouldShowSection = (emojiArray: string[]) => {
+    if (!searchQuery.trim()) return true;
+    return filterEmojis(emojiArray, searchQuery).length > 0;
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1981,10 +2095,63 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     {/* Second Attachment Menu - positioned relative to textarea wrapper */}
                     {showEmojiPicker && (
                       <div className="emoji-menu">
+                        {/* Search Section */}
+                        <div className="emoji-search-section">
+                          <input
+                            type="text"
+                            placeholder="Search emojis..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="emoji-search-input"
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              color: 'white',
+                              fontSize: '14px',
+                              marginBottom: '10px',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+
+                        {/* Recently Used Section */}
+                        {recentlyUsedEmojis.length > 0 && !searchQuery && (
+                          <div className="emoji-section">
+                            <div className="emoji-section-title">🕒 Recently Used</div>
+                            <div className="emoji-row">
+                              {recentlyUsedEmojis.map((emoji, index) => (
+                                <button
+                                  key={`recent-${index}`}
+                                  className="emoji-button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleEmojiSelect(emoji);
+                                  }}
+                                  style={{
+                                    cursor: 'pointer',
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '20px',
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="emoji-section">
                           <div className="emoji-section-title">😀 Smileys</div>
                           <div className="emoji-row">
-                            {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪'].map((emoji, index) => (
+                            {filterEmojis(['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2019,7 +2186,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">�‍👩‍👧‍👦 People & Family</div>
                           <div className="emoji-row">
-                            {['👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👵', '🧓', '👴', '👲', '👳‍♀️', '👳‍♂️', '🧕', '🤱', '👰‍♀️', '👰‍♂️', '🤵‍♀️', '🤵‍♂️', '👸', '🤴', '🦸‍♀️', '🦸‍♂️', '🦹‍♀️', '🦹‍♂️', '🧙‍♀️', '🧙‍♂️', '🧚‍♀️', '🧚‍♂️', '🧛‍♀️', '🧛‍♂️', '🧜‍♀️', '🧜‍♂️', '🧝‍♀️', '🧝‍♂️', '🧞‍♀️', '🧞‍♂️', '🧟‍♀️', '🧟‍♂️', '👻', '👽', '🤖', '👮‍♀️', '👮‍♂️', '🕵️‍♀️', '🕵️‍♂️'].map((emoji, index) => (
+                            {filterEmojis(['👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👵', '🧓', '👴', '👲', '👳‍♀️', '👳‍♂️', '🧕', '🤱', '👰‍♀️', '👰‍♂️', '🤵‍♀️', '🤵‍♂️', '👸', '🤴', '🦸‍♀️', '🦸‍♂️', '🦹‍♀️', '🦹‍♂️', '🧙‍♀️', '🧙‍♂️', '🧚‍♀️', '🧚‍♂️', '🧛‍♀️', '🧛‍♂️', '🧜‍♀️', '🧜‍♂️', '🧝‍♀️', '🧝‍♂️', '🧞‍♀️', '🧞‍♂️', '🧟‍♀️', '🧟‍♂️', '👻', '👽', '🤖', '👮‍♀️', '👮‍♂️', '🕵️‍♀️', '🕵️‍♂️'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2030,7 +2197,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             ))}
                           </div>
                           <div className="emoji-row">
-                            {['💂‍♀️', '💂‍♂️', '🥷', '👷‍♀️', '👷‍♂️', '🤴', '👸', '👩‍⚕️', '👨‍⚕️', '👩‍🌾', '👨‍🌾', '👩‍🍳', '👨‍🍳', '👩‍🎓', '👨‍🎓', '👩‍🎤', '👨‍🎤', '👩‍🏫', '👨‍🏫', '👩‍🏭', '👨‍🏭', '👩‍💻', '👨‍💻', '👩‍💼', '👨‍💼', '👩‍🔧', '👨‍🔧', '👩‍🔬', '👨‍🔬', '👩‍🎨', '👨‍🎨', '👩‍🚒', '👨‍🚒', '👩‍✈️', '👨‍✈️', '👩‍🚀', '👨‍🚀', '👩‍⚖️', '👨‍⚖️', '🤶', '🎅'].map((emoji, index) => (
+                            {filterEmojis(['💂‍♀️', '💂‍♂️', '🥷', '👷‍♀️', '👷‍♂️', '🤴', '👸', '👩‍⚕️', '👨‍⚕️', '👩‍🌾', '👨‍🌾', '👩‍🍳', '👨‍🍳', '👩‍🎓', '👨‍🎓', '👩‍🎤', '👨‍🎤', '👩‍🏫', '👨‍🏫', '👩‍🏭', '👨‍🏭', '👩‍💻', '👨‍💻', '👩‍💼', '👨‍💼', '👩‍🔧', '👨‍🔧', '👩‍🔬', '👨‍🔬', '👩‍🎨', '👨‍🎨', '👩‍🚒', '👨‍🚒', '👩‍✈️', '👨‍✈️', '👩‍🚀', '👨‍🚀', '👩‍⚖️', '👨‍⚖️', '🤶', '🎅'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2041,7 +2208,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             ))}
                           </div>
                           <div className="emoji-row">
-                            {['👨‍👩‍👧', '👨‍👩‍👦', '👨‍👩‍👧‍👦', '👨‍👨‍👧', '👨‍👨‍👦', '👨‍👨‍👧‍👦', '👩‍👩‍👧', '👩‍👩‍👦', '👩‍👩‍👧‍👦', '👨‍👧', '👨‍👦', '👨‍👧‍👦', '👩‍👧', '👩‍👦', '👩‍👧‍👦', '🗣️', '👤', '👥', '🫂', '👣'].map((emoji, index) => (
+                            {filterEmojis(['👨‍👩‍👧', '👨‍👩‍👦', '👨‍👩‍👧‍👦', '👨‍👨‍👧', '👨‍👨‍👦', '👨‍👨‍👧‍👦', '👩‍👩‍👧', '👩‍👩‍👦', '👩‍👩‍👧‍👦', '👨‍👧', '👨‍👦', '👨‍👧‍👦', '👩‍👧', '👩‍👦', '👩‍👧‍👦', '🗣️', '👤', '👥', '🫂', '👣'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2056,7 +2223,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">�💕 Hearts & Love (36 total)</div>
                           <div className="emoji-row">
-                            {['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️', '💯', '💢', '💥', '💫', '💦', '💨'].map((emoji, index) => (
+                            {filterEmojis(['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️', '💯', '💢', '💥', '💫', '💦', '💨'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2071,7 +2238,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">👋 Gestures</div>
                           <div className="emoji-row">
-                            {['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👋', '🤚', '🖐️', '✋', '🖖', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾'].map((emoji, index) => (
+                            {filterEmojis(['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👋', '🤚', '🖐️', '✋', '🖖', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2086,18 +2253,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">🎉 Celebrations & Symbols</div>
                           <div className="emoji-row">
-                            {['🎉', '🎊', '🎈', '🎂', '🎁', '🏆', '🥇', '🥈', '🥉', '⭐', '🌟', '✨', '🎯', '💡', '🔥', '💧', '🌈', '☀️', '🌙', '⚡', '💫', '💎', '🔮', '💰', '🗝️', '🎭', '🎪'].map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="emoji-row">
-                            {['🌟', '💫', '🔥', '💎', '🏆', '🎯'].map((emoji, index) => (
+                            {filterEmojis(['🎉', '🎊', '🎈', '🎂', '🎁', '🏆', '🥇', '🥈', '🥉', '⭐', '🌟', '✨', '🎯', '💡', '🔥', '💧', '🌈', '☀️', '🌙', '⚡', '💫', '💎', '🔮', '💰', '🗝️', '🎭', '🎪'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2112,7 +2268,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">🌮 Food & Drinks</div>
                           <div className="emoji-row">
-                            {['🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🥝', '🍅', '🥕', '🌽', '🌶️', '🍞', '🥖', '🥨', '🧀', '🥓', '🍳', '🍔', '🍟', '🍕', '🌭', '🥪', '🌮', '🌯', '🥗', '🍝', '🍜', '🍲', '🍱', '🍣', '🍤', '🥟', '🍦', '🍰', '🎂', '🍭', '🍬', '🍫', '🍿', '☕', '🍵', '🥤', '🍺', '🍷', '🥂', '🍾', '🍸'].map((emoji, index) => (
+                            {filterEmojis(['🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🥝', '🍅', '🥕', '🌽', '🌶️', '🍞', '🥖', '🥨', '🧀', '🥓', '🍳', '🍔', '🍟', '🍕', '🌭', '🥪', '🌮', '🌯', '🥗', '🍝', '🍜', '🍲', '🍱', '🍣', '🍤', '🥟', '🍦', '🍰', '🎂', '🍭', '🍬', '🍫', '🍿', '☕', '🍵', '🥤', '🍺', '🍷', '🥂', '🍾', '🍸'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2127,7 +2283,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">🐶 Animals & Nature</div>
                           <div className="emoji-row">
-                            {['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦄', '🐝', '🦋', '🐌', '🐛', '🐜', '🌸', '🌺', '🌻', '🌹', '🥀', '🌷', '🌲', '🌳', '🌴', '🌱', '🌿', '☘️'].map((emoji, index) => (
+                            {filterEmojis(['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦄', '🐝', '🦋', '🐌', '🐛', '🐜', '🌸', '🌺', '🌻', '🌹', '🥀', '🌷', '🌲', '🌳', '🌴', '🌱', '🌿', '☘️'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2142,7 +2298,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">🚗 Travel & Places</div>
                           <div className="emoji-row">
-                            {['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜', '🏍️', '🚲', '🛴', '🚁', '✈️', '🚀', '🛸', '🚢', '⛵', '🏠', '🏡', '🏢', '🏬', '🏭', '🏰', '🗼', '🌉', '🎡', '🎢', '🎠', '⛱️', '🏖️', '🏝️'].map((emoji, index) => (
+                            {filterEmojis(['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜', '🏍️', '🚲', '🛴', '🚁', '✈️', '🚀', '🛸', '🚢', '⛵', '🏠', '🏡', '🏢', '🏬', '🏭', '🏰', '🗼', '🌉', '🎡', '🎢', '🎠', '⛱️', '🏖️', '🏝️'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2157,7 +2313,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">💼 Work & School</div>
                           <div className="emoji-row">
-                            {['💼', '👔', '👗', '👠', '👓', '🎓', '📚', '📖', '📝', '✏️', '📌', '📎', '📋', '📊', '📈', '📉', '💰', '💵', '💳', '💎', '⚖️', '🔧', '⚙️', '🔨'].map((emoji, index) => (
+                            {filterEmojis(['💼', '👔', '👗', '👠', '👓', '🎓', '📚', '📖', '📝', '✏️', '📌', '📎', '📋', '📊', '📈', '📉', '💰', '💵', '💳', '💎', '⚖️', '🔧', '⚙️', '🔨'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2172,7 +2328,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">🎮 Entertainment</div>
                           <div className="emoji-row">
-                            {['🎮', '🕹️', '🎲', '🃏', '🎯', '🎪', '🎨', '🎭', '🎵', '🎶', '🎤', '🎧', '📱', '💻', '⌚', '📷', '📺', '🎬', '🎞️', '📽️', '🎸', '🥁', '🎹', '🎺'].map((emoji, index) => (
+                            {filterEmojis(['🎮', '🕹️', '🎲', '🃏', '🎯', '🎪', '🎨', '🎭', '🎵', '🎶', '🎤', '🎧', '📱', '💻', '⌚', '📷', '📺', '🎬', '🎞️', '📽️', '🎸', '🥁', '🎹', '🎺'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2187,7 +2343,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">⚽ Sports & Activities</div>
                           <div className="emoji-row">
-                            {['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️‍♂️'].map((emoji, index) => (
+                            {filterEmojis(['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️‍♂️'], searchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
