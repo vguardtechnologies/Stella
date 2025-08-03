@@ -3066,68 +3066,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               )}
             </div>
             
-            {/* Third Section - Quick Actions & Info */}
-            <div className="shopify-section" style={{ padding: '10px', border: '1px solid #ddd', margin: '10px 0', borderRadius: '4px', backgroundColor: '#f5f5f5' }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#333' }}>
-                ⚡ Quick Actions
-              </h4>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '15px' }}>
-                <button
-                  onClick={() => {
-                    setCartNotification('Cart commands: "add to cart [product name]"');
-                    setTimeout(() => setCartNotification(''), 4000);
-                  }}
-                  style={{
-                    padding: '8px',
-                    fontSize: '10px',
-                    backgroundColor: '#2196F3',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  📝 Cart Commands
-                </button>
-                
-                <button
-                  onClick={() => {
-                    if (cartItems.length > 0) {
-                      const summary = `Cart Summary:\n${cartItems.map(item => `• ${item.title} (${item.quantity}x)`).join('\n')}\nTotal: $${cartTotal.toFixed(2)}`;
-                      setCartNotification('Cart summary copied to clipboard!');
-                      navigator.clipboard.writeText(summary);
-                      setTimeout(() => setCartNotification(''), 3000);
-                    } else {
-                      setCartNotification('Cart is empty');
-                      setTimeout(() => setCartNotification(''), 3000);
-                    }
-                  }}
-                  style={{
-                    padding: '8px',
-                    fontSize: '10px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  📋 Copy Summary
-                </button>
-              </div>
-              
-              <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.4' }}>
-                <div style={{ marginBottom: '5px' }}>
-                  <strong>Cart Status:</strong> {cartItems.length === 0 ? 'Empty' : `${cartItems.length} items ($${cartTotal.toFixed(2)})`}
-                </div>
-                <div style={{ marginBottom: '5px' }}>
-                  <strong>Store:</strong> {actualShopName || shopifyStore?.domain || 'Not connected'}
-                </div>
-                <div>
-                  <strong>Chat Commands:</strong> Type "add to cart [product name]" in chat
-                </div>
-              </div>
+            {/* Third Section */}
+            <div className="shopify-section" style={{ padding: '10px', border: '1px dashed #ccc', margin: '10px 0', borderRadius: '4px' }}>
+              <p style={{ color: '#666', textAlign: 'center', margin: '20px 0' }}>Section 3 - Ready for content</p>
             </div>
           </div>
         </div>
