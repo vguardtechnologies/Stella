@@ -2948,10 +2948,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             </div>
             
             {/* First Section - Products */}
-            <div className="shopify-section" style={{ padding: '10px', border: '1px solid #e0e0e0', margin: '10px 0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+            <div className="shopify-section" style={{ padding: '10px', border: '1px solid #334155', margin: '10px 0', borderRadius: '8px', backgroundColor: '#1e293b' }}>
               {/* Products Header - Moved Up */}
               <div style={{ marginBottom: '6px' }}>
-                <h4 style={{ margin: 0, color: '#333', fontSize: '14px', fontWeight: 'bold' }}>🛍️ Products</h4>
+                <h4 style={{ margin: 0, color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>🛍️ Products</h4>
               </div>
 
               {/* Dynamic Search Bar */}
@@ -2992,7 +2992,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 </div>
                 
                 {productSearchQuery && (
-                  <div style={{ fontSize: '8px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '8px', color: '#cccccc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>
                       Searching {productSearchFilter === 'all' ? 'all fields' : productSearchFilter} for "{productSearchQuery}"
                     </span>
@@ -3058,22 +3058,25 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       <div 
                         key={product.id} 
                         style={{ 
-                          border: '1px solid #ddd', 
+                          border: '1px solid rgba(255,255,255,0.2)', 
                           borderRadius: '8px', 
                           padding: '4px', 
-                          backgroundColor: 'white',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                          backgroundColor: 'rgba(255,255,255,0.1)',
+                          backdropFilter: 'blur(10px)',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                           transition: 'all 0.2s',
                           cursor: 'pointer',
                           position: 'relative'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'translateY(-3px)';
-                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.15)';
+                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
+                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 3px 8px rgba(0,0,0,0.1)';
+                          e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
                         }}
                       >
                         {/* Availability Badge */}
@@ -3110,13 +3113,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           margin: '0 0 2px 0', 
                           fontSize: '11px', 
                           fontWeight: 'bold',
-                          color: '#333',
+                          color: '#ffffff',
                           lineHeight: '1.1',
                           height: '22px',
                           overflow: 'hidden',
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical'
+                          WebkitBoxOrient: 'vertical',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                         }}>
                           {product.title}
                         </h5>
@@ -3126,7 +3130,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           margin: '0 0 3px 0', 
                           fontSize: '12px', 
                           fontWeight: 'bold',
-                          color: '#2196F3'
+                          color: '#60a5fa',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                         }}>
                           {priceRange}
                         </div>
@@ -3136,7 +3141,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           {/* Clickable Colors */}
                           {colors.size > 0 && (
                             <div style={{ marginBottom: '2px' }}>
-                              <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '1px', fontSize: '8px' }}>🎨 Colors:</div>
+                              <div style={{ color: '#e2e8f0', fontWeight: 'bold', marginBottom: '1px', fontSize: '8px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>🎨 Colors:</div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
                                 {Array.from(colors).map((color) => {
                                   const isSelected = selectedVariants[product.id]?.['Color'] === color || selectedVariants[product.id]?.['Colour'] === color;
@@ -3175,7 +3180,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           {/* Clickable Sizes */}
                           {sizes.size > 0 && (
                             <div style={{ marginBottom: '2px' }}>
-                              <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '1px', fontSize: '8px' }}>📏 Sizes:</div>
+                              <div style={{ color: '#e2e8f0', fontWeight: 'bold', marginBottom: '1px', fontSize: '8px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>📏 Sizes:</div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
                                 {Array.from(sizes).map((size) => {
                                   const isSelected = selectedVariants[product.id]?.['Size'] === size;
@@ -3213,19 +3218,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
                           {/* Variants Count */}
                           <div style={{ marginBottom: '1px', display: 'flex', alignItems: 'center', gap: '1px' }}>
-                            <span style={{ color: '#666', fontWeight: 'bold', fontSize: '7px' }}>🔄 Variants:</span>
-                            <span style={{ color: '#555', fontSize: '7px' }}>
+                            <span style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>🔄 Variants:</span>
+                            <span style={{ color: '#cbd5e1', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                               {variants.length} option{variants.length !== 1 ? 's' : ''} available
                             </span>
                           </div>
 
                           {/* Stock Status */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
-                            <span style={{ color: '#666', fontWeight: 'bold', fontSize: '7px' }}>📦 Stock:</span>
+                            <span style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>📦 Stock:</span>
                             <span style={{ 
-                              color: isAvailable ? '#4CAF50' : '#f44336',
+                              color: isAvailable ? '#4ade80' : '#f87171',
                               fontWeight: 'bold',
-                              fontSize: '7px'
+                              fontSize: '7px',
+                              textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                             }}>
                               {isAvailable ? `${totalStock} units` : 'Out of stock'}
                             </span>
