@@ -3023,7 +3023,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               ) : (productSearchQuery ? filteredProducts : shopifyProducts).length > 0 ? (
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                  gridTemplateColumns: 'repeat(2, 1fr)', 
                   gap: '15px',
                   maxHeight: '400px',
                   overflowY: 'auto'
@@ -3074,10 +3074,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         key={product.id} 
                         style={{ 
                           border: '1px solid #ddd', 
-                          borderRadius: '12px', 
-                          padding: '12px', 
+                          borderRadius: '8px', 
+                          padding: '4px', 
                           backgroundColor: 'white',
-                          boxShadow: '0 3px 8px rgba(0,0,0,0.1)',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
                           transition: 'all 0.2s',
                           cursor: 'pointer',
                           position: 'relative'
@@ -3113,21 +3113,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           alt={product.title}
                           style={{ 
                             width: '100%', 
-                            height: '120px', 
+                            height: '80px', 
                             objectFit: 'cover', 
                             borderRadius: '8px',
-                            marginBottom: '10px'
+                            marginBottom: '6px'
                           }}
                         />
 
                         {/* Product Title */}
                         <h5 style={{ 
-                          margin: '0 0 8px 0', 
-                          fontSize: '14px', 
+                          margin: '0 0 2px 0', 
+                          fontSize: '11px', 
                           fontWeight: 'bold',
                           color: '#333',
-                          lineHeight: '1.3',
-                          height: '36px',
+                          lineHeight: '1.1',
+                          height: '22px',
                           overflow: 'hidden',
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
@@ -3138,8 +3138,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
                         {/* Price Range */}
                         <div style={{ 
-                          margin: '0 0 8px 0', 
-                          fontSize: '16px', 
+                          margin: '0 0 3px 0', 
+                          fontSize: '12px', 
                           fontWeight: 'bold',
                           color: '#2196F3'
                         }}>
@@ -3147,12 +3147,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         </div>
 
                         {/* Product Details */}
-                        <div style={{ marginBottom: '10px', fontSize: '11px', lineHeight: '1.4' }}>
+                        <div style={{ marginBottom: '3px', fontSize: '9px', lineHeight: '1.2' }}>
                           {/* Clickable Colors */}
                           {colors.size > 0 && (
-                            <div style={{ marginBottom: '6px' }}>
-                              <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '3px' }}>🎨 Colors:</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                            <div style={{ marginBottom: '2px' }}>
+                              <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '1px', fontSize: '8px' }}>🎨 Colors:</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
                                 {Array.from(colors).map((color) => {
                                   const isSelected = selectedVariants[product.id]?.['Color'] === color || selectedVariants[product.id]?.['Colour'] === color;
                                   const isColorAvailable = isOptionValueAvailable('color', color);
@@ -3168,10 +3168,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                       }}
                                       disabled={!isColorAvailable}
                                       style={{
-                                        padding: '2px 6px',
-                                        fontSize: '9px',
+                                        padding: '1px 3px',
+                                        fontSize: '7px',
                                         border: `1px solid ${isSelected && isColorAvailable ? '#2196F3' : '#ddd'}`,
-                                        borderRadius: '10px',
+                                        borderRadius: '6px',
                                         backgroundColor: isSelected && isColorAvailable ? '#2196F3' : !isColorAvailable ? '#f5f5f5' : 'white',
                                         color: isSelected && isColorAvailable ? 'white' : !isColorAvailable ? '#999' : '#555',
                                         cursor: isColorAvailable ? 'pointer' : 'not-allowed',
@@ -3189,9 +3189,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
                           {/* Clickable Sizes */}
                           {sizes.size > 0 && (
-                            <div style={{ marginBottom: '6px' }}>
-                              <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '3px' }}>📏 Sizes:</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                            <div style={{ marginBottom: '2px' }}>
+                              <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '1px', fontSize: '8px' }}>📏 Sizes:</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
                                 {Array.from(sizes).map((size) => {
                                   const isSelected = selectedVariants[product.id]?.['Size'] === size;
                                   const isSizeAvailable = isOptionValueAvailable('size', size);
@@ -3207,10 +3207,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                       }}
                                       disabled={!isSizeAvailable}
                                       style={{
-                                        padding: '2px 6px',
-                                        fontSize: '9px',
+                                        padding: '1px 3px',
+                                        fontSize: '7px',
                                         border: `1px solid ${isSelected && isSizeAvailable ? '#4CAF50' : '#ddd'}`,
-                                        borderRadius: '10px',
+                                        borderRadius: '6px',
                                         backgroundColor: isSelected && isSizeAvailable ? '#4CAF50' : !isSizeAvailable ? '#f5f5f5' : 'white',
                                         color: isSelected && isSizeAvailable ? 'white' : !isSizeAvailable ? '#999' : '#555',
                                         cursor: isSizeAvailable ? 'pointer' : 'not-allowed',
@@ -3227,19 +3227,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           )}
 
                           {/* Variants Count */}
-                          <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ color: '#666', fontWeight: 'bold' }}>🔄 Variants:</span>
-                            <span style={{ color: '#555' }}>
+                          <div style={{ marginBottom: '1px', display: 'flex', alignItems: 'center', gap: '1px' }}>
+                            <span style={{ color: '#666', fontWeight: 'bold', fontSize: '7px' }}>🔄 Variants:</span>
+                            <span style={{ color: '#555', fontSize: '7px' }}>
                               {variants.length} option{variants.length !== 1 ? 's' : ''} available
                             </span>
                           </div>
 
                           {/* Stock Status */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ color: '#666', fontWeight: 'bold' }}>📦 Stock:</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                            <span style={{ color: '#666', fontWeight: 'bold', fontSize: '7px' }}>📦 Stock:</span>
                             <span style={{ 
                               color: isAvailable ? '#4CAF50' : '#f44336',
-                              fontWeight: 'bold'
+                              fontWeight: 'bold',
+                              fontSize: '7px'
                             }}>
                               {isAvailable ? `${totalStock} units` : 'Out of stock'}
                             </span>
@@ -3247,18 +3248,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         </div>
 
                         {/* Action Buttons */}
-                        <div style={{ display: 'flex', gap: '6px', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', gap: '2px', flexDirection: 'column' }}>
                           <button
                             onClick={() => addToShopifyCart(product, 1)}
                             disabled={!isAvailable}
                             style={{
                               width: '100%',
-                              padding: '8px',
-                              fontSize: '11px',
+                              padding: '4px',
+                              fontSize: '8px',
                               backgroundColor: isAvailable ? '#4CAF50' : '#ccc',
                               color: 'white',
                               border: 'none',
-                              borderRadius: '6px',
+                              borderRadius: '3px',
                               cursor: isAvailable ? 'pointer' : 'not-allowed',
                               transition: 'background-color 0.2s',
                               fontWeight: 'bold'
@@ -3284,12 +3285,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             }}
                             style={{
                               width: '100%',
-                              padding: '7px',
-                              fontSize: '10px',
+                              padding: '3px',
+                              fontSize: '7px',
                               backgroundColor: '#2196F3',
                               color: 'white',
                               border: 'none',
-                              borderRadius: '6px',
+                              borderRadius: '3px',
                               cursor: 'pointer',
                               transition: 'background-color 0.2s'
                             }}
