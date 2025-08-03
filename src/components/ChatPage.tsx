@@ -252,6 +252,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [actualShopName, setActualShopName] = useState<string>('');
   const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productSearchFilter, setProductSearchFilter] = useState('all'); // 'all', 'price', 'color', 'size', 'availability'
+  const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
+  const [selectedVariants, setSelectedVariants] = useState<{[productId: string]: {[optionName: string]: string}}>({});
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [cartTotal, setCartTotal] = useState(0);
   const [cartNotification, setCartNotification] = useState<string>('');
@@ -426,6 +430,82 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
+  // Filter products based on search query and filter type
+  const filterProducts = (products: any[], query: string, filterType: string) => {
+    if (!query.trim()) return products;
+
+    const searchTerm = query.toLowerCase();
+    
+    // Helper function to safely handle tags (can be string or array)
+    const getTagsString = (tags: any) => {
+      if (!tags) return '';
+      if (typeof tags === 'string') return tags.toLowerCase();
+      if (Array.isArray(tags)) return tags.join(' ').toLowerCase();
+      return '';
+    };
+
+    // Helper function to safely handle options
+    const getOptionsString = (options: any) => {
+      if (!options || !Array.isArray(options)) return '';
+      return options.map((opt: any) => {
+        const name = opt?.name || '';
+        const values = opt?.values;
+        let valuesStr = '';
+        if (Array.isArray(values)) {
+          valuesStr = values.join(' ');
+        } else if (typeof values === 'string') {
+          valuesStr = values;
+        }
+        return `${name} ${valuesStr}`;
+      }).join(' ').toLowerCase();
+    };
+    
+    return products.filter(product => {
+      switch (filterType) {
+        case 'price':
+          const price = product.variants?.[0]?.price || '0';
+          return price.toString().includes(searchTerm);
+        
+        case 'color':
+          // Search in title, tags, and options for color-related terms
+          const colorFields = [
+            product.title?.toLowerCase() || '',
+            getTagsString(product.tags),
+            getOptionsString(product.options)
+          ].join(' ');
+          return colorFields.includes(searchTerm);
+        
+        case 'size':
+          // Search in title, tags, and options for size-related terms
+          const sizeFields = [
+            product.title?.toLowerCase() || '',
+            getTagsString(product.tags),
+            getOptionsString(product.options)
+          ].join(' ');
+          return sizeFields.includes(searchTerm) || 
+                 /\b(xs|s|m|l|xl|xxl|small|medium|large|extra|size)\b/.test(sizeFields);
+        
+        case 'availability':
+          const availability = product.variants?.[0]?.inventory_quantity > 0 ? 'in stock' : 'out of stock';
+          return availability.includes(searchTerm) || 
+                 (searchTerm.includes('available') && product.variants?.[0]?.inventory_quantity > 0) ||
+                 (searchTerm.includes('unavailable') && product.variants?.[0]?.inventory_quantity <= 0);
+        
+        case 'all':
+        default:
+          // Search across all fields
+          const allFields = [
+            product.title?.toLowerCase() || '',
+            product.body_html?.toLowerCase() || '',
+            getTagsString(product.tags),
+            product.variants?.[0]?.price?.toString() || '',
+            getOptionsString(product.options)
+          ].join(' ');
+          return allFields.includes(searchTerm);
+      }
+    });
+  };
+
   // Send product as message in chat
   const sendProductInChat = async (product: any) => {
     if (!selectedConversation) {
@@ -474,6 +554,75 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     } catch (error) {
       console.error('Error sending product message:', error);
       alert('Error sending product. Please try again.');
+    }
+  };
+
+  // Handle variant option selection
+  const handleVariantOptionSelect = (productId: string, optionName: string, optionValue: string) => {
+    setSelectedVariants(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        [optionName]: optionValue
+      }
+    }));
+  };
+
+  // Send product with selected variant options in chat
+  const sendSelectedVariantInChat = async (product: any) => {
+    if (!selectedConversation) {
+      alert('Please select a conversation first');
+      return;
+    }
+
+    const selectedOptions = selectedVariants[product.id] || {};
+    const optionStrings = Object.entries(selectedOptions).map(([name, value]) => `${name}: ${value}`);
+    
+    let productMessage = `🛍️ *${product.title}*\n\n`;
+    
+    if (optionStrings.length > 0) {
+      productMessage += `📋 *Selected Options:*\n${optionStrings.map(opt => `• ${opt}`).join('\n')}\n\n`;
+    }
+    
+    productMessage += `💰 Price: $${product.variants?.[0]?.price || 'N/A'}\n` +
+      `🔗 Link: ${shopifyStore?.domain ? `https://${shopifyStore.domain}/products/${product.handle}` : '#'}\n\n` +
+      `To add this item to your cart, simply reply: *"add to cart"* 🛒\n\n` +
+      `Interested? Let me know if you'd like more details! 😊`;
+
+    try {
+      const phoneNumber = selectedConversation.replace('wa_', '');
+      
+      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phoneNumber,
+          message: productMessage
+        })
+      });
+
+      if (response.ok) {
+        const newMessage: Message = {
+          id: `product_variant_${Date.now()}`,
+          text: productMessage,
+          sender: 'agent',
+          timestamp: new Date(),
+          status: 'sent',
+          type: 'text',
+          direction: 'outgoing'
+        };
+        
+        setMessages(prev => [...prev, newMessage]);
+        console.log(`✅ Product with selected options sent: ${product.title}`);
+      } else {
+        console.error('Failed to send product with variant message');
+        alert('Failed to send product. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending product with variant message:', error);
+      alert('Failed to send product. Please try again.');
     }
   };
 
@@ -1055,6 +1204,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   useEffect(() => {
     fetchShopifyProducts();
   }, [shopifyStore?.connected]);
+
+  // Update filtered products when products, search query, or filter changes
+  useEffect(() => {
+    const filtered = filterProducts(shopifyProducts, productSearchQuery, productSearchFilter);
+    setFilteredProducts(filtered);
+  }, [shopifyProducts, productSearchQuery, productSearchFilter]);
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -2794,124 +2949,392 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             
             {/* First Section - Products */}
             <div className="shopify-section" style={{ padding: '10px', border: '1px solid #e0e0e0', margin: '10px 0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-                <h4 style={{ margin: 0, color: '#333', fontSize: '16px' }}>🛍️ Products</h4>
+              {/* Products Header - Moved Up */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <h4 style={{ margin: 0, color: '#333', fontSize: '18px', fontWeight: 'bold' }}>🛍️ Products</h4>
                 <button 
                   onClick={fetchShopifyProducts}
                   style={{ 
-                    padding: '4px 8px', 
+                    padding: '6px 12px', 
                     fontSize: '12px', 
                     backgroundColor: '#4CAF50', 
                     color: 'white', 
                     border: 'none', 
                     borderRadius: '4px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
                   }}
                 >
-                  Refresh
+                  🔄 Refresh
                 </button>
+              </div>
+
+              {/* Dynamic Search Bar */}
+              <div style={{ marginBottom: '15px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={productSearchQuery}
+                    onChange={(e) => setProductSearchQuery(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      outline: 'none'
+                    }}
+                  />
+                  <select
+                    value={productSearchFilter}
+                    onChange={(e) => setProductSearchFilter(e.target.value)}
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      backgroundColor: 'white',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">🔍 All Fields</option>
+                    <option value="price">💰 Price</option>
+                    <option value="color">🎨 Color</option>
+                    <option value="size">📏 Size</option>
+                    <option value="availability">📦 Availability</option>
+                  </select>
+                </div>
+                
+                {productSearchQuery && (
+                  <div style={{ fontSize: '11px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>
+                      Searching {productSearchFilter === 'all' ? 'all fields' : productSearchFilter} for "{productSearchQuery}"
+                    </span>
+                    <span>
+                      {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} found
+                    </span>
+                  </div>
+                )}
               </div>
               
               {productsLoading ? (
                 <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>Loading products...</div>
-              ) : shopifyProducts.length > 0 ? (
+              ) : (productSearchQuery ? filteredProducts : shopifyProducts).length > 0 ? (
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
-                  gap: '10px',
-                  maxHeight: '300px',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                  gap: '15px',
+                  maxHeight: '400px',
                   overflowY: 'auto'
                 }}>
-                  {shopifyProducts.map((product) => (
-                    <div 
-                      key={product.id} 
-                      style={{ 
-                        border: '1px solid #ddd', 
-                        borderRadius: '8px', 
-                        padding: '8px', 
-                        backgroundColor: 'white',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                        transition: 'transform 0.2s',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                      onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                    >
-                      <img 
-                        src={product.images?.[0]?.src || 'https://via.placeholder.com/120x120/f0f0f0/666?text=No+Image'} 
-                        alt={product.title}
+                  {(productSearchQuery ? filteredProducts : shopifyProducts).map((product) => {
+                    // Calculate availability and variants info
+                    const variants = product.variants || [];
+                    const availableVariants = variants.filter((v: any) => (v.inventory_quantity || 0) > 0);
+                    const isAvailable = availableVariants.length > 0;
+                    const totalStock = variants.reduce((sum: number, v: any) => sum + (v.inventory_quantity || 0), 0);
+                    
+                    // Extract sizes, colors, and prices
+                    const sizes = new Set<string>();
+                    const colors = new Set<string>();
+                    const prices = variants.map((v: any) => parseFloat(v.price || '0')).filter((p: number) => p > 0);
+                    
+                    // Parse options for sizes and colors
+                    (product.options || []).forEach((option: any) => {
+                      if (option.name?.toLowerCase().includes('size')) {
+                        (option.values || []).forEach((value: string) => sizes.add(value));
+                      }
+                      if (option.name?.toLowerCase().includes('color') || option.name?.toLowerCase().includes('colour')) {
+                        (option.values || []).forEach((value: string) => colors.add(value));
+                      }
+                    });
+
+                    // Helper function to check if a specific option value is available
+                    const isOptionValueAvailable = (optionName: string, optionValue: string) => {
+                      // Find variants that match this specific option value
+                      const matchingVariants = variants.filter((variant: any) => {
+                        const variantOptions = variant.option1 || variant.option2 || variant.option3;
+                        // Check if this variant has the specified option value
+                        return variant.option1 === optionValue || 
+                               variant.option2 === optionValue || 
+                               variant.option3 === optionValue;
+                      });
+                      
+                      // Check if any matching variant has inventory
+                      return matchingVariants.some((variant: any) => (variant.inventory_quantity || 0) > 0);
+                    };
+
+                    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+                    const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+                    const priceRange = minPrice === maxPrice ? `$${minPrice.toFixed(2)}` : `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+
+                    return (
+                      <div 
+                        key={product.id} 
                         style={{ 
-                          width: '100%', 
-                          height: '80px', 
-                          objectFit: 'cover', 
-                          borderRadius: '4px',
-                          marginBottom: '8px'
+                          border: '1px solid #ddd', 
+                          borderRadius: '12px', 
+                          padding: '12px', 
+                          backgroundColor: 'white',
+                          boxShadow: '0 3px 8px rgba(0,0,0,0.1)',
+                          transition: 'all 0.2s',
+                          cursor: 'pointer',
+                          position: 'relative'
                         }}
-                      />
-                      <h5 style={{ 
-                        margin: '0 0 4px 0', 
-                        fontSize: '12px', 
-                        fontWeight: 'bold',
-                        color: '#333',
-                        lineHeight: '1.2',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {product.title}
-                      </h5>
-                      <p style={{ 
-                        margin: '0 0 8px 0', 
-                        fontSize: '11px', 
-                        color: '#666',
-                        lineHeight: '1.2'
-                      }}>
-                        ${product.variants?.[0]?.price || 'N/A'}
-                      </p>
-                      <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
-                        <button
-                          onClick={() => addToShopifyCart(product, 1)}
-                          style={{
-                            width: '100%',
-                            padding: '6px',
-                            fontSize: '10px',
-                            backgroundColor: '#4CAF50',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s'
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-3px)';
+                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.15)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 3px 8px rgba(0,0,0,0.1)';
+                        }}
+                      >
+                        {/* Availability Badge */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '9px',
+                          fontWeight: 'bold',
+                          backgroundColor: isAvailable ? '#4CAF50' : '#f44336',
+                          color: 'white',
+                          zIndex: 1
+                        }}>
+                          {isAvailable ? `✓ ${totalStock} in stock` : '✗ SOLD OUT'}
+                        </div>
+
+                        {/* Product Image */}
+                        <img 
+                          src={product.images?.[0]?.src || 'https://via.placeholder.com/200x150/f0f0f0/666?text=No+Image'} 
+                          alt={product.title}
+                          style={{ 
+                            width: '100%', 
+                            height: '120px', 
+                            objectFit: 'cover', 
+                            borderRadius: '8px',
+                            marginBottom: '10px'
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#45a049'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4CAF50'}
-                        >
-                          Add to Cart
-                        </button>
-                        <button
-                          onClick={() => sendProductInChat(product)}
-                          style={{
-                            width: '100%',
-                            padding: '6px',
-                            fontSize: '10px',
-                            backgroundColor: '#2196F3',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1976D2'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2196F3'}
-                        >
-                          Send in Chat
-                        </button>
+                        />
+
+                        {/* Product Title */}
+                        <h5 style={{ 
+                          margin: '0 0 8px 0', 
+                          fontSize: '14px', 
+                          fontWeight: 'bold',
+                          color: '#333',
+                          lineHeight: '1.3',
+                          height: '36px',
+                          overflow: 'hidden',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical'
+                        }}>
+                          {product.title}
+                        </h5>
+
+                        {/* Price Range */}
+                        <div style={{ 
+                          margin: '0 0 8px 0', 
+                          fontSize: '16px', 
+                          fontWeight: 'bold',
+                          color: '#2196F3'
+                        }}>
+                          {priceRange}
+                        </div>
+
+                        {/* Product Details */}
+                        <div style={{ marginBottom: '10px', fontSize: '11px', lineHeight: '1.4' }}>
+                          {/* Clickable Colors */}
+                          {colors.size > 0 && (
+                            <div style={{ marginBottom: '6px' }}>
+                              <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '3px' }}>🎨 Colors:</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                {Array.from(colors).map((color) => {
+                                  const isSelected = selectedVariants[product.id]?.['Color'] === color || selectedVariants[product.id]?.['Colour'] === color;
+                                  const isColorAvailable = isOptionValueAvailable('color', color);
+                                  return (
+                                    <button
+                                      key={color}
+                                      onClick={() => {
+                                        if (!isColorAvailable) return; // Don't allow selection if this color is not available
+                                        const colorOptionName = product.options?.find((opt: any) => 
+                                          opt.name?.toLowerCase().includes('color') || opt.name?.toLowerCase().includes('colour')
+                                        )?.name || 'Color';
+                                        handleVariantOptionSelect(product.id, colorOptionName, color);
+                                      }}
+                                      disabled={!isColorAvailable}
+                                      style={{
+                                        padding: '2px 6px',
+                                        fontSize: '9px',
+                                        border: `1px solid ${isSelected && isColorAvailable ? '#2196F3' : '#ddd'}`,
+                                        borderRadius: '10px',
+                                        backgroundColor: isSelected && isColorAvailable ? '#2196F3' : !isColorAvailable ? '#f5f5f5' : 'white',
+                                        color: isSelected && isColorAvailable ? 'white' : !isColorAvailable ? '#999' : '#555',
+                                        cursor: isColorAvailable ? 'pointer' : 'not-allowed',
+                                        transition: 'all 0.2s',
+                                        opacity: isColorAvailable ? 1 : 0.5
+                                      }}
+                                    >
+                                      {color}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Clickable Sizes */}
+                          {sizes.size > 0 && (
+                            <div style={{ marginBottom: '6px' }}>
+                              <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '3px' }}>📏 Sizes:</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                {Array.from(sizes).map((size) => {
+                                  const isSelected = selectedVariants[product.id]?.['Size'] === size;
+                                  const isSizeAvailable = isOptionValueAvailable('size', size);
+                                  return (
+                                    <button
+                                      key={size}
+                                      onClick={() => {
+                                        if (!isSizeAvailable) return; // Don't allow selection if this size is not available
+                                        const sizeOptionName = product.options?.find((opt: any) => 
+                                          opt.name?.toLowerCase().includes('size')
+                                        )?.name || 'Size';
+                                        handleVariantOptionSelect(product.id, sizeOptionName, size);
+                                      }}
+                                      disabled={!isSizeAvailable}
+                                      style={{
+                                        padding: '2px 6px',
+                                        fontSize: '9px',
+                                        border: `1px solid ${isSelected && isSizeAvailable ? '#4CAF50' : '#ddd'}`,
+                                        borderRadius: '10px',
+                                        backgroundColor: isSelected && isSizeAvailable ? '#4CAF50' : !isSizeAvailable ? '#f5f5f5' : 'white',
+                                        color: isSelected && isSizeAvailable ? 'white' : !isSizeAvailable ? '#999' : '#555',
+                                        cursor: isSizeAvailable ? 'pointer' : 'not-allowed',
+                                        transition: 'all 0.2s',
+                                        opacity: isSizeAvailable ? 1 : 0.5
+                                      }}
+                                    >
+                                      {size}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Variants Count */}
+                          <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: '#666', fontWeight: 'bold' }}>🔄 Variants:</span>
+                            <span style={{ color: '#555' }}>
+                              {variants.length} option{variants.length !== 1 ? 's' : ''} available
+                            </span>
+                          </div>
+
+                          {/* Stock Status */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: '#666', fontWeight: 'bold' }}>📦 Stock:</span>
+                            <span style={{ 
+                              color: isAvailable ? '#4CAF50' : '#f44336',
+                              fontWeight: 'bold'
+                            }}>
+                              {isAvailable ? `${totalStock} units` : 'Out of stock'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', gap: '6px', flexDirection: 'column' }}>
+                          <button
+                            onClick={() => addToShopifyCart(product, 1)}
+                            disabled={!isAvailable}
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              fontSize: '11px',
+                              backgroundColor: isAvailable ? '#4CAF50' : '#ccc',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: isAvailable ? 'pointer' : 'not-allowed',
+                              transition: 'background-color 0.2s',
+                              fontWeight: 'bold'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (isAvailable) e.currentTarget.style.backgroundColor = '#45a049';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (isAvailable) e.currentTarget.style.backgroundColor = '#4CAF50';
+                            }}
+                          >
+                            {isAvailable ? '🛒 Add to Cart' : '❌ Unavailable'}
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              const hasSelectedOptions = selectedVariants[product.id] && Object.keys(selectedVariants[product.id]).length > 0;
+                              if (hasSelectedOptions) {
+                                sendSelectedVariantInChat(product);
+                              } else {
+                                sendProductInChat(product);
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '7px',
+                              fontSize: '10px',
+                              backgroundColor: '#2196F3',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1976D2'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2196F3'}
+                          >
+                            {selectedVariants[product.id] && Object.keys(selectedVariants[product.id]).length > 0 
+                              ? '💬 Send Selected' 
+                              : '💬 Send in Chat'
+                            }
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
-                  {shopifyStore?.connected ? 'No products found' : 'Connect Shopify to see products'}
+                  {productSearchQuery 
+                    ? `No products found for "${productSearchQuery}" in ${productSearchFilter === 'all' ? 'any field' : productSearchFilter}`
+                    : shopifyStore?.connected 
+                      ? 'No products found' 
+                      : 'Connect Shopify to see products'
+                  }
+                  {productSearchQuery && (
+                    <div style={{ marginTop: '8px' }}>
+                      <button
+                        onClick={() => {
+                          setProductSearchQuery('');
+                          setProductSearchFilter('all');
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '11px',
+                          backgroundColor: '#2196F3',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Clear Search
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
