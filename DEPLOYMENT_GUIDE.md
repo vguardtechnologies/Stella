@@ -1,25 +1,27 @@
 # Stella WhatsApp Integration - Production Deployment Guide
 
-## 🚀 Quick Deploy to Vercel
+## 🚀 Quick Deploy to Railway
 
 ### Prerequisites
-- [Vercel CLI](https://vercel.com/cli) installed: `npm i -g vercel`
+- [Railway CLI](https://docs.railway.app/cli) installed: `npm i -g @railway/cli`
 - GitHub repository with your code
-- Vercel account connected to GitHub
+- Railway account connected to GitHub
 
 ### 1. Frontend + Backend Deployment
 
 ```bash
-# Deploy both frontend and serverless API
-vercel --prod
+# Deploy both frontend and backend
+railway login
+railway link
+railway up
 
 # Or connect GitHub repository for automatic deployments
-# Go to vercel.com → Import Project → Select Repository
+# Go to railway.app → New Project → Deploy from GitHub → Select Repository
 ```
 
 ### 2. Environment Variables Setup
 
-In Vercel Dashboard → Project → Settings → Environment Variables:
+In Railway Dashboard → Project → Variables:
 
 ```bash
 # WhatsApp Business API
@@ -28,34 +30,34 @@ WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
 WHATSAPP_VERIFY_TOKEN=your_verify_token
 WHATSAPP_BUSINESS_ACCOUNT_ID=your_business_account_id
 
-# Database
+# Database (Railway provides this automatically)
 DATABASE_URL=postgresql://username:password@hostname:5432/database
 
 # Security
 JWT_SECRET=your_super_secure_jwt_secret_min_32_chars
-ALLOWED_ORIGINS=https://your-domain.vercel.app
+ALLOWED_ORIGINS=https://your-domain.railway.app
 
 # API Configuration
-VITE_API_URL=https://your-project.vercel.app/api
+VITE_API_URL=https://your-project.railway.app/api
 NODE_ENV=production
 ```
 
 ### 3. Database Setup
 
-#### Option A: Vercel Postgres (Recommended)
+#### Option A: Railway Postgres (Recommended)
 ```bash
-# Add Vercel Postgres to your project
-vercel postgres create stella-db
+# Add Railway Postgres to your project
+railway add postgresql
 
-# Get connection string
-vercel env pull
+# Get connection string automatically
+railway variables
 ```
 
 #### Option B: Supabase
 1. Go to [supabase.com](https://supabase.com)
 2. Create new project
 3. Copy database URL from Settings → Database
-4. Add to Vercel environment variables
+4. Add to Railway environment variables
 
 #### Option C: PlanetScale
 ```bash
@@ -73,7 +75,7 @@ pscale connect stella-whatsapp main
 
 ```bash
 # Run database initialization
-vercel dev
+railway run npm run dev
 # Then visit: http://localhost:3000/api/init-db
 ```
 
@@ -91,7 +93,7 @@ vercel dev
 #### Step 3: Configure Webhook
 ```bash
 # Your webhook URL will be:
-https://your-project.vercel.app/api/webhook/whatsapp
+https://your-project.railway.app/api/webhook/whatsapp
 
 # Verify token: Use your WHATSAPP_VERIFY_TOKEN
 # Subscribe to: messages, message_deliveries, message_reads
@@ -109,7 +111,7 @@ https://your-project.vercel.app/api/webhook/whatsapp
 
 #### Custom Domain
 ```bash
-# Add custom domain in Vercel Dashboard
+# Add custom domain in Railway Dashboard
 # Update ALLOWED_ORIGINS environment variable
 # Update VITE_API_URL if needed
 ```
@@ -264,7 +266,7 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 #### Webhook Not Receiving Messages
 ```bash
 # Check webhook URL is accessible
-curl https://your-domain.vercel.app/api/webhook/whatsapp
+curl https://your-domain.railway.app/api/webhook/whatsapp
 
 # Verify webhook subscription in Meta Dashboard
 # Check verify token matches environment variable
@@ -284,7 +286,7 @@ node -e "const { Pool } = require('pg'); const pool = new Pool({ connectionStrin
 ```
 
 ### Support Resources
-- **Vercel Support**: [vercel.com/support](https://vercel.com/support)
+- **Railway Support**: [railway.app/help](https://railway.app/help)
 - **WhatsApp Business API**: [developers.facebook.com/support](https://developers.facebook.com/support)
 - **Meta Business Support**: [business.facebook.com/support](https://business.facebook.com/support)
 

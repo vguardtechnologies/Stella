@@ -56,7 +56,7 @@ src/
 **Chosen: Option C - Serverless (Recommended for scalability)**
 
 ✅ **IMPLEMENTED FEATURES:**
-- Vercel serverless functions architecture
+- Railway full-stack deployment architecture
 - TypeScript-based API endpoints
 - PostgreSQL database with structured schema
 - JWT-based authentication system
@@ -117,7 +117,7 @@ GET  /api/webhook/whatsapp                 // ✅ Webhook verification
 api/
 ├── package.json           # ✅ Dependencies and scripts
 ├── tsconfig.json         # ✅ TypeScript configuration  
-├── vercel.json           # ✅ Deployment configuration
+├── railway.json         # ✅ Railway deployment configuration
 ├── lib/
 │   ├── database.ts       # ✅ PostgreSQL operations
 │   └── auth.ts          # ✅ JWT authentication
@@ -168,7 +168,7 @@ api/
 │   ├── auth/
 │   ├── whatsapp/
 │   └── webhooks/
-├── vercel.json
+├── railway.json
 └── package.json
 ```
 
@@ -518,8 +518,8 @@ export const WhatsAppProvider: React.FC<{ children: ReactNode }> = ({ children }
 #### 5.1 Environment Setup ✅ **COMPLETED**
 ```bash
 # ✅ FRONTEND DEPLOYED SUCCESSFULLY
-Production URL: https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app
-Vercel Project: https://vercel.com/ayo-marcelles-projects/stella
+Production URL: Your Railway deployment URL
+Railway Project: https://railway.app/dashboard
 
 # 🔄 NEXT: Database Setup Required
 # Complete setup guide: ./setup-database.sh
@@ -530,12 +530,12 @@ Vercel Project: https://vercel.com/ayo-marcelles-projects/stella
 **✅ SUCCESSFULLY DEPLOYED:**
 - Frontend application live and accessible
 - React + Vite + TypeScript build successful
-- Vercel hosting configured and working
+- Railway hosting configured and working
 - SSL certificate automatically provisioned
 
 **🔗 LIVE URLS:**
-- **Production**: https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app
-- **Dashboard**: https://vercel.com/ayo-marcelles-projects/stella
+- **Production**: Your Railway deployment URL
+- **Dashboard**: https://railway.app/dashboard
 .env.template - Complete configuration guide
 WHATSAPP_ACCESS_TOKEN=your_production_token
 WHATSAPP_PHONE_NUMBER_ID=your_phone_id
@@ -547,20 +547,20 @@ JWT_SECRET=your_jwt_secret
 #### 5.2 Deployment Configuration ✅ **COMPLETED**
 
 **✅ DEPLOYMENT INFRASTRUCTURE:**
-- Vercel configuration (vercel.json)
+- Railway configuration (railway.json)
 - Deployment script (deploy.sh)
 - Build optimization settings
 - Environment variables template
 - Production README guide
 
 **✅ DEPLOYMENT OPTIONS READY:**
-- **Vercel** (Recommended - One-click deploy)
+- **Railway** (Recommended - Full-stack deploy)
 - **Netlify** (Alternative frontend hosting)
 - **AWS Amplify** (Enterprise option)
 - **Digital Ocean App Platform** (Cost-effective)
 
 **✅ DATABASE HOSTING OPTIONS:**
-- **Vercel Postgres** (Recommended)
+- **Railway PostgreSQL** (Recommended)
 - **Supabase** (PostgreSQL with real-time)
 - **PlanetScale** (MySQL alternative)
 - **AWS RDS** (Enterprise option)

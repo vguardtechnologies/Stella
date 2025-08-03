@@ -4,23 +4,23 @@
 
 ### 🌐 Live Application
 **Your app is now LIVE and working!**
-- **Frontend URL**: https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app
+- **Frontend URL**: Your Railway deployment URL
 - **Status**: ✅ **FULLY FUNCTIONAL**
 - **Data Storage**: Mock data (working perfectly)
 - **Authentication**: Local storage based
 - **WhatsApp UI**: Complete and ready
 
 ### 🏗️ Infrastructure
-- **Hosting**: Vercel (Production)
+- **Hosting**: Railway (Production)
 - **Framework**: React + Vite + TypeScript
-- **API**: Serverless functions ready
+- **API**: Full-stack Node.js app
 - **Environment**: Production variables configured
 - **Security**: JWT tokens generated and configured
 
 ## 🔄 WHAT YOU CAN DO RIGHT NOW
 
 ### 1. Test Your Live App
-✅ **Visit**: https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app
+✅ **Visit**: Your Railway deployment URL
 - Register a new account
 - Test the WhatsApp integration UI
 - Send mock messages
@@ -32,14 +32,14 @@ To connect real WhatsApp Business API:
 
 ```bash
 # Get WhatsApp credentials from Meta Developer Console
-# Then add them to Vercel:
+# Then add them to Railway:
 
-vercel env add WHATSAPP_ACCESS_TOKEN production
-vercel env add WHATSAPP_PHONE_NUMBER_ID production
-vercel env add WHATSAPP_BUSINESS_ACCOUNT_ID production
+railway variables set WHATSAPP_ACCESS_TOKEN=your_token_here
+railway variables set WHATSAPP_PHONE_NUMBER_ID=your_id_here  
+railway variables set WHATSAPP_BUSINESS_ACCOUNT_ID=your_account_id
 
-# Redeploy
-vercel --prod
+# Then redeploy:
+railway up
 ```
 
 ### 3. Add Real Database (Optional)
@@ -63,22 +63,22 @@ Your app works perfectly with mock data, but for production with multiple users:
    - Business Account ID
 
 ### Step 2: Webhook Configuration
-- **Webhook URL**: `https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app/api/webhook/whatsapp`
+- **Webhook URL**: `https://your-app.railway.app/api/webhook/whatsapp`
 - **Verify Token**: `MCFmMwCZqLxpjxvYZAdkvg==` (already configured)
 
 ### Step 3: Add Credentials
 ```bash
-vercel env add WHATSAPP_ACCESS_TOKEN production
+railway variables set WHATSAPP_ACCESS_TOKEN=your_token_here
 # Paste your access token
 
-vercel env add WHATSAPP_PHONE_NUMBER_ID production  
+railway variables set WHATSAPP_PHONE_NUMBER_ID=your_id_here
 # Paste your phone number ID
 
-vercel env add WHATSAPP_BUSINESS_ACCOUNT_ID production
+railway variables set WHATSAPP_BUSINESS_ACCOUNT_ID=your_account_id
 # Paste your business account ID
 
 # Redeploy with new variables
-vercel --prod
+railway up
 ```
 
 ## 🧪 Testing Workflow
@@ -121,14 +121,14 @@ Your app is **READY FOR USERS** right now with mock data!
 ### For Production WhatsApp Integration:
 1. ✅ App deployed and working
 2. 🔄 Get WhatsApp Business API access
-3. 🔄 Add API credentials to Vercel
+3. 🔄 Add API credentials to Railway
 4. 🔄 Test with real phone numbers
 5. ✅ You're live!
 
 ## 📞 Support
 
-- **Live App**: https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app
-- **Vercel Dashboard**: https://vercel.com/ayo-marcelles-projects/stella
+- **Live App**: Your Railway deployment URL
+- **Railway Dashboard**: https://railway.app/dashboard
 - **Quick Setup**: `./quick-setup.sh`
 - **Environment Setup**: `./setup-database.sh`
 
@@ -136,4 +136,4 @@ Your app is **READY FOR USERS** right now with mock data!
 
 **🎉 Congratulations! Your WhatsApp Business Integration is LIVE and ready for users!**
 
-*Test it now: https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app*
+*Test it now: Your Railway deployment URL*

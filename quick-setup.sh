@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 echo ""
 echo -e "${GREEN}✅ Current Status:${NC}"
-echo "- Frontend: https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app"
+echo "- Frontend: Your Railway deployment URL"
 echo "- Environment: Ready for database connection"
 echo ""
 
@@ -25,7 +25,7 @@ echo "Choose your database setup:"
 echo "1. 📦 Continue with mock data (immediate testing)"
 echo "2. 🟢 Set up Supabase (free PostgreSQL, 5 minutes)"
 echo "3. 🔵 Set up PlanetScale (free MySQL, 3 minutes)"
-echo "4. 🟣 Set up Vercel Postgres (paid, instant)"
+echo "4. � Set up Railway PostgreSQL (recommended)"
 echo ""
 
 read -p "Enter your choice (1-4): " choice
@@ -47,7 +47,7 @@ case $choice in
         echo "4. Add them in your app settings"
         echo ""
         echo -e "${GREEN}🎯 Your app is ready for testing!${NC}"
-        echo "Visit: https://stella-nvyb66ka2-ayo-marcelles-projects.vercel.app"
+        echo "Visit: Your Railway deployment URL"
         ;;
     2)
         echo ""
@@ -63,10 +63,10 @@ case $choice in
         echo "5. Wait 2-3 minutes for setup"
         echo "6. Go to Settings → Database"
         echo "7. Copy connection string"
-        echo "8. Run: vercel env add DATABASE_URL production"
-        echo "9. Paste the connection string"
+        echo "8. Run: railway variables set DATABASE_URL=your_connection_string"
+        echo "9. Deploy: railway up"
         echo ""
-        echo -e "${YELLOW}⏳ After setup, redeploy with: vercel --prod${NC}"
+        echo -e "${YELLOW}⏳ After setup, redeploy with: railway up${NC}"
         ;;
     3)
         echo ""
@@ -80,24 +80,23 @@ case $choice in
         echo "4. Go to 'Connect' tab"
         echo "5. Select 'Connect with: Prisma'"
         echo "6. Copy the DATABASE_URL"
-        echo "7. Run: vercel env add DATABASE_URL production"
+        echo "7. Run: railway variables set DATABASE_URL=connection_string"
         echo "8. Paste the URL"
         echo ""
-        echo -e "${YELLOW}⏳ After setup, redeploy with: vercel --prod${NC}"
+        echo -e "${YELLOW}⏳ After setup, redeploy with: railway up${NC}"
         ;;
     4)
         echo ""
-        echo -e "${GREEN}🟣 Setting up Vercel Postgres...${NC}"
+        echo -e "${GREEN}� Setting up Railway PostgreSQL...${NC}"
         echo ""
-        echo "1. Go to: https://vercel.com/ayo-marcelles-projects/stella"
-        echo "2. Click 'Storage' tab"
-        echo "3. Click 'Create Database'"
-        echo "4. Select 'Postgres'"
-        echo "5. Choose your plan ($20/month for Hobby)"
-        echo "6. Name: stella-db"
-        echo "7. It will auto-connect to your project"
+        echo "1. Run: railway add postgresql"
+        echo "2. Check variables: railway variables"
+        echo "3. DATABASE_URL will be auto-generated"
+        echo "4. Deploy: railway up"
+        echo "5. Your database is ready to use!"
+        echo "6. No additional setup needed"
         echo ""
-        echo -e "${YELLOW}⏳ After setup, redeploy with: vercel --prod${NC}"
+        echo -e "${YELLOW}⏳ After setup, redeploy with: railway up${NC}"
         ;;
     *)
         echo ""
