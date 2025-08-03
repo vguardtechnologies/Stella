@@ -2943,35 +2943,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
           {/* E-commerce Integration Panel */}
           <div className="shopify-panel">
-            <div className="panel-header">
-              <h3>🛒 {shopifyStore?.connected && actualShopName ? actualShopName : shopifyStore?.connected && shopifyStore?.shop ? shopifyStore.shop : 'E-commerce Store'}</h3>
+            <div style={{ padding: '4px 8px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>🛒 {shopifyStore?.connected && actualShopName ? actualShopName : shopifyStore?.connected && shopifyStore?.shop ? shopifyStore.shop : 'E-commerce Store'}</h3>
             </div>
             
             {/* First Section - Products */}
             <div className="shopify-section" style={{ padding: '10px', border: '1px solid #e0e0e0', margin: '10px 0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
               {/* Products Header - Moved Up */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <h4 style={{ margin: 0, color: '#333', fontSize: '18px', fontWeight: 'bold' }}>🛍️ Products</h4>
-                <button 
-                  onClick={fetchShopifyProducts}
-                  style={{ 
-                    padding: '6px 12px', 
-                    fontSize: '12px', 
-                    backgroundColor: '#4CAF50', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  🔄 Refresh
-                </button>
+              <div style={{ marginBottom: '6px' }}>
+                <h4 style={{ margin: 0, color: '#333', fontSize: '14px', fontWeight: 'bold' }}>🛍️ Products</h4>
               </div>
 
               {/* Dynamic Search Bar */}
-              <div style={{ marginBottom: '15px' }}>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
                   <input
                     type="text"
                     placeholder="Search products..."
@@ -2979,10 +2964,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     onChange={(e) => setProductSearchQuery(e.target.value)}
                     style={{
                       flex: 1,
-                      padding: '8px 12px',
+                      padding: '4px 8px',
                       border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontSize: '12px',
+                      borderRadius: '3px',
+                      fontSize: '10px',
                       outline: 'none'
                     }}
                   />
@@ -2990,10 +2975,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     value={productSearchFilter}
                     onChange={(e) => setProductSearchFilter(e.target.value)}
                     style={{
-                      padding: '8px',
+                      padding: '4px',
                       border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontSize: '11px',
+                      borderRadius: '3px',
+                      fontSize: '9px',
                       backgroundColor: 'white',
                       cursor: 'pointer'
                     }}
@@ -3007,7 +2992,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 </div>
                 
                 {productSearchQuery && (
-                  <div style={{ fontSize: '11px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '8px', color: '#666', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>
                       Searching {productSearchFilter === 'all' ? 'all fields' : productSearchFilter} for "{productSearchQuery}"
                     </span>
