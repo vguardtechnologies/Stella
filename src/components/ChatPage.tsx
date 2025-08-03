@@ -4,6 +4,7 @@ import ContactManager from './ContactManager';
 import ImageModal from './ImageModal';
 import WhatsAppTemplateManager from './WhatsAppTemplateManager';
 import MediaBrowser from './MediaBrowser';
+import ShopifyStatusWidget from './ShopifyStatusWidget';
 import './ChatPage.css';
 
 // Template interface for WhatsApp templates
@@ -572,127 +573,44 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setShowMediaBrowser(false);
   };
 
-  // Helper function to wrap emojis in spans for bigger sizing
-  const renderTextWithBiggerEmojis = (text: string) => {
-    // Regex to match emoji characters (most comprehensive emoji regex)
-    const emojiRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Flag_Sequence}|\p{Emoji_Keycap_Sequence}|\p{Emoji_Tag_Sequence}|\p{Emoji_ZWJ_Sequence})/gu;
-    
-    const parts = text.split(emojiRegex);
-    
-    return parts.map((part, index) => {
-      // Create a fresh regex for testing each part to avoid state issues
-      const testRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Flag_Sequence}|\p{Emoji_Keycap_Sequence}|\p{Emoji_Tag_Sequence}|\p{Emoji_ZWJ_Sequence})/gu;
-      // Check if this part is an emoji
-      if (part && testRegex.test(part)) {
-        return (
-          <span key={index} className="emoji-char">
-            {part}
-          </span>
-        );
-      } else {
-        return part;
-      }
-    });
-  };
-
   // Helper function to filter emojis based on search query
   const filterEmojis = (emojiArray: string[], query: string) => {
     if (!query.trim()) return emojiArray;
     return emojiArray.filter(emoji => {
-      // Comprehensive emoji name mapping for better search
+      // Enhanced emoji name mapping for better search
       const emojiNames: { [key: string]: string[] } = {
-        // Smileys & Emotion
-        '😀': ['smile', 'happy', 'grin', 'face', 'joy'],
-        '😃': ['smile', 'happy', 'joy', 'face', 'grin'],
-        '😄': ['smile', 'happy', 'laugh', 'face', 'joy'],
-        '😁': ['grin', 'smile', 'happy', 'face', 'beam'],
-        '😆': ['laugh', 'happy', 'smile', 'face', 'squint'],
-        '😅': ['sweat', 'laugh', 'nervous', 'face', 'relief'],
-        '😂': ['joy', 'laugh', 'tears', 'face', 'crying'],
-        '🤣': ['rolling', 'laugh', 'floor', 'face', 'rofl'],
-        '😊': ['blush', 'smile', 'happy', 'face', 'warm'],
-        '😇': ['innocent', 'halo', 'angel', 'face', 'saint'],
-        '🙂': ['smile', 'happy', 'slight', 'face', 'content'],
-        '🙃': ['upside', 'down', 'silly', 'face', 'sarcasm'],
-        '😉': ['wink', 'smile', 'face', 'flirt'],
-        '😌': ['relieved', 'peaceful', 'face', 'content'],
-        '😍': ['love', 'heart', 'eyes', 'face', 'crush'],
-        '🥰': ['love', 'hearts', 'smile', 'face', 'affection'],
-        '😘': ['kiss', 'love', 'face', 'blow'],
-        '😗': ['kiss', 'whistle', 'face'],
-        '😙': ['kiss', 'smile', 'face'],
-        '😚': ['kiss', 'closed', 'eyes', 'face'],
-        '😋': ['tongue', 'tasty', 'face', 'yum', 'delicious'],
-        '😛': ['tongue', 'out', 'face', 'playful'],
-        '😝': ['tongue', 'wink', 'face', 'silly'],
-        '😜': ['tongue', 'wink', 'face', 'joke'],
-        '🤪': ['crazy', 'wild', 'face', 'zany'],
-        '🤨': ['raised', 'eyebrow', 'face', 'suspicious'],
-        '🧐': ['monocle', 'face', 'thinking', 'fancy'],
-        '🤓': ['nerd', 'glasses', 'face', 'geek'],
-        '😎': ['cool', 'sunglasses', 'face', 'awesome'],
-        '🤩': ['star', 'eyes', 'wow', 'face', 'amazed'],
-        '🥳': ['party', 'celebration', 'face', 'birthday'],
-        '😏': ['smirk', 'face', 'sly', 'mischief'],
-        '😒': ['unamused', 'face', 'bored'],
-        '😞': ['disappointed', 'face', 'sad'],
-        '😔': ['pensive', 'face', 'thoughtful', 'sad'],
-        '😟': ['worried', 'face', 'concerned'],
-        '😕': ['confused', 'face', 'slightly'],
-        '🙁': ['frown', 'face', 'sad'],
-        '☹️': ['frown', 'face', 'very', 'sad'],
-        '😣': ['persevering', 'face', 'struggling'],
-        '😖': ['confounded', 'face', 'frustrated'],
-        '😫': ['tired', 'face', 'exhausted'],
-        '😩': ['weary', 'face', 'fed', 'up'],
-        '🥺': ['pleading', 'face', 'puppy', 'eyes'],
-        '😢': ['cry', 'tear', 'sad', 'face'],
-        '😭': ['cry', 'tears', 'sad', 'face', 'sobbing'],
-        '😤': ['angry', 'mad', 'face', 'huffing'],
-        '😠': ['angry', 'mad', 'face', 'grumpy'],
-        '😡': ['angry', 'red', 'mad', 'face', 'rage'],
-        '🤬': ['swearing', 'cursing', 'face', 'symbols'],
-        '🤯': ['exploding', 'head', 'mind', 'blown'],
-        '😳': ['flushed', 'face', 'embarrassed'],
-        '🥵': ['hot', 'heat', 'face', 'sweating'],
-        '🥶': ['cold', 'freeze', 'face', 'freezing'],
-        '😱': ['scream', 'fear', 'face', 'shock'],
-        '😨': ['fearful', 'face', 'scared'],
-        '😰': ['anxious', 'sweat', 'face', 'worried'],
-        '😥': ['sad', 'sweat', 'face', 'disappointed'],
-        '😓': ['downcast', 'sweat', 'face'],
-        '🤗': ['hug', 'face', 'embrace'],
-        '🤔': ['thinking', 'face', 'hmm'],
-        '🤭': ['hand', 'mouth', 'face', 'oops'],
-        '🤫': ['shush', 'quiet', 'face', 'secret'],
-        '🤥': ['lying', 'face', 'pinocchio'],
-        '😶': ['no', 'mouth', 'face', 'speechless'],
-        '😐': ['neutral', 'face', 'meh'],
-        '😑': ['expressionless', 'face', 'blank'],
-        '😬': ['grimace', 'face', 'awkward'],
-        '🙄': ['eye', 'roll', 'face', 'whatever'],
-        '😯': ['hushed', 'face', 'surprised'],
-        '😦': ['frowning', 'open', 'mouth', 'face'],
-        '😧': ['anguished', 'face', 'distressed'],
-        '😮': ['open', 'mouth', 'face', 'wow'],
-        '😲': ['astonished', 'face', 'shock'],
-        '🥱': ['yawn', 'face', 'tired', 'sleepy'],
-        '😴': ['sleep', 'face', 'zzz', 'tired'],
-        '🤤': ['drool', 'face', 'sleep'],
-        '😪': ['sleepy', 'face', 'tired'],
-
-        // Hearts & Love
-        '❤️': ['heart', 'love', 'red', 'romance'],
-        '🧡': ['heart', 'orange', 'love'],
-        '💛': ['heart', 'yellow', 'love'],
-        '💚': ['heart', 'green', 'love'],
+        '😀': ['smile', 'happy', 'grin', 'face'],
+        '😃': ['smile', 'happy', 'joy', 'face'],
+        '😄': ['smile', 'happy', 'laugh', 'face'],
+        '😁': ['grin', 'smile', 'happy', 'face'],
+        '😆': ['laugh', 'happy', 'smile', 'face'],
+        '😅': ['sweat', 'laugh', 'nervous', 'face'],
+        '😂': ['joy', 'laugh', 'tears', 'face'],
+        '🤣': ['rolling', 'laugh', 'floor', 'face'],
+        '😊': ['blush', 'smile', 'happy', 'face'],
+        '😇': ['innocent', 'halo', 'angel', 'face'],
+        '🙂': ['smile', 'happy', 'slight', 'face'],
+        '😉': ['wink', 'smile', 'face'],
+        '😍': ['love', 'heart', 'eyes', 'face'],
+        '🥰': ['love', 'hearts', 'smile', 'face'],
+        '😘': ['kiss', 'love', 'face'],
+        '😋': ['tongue', 'tasty', 'face'],
+        '😎': ['cool', 'sunglasses', 'face'],
+        '🤩': ['star', 'eyes', 'wow', 'face'],
+        '😭': ['cry', 'tears', 'sad', 'face'],
+        '😤': ['angry', 'mad', 'face'],
+        '😠': ['angry', 'mad', 'face'],
+        '😡': ['angry', 'red', 'mad', 'face'],
+        '🥵': ['hot', 'heat', 'face'],
+        '🥶': ['cold', 'freeze', 'face'],
+        '❤️': ['heart', 'love', 'red'],
         '💙': ['heart', 'blue', 'love'],
+        '💚': ['heart', 'green', 'love'],
+        '💛': ['heart', 'yellow', 'love'],
         '💜': ['heart', 'purple', 'love'],
+        '🧡': ['heart', 'orange', 'love'],
         '🤍': ['heart', 'white', 'love'],
         '🖤': ['heart', 'black', 'love'],
-        '🤎': ['heart', 'brown', 'love'],
-        '💔': ['broken', 'heart', 'love', 'sad'],
-        '❣️': ['exclamation', 'heart', 'love'],
         '💕': ['hearts', 'love', 'two'],
         '💞': ['hearts', 'love', 'revolving'],
         '💓': ['heart', 'beating', 'love'],
@@ -700,641 +618,48 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         '💖': ['heart', 'sparkling', 'love'],
         '💘': ['heart', 'arrow', 'cupid'],
         '💝': ['heart', 'gift', 'love'],
-        '💟': ['heart', 'decoration', 'love'],
-        '♥️': ['heart', 'suit', 'love'],
-
-        // Gestures & Hands
-        '👍': ['thumbs', 'up', 'good', 'like', 'yes'],
-        '👎': ['thumbs', 'down', 'bad', 'dislike', 'no'],
-        '👌': ['ok', 'hand', 'perfect', 'good'],
-        '✌️': ['peace', 'victory', 'hand'],
-        '🤞': ['fingers', 'crossed', 'luck', 'hand', 'hope'],
-        '🤟': ['love', 'you', 'hand', 'sign'],
-        '🤘': ['rock', 'on', 'hand', 'metal'],
-        '🤙': ['call', 'me', 'hand', 'shaka'],
-        '👈': ['point', 'left', 'hand'],
-        '👉': ['point', 'right', 'hand'],
-        '👆': ['point', 'up', 'hand'],
-        '🖕': ['middle', 'finger', 'hand'],
-        '👇': ['point', 'down', 'hand'],
-        '☝️': ['index', 'point', 'up', 'hand'],
+        '👍': ['thumbs', 'up', 'good', 'like'],
+        '👎': ['thumbs', 'down', 'bad', 'dislike'],
         '👋': ['wave', 'hello', 'goodbye', 'hand'],
-        '🤚': ['raised', 'back', 'hand'],
-        '🖐️': ['raised', 'hand', 'five'],
-        '✋': ['raised', 'hand', 'stop'],
-        '🖖': ['vulcan', 'spock', 'hand'],
-        '👏': ['clap', 'applause', 'hand'],
-        '🙌': ['praise', 'hands', 'celebration'],
-        '👐': ['open', 'hands', 'hug'],
-        '🤲': ['palms', 'up', 'hands'],
-        '🤝': ['handshake', 'deal', 'hand'],
         '🙏': ['pray', 'thanks', 'please', 'hand'],
-
-        // Animals & Nature
-        '🐶': ['dog', 'puppy', 'animal', 'pet'],
-        '🐱': ['cat', 'kitten', 'animal', 'pet'],
+        '👏': ['clap', 'applause', 'hand'],
+        '🤝': ['handshake', 'deal', 'hand'],
+        '✌️': ['peace', 'victory', 'hand'],
+        '🤞': ['fingers', 'crossed', 'luck', 'hand'],
+        '🎉': ['party', 'celebration', 'confetti'],
+        '🎊': ['party', 'confetti', 'celebration'],
+        '🎈': ['balloon', 'party', 'celebration'],
+        '🎂': ['cake', 'birthday', 'celebration'],
+        '🎁': ['gift', 'present', 'celebration'],
+        '🔥': ['fire', 'hot', 'flame', 'lit'],
+        '⭐': ['star', 'favorite', 'cool'],
+        '✨': ['sparkles', 'magic', 'shiny'],
+        '💎': ['diamond', 'gem', 'precious'],
+        '🏆': ['trophy', 'winner', 'award'],
+        '🐶': ['dog', 'puppy', 'animal'],
+        '🐱': ['cat', 'kitten', 'animal'],
         '🐭': ['mouse', 'animal'],
-        '🐹': ['hamster', 'animal', 'pet'],
+        '🐹': ['hamster', 'animal'],
         '🐰': ['rabbit', 'bunny', 'animal'],
         '🦊': ['fox', 'animal'],
         '🐻': ['bear', 'animal'],
         '🐼': ['panda', 'bear', 'animal'],
-        '🐨': ['koala', 'animal'],
-        '🐯': ['tiger', 'animal'],
-        '🦁': ['lion', 'animal'],
-        '🐮': ['cow', 'animal'],
-        '🐷': ['pig', 'animal'],
-        '🐸': ['frog', 'animal'],
-        '🐵': ['monkey', 'animal'],
-        '🐔': ['chicken', 'animal'],
-        '🐧': ['penguin', 'animal'],
-        '🐦': ['bird', 'animal'],
-        '🦄': ['unicorn', 'animal', 'magical'],
-        '🐝': ['bee', 'insect', 'honey'],
-        '🦋': ['butterfly', 'insect'],
-        '🐌': ['snail', 'slow'],
-        '🐛': ['bug', 'insect'],
-        '🐜': ['ant', 'insect'],
-        '🌸': ['cherry', 'blossom', 'flower'],
-        '🌺': ['hibiscus', 'flower'],
-        '🌻': ['sunflower', 'flower'],
-        '🌹': ['rose', 'flower'],
-        '🥀': ['wilted', 'flower'],
-        '🌷': ['tulip', 'flower'],
-        '🌲': ['evergreen', 'tree'],
-        '🌳': ['deciduous', 'tree'],
-        '🌴': ['palm', 'tree'],
-        '🌱': ['seedling', 'plant'],
-        '🌿': ['herb', 'plant'],
-        '☘️': ['shamrock', 'clover'],
-
-        // Food & Drinks
-        '🍎': ['apple', 'fruit', 'red'],
-        '🍊': ['orange', 'fruit'],
-        '🍋': ['lemon', 'fruit'],
-        '🍌': ['banana', 'fruit'],
-        '🍉': ['watermelon', 'fruit'],
-        '🍇': ['grapes', 'fruit'],
-        '🍓': ['strawberry', 'fruit'],
-        '🥝': ['kiwi', 'fruit'],
-        '🍅': ['tomato', 'vegetable'],
-        '🥕': ['carrot', 'vegetable'],
-        '🌽': ['corn', 'vegetable'],
-        '🌶️': ['hot', 'pepper', 'spicy'],
-        '🍞': ['bread', 'food'],
-        '🥖': ['baguette', 'bread'],
-        '🥨': ['pretzel', 'food'],
-        '🧀': ['cheese', 'food'],
-        '🥓': ['bacon', 'meat'],
-        '🍳': ['egg', 'cooking'],
-        '🍔': ['burger', 'food', 'hamburger'],
-        '🍟': ['fries', 'food', 'french'],
-        '🍕': ['pizza', 'food'],
-        '🌭': ['hot', 'dog', 'food'],
-        '🥪': ['sandwich', 'food'],
-        '🌮': ['taco', 'food'],
-        '🌯': ['burrito', 'food'],
-        '🥗': ['salad', 'food', 'healthy'],
-        '🍝': ['pasta', 'food', 'spaghetti'],
-        '🍜': ['ramen', 'noodles', 'food'],
-        '🍲': ['stew', 'food'],
-        '🍱': ['bento', 'box', 'food'],
-        '🍣': ['sushi', 'food'],
-        '🍤': ['shrimp', 'food'],
-        '🥟': ['dumpling', 'food'],
-        '🍦': ['ice', 'cream', 'dessert'],
-        '🍰': ['cake', 'dessert'],
-        '🎂': ['birthday', 'cake', 'celebration'],
-        '🍭': ['lollipop', 'candy'],
-        '🍬': ['candy', 'sweet'],
-        '🍫': ['chocolate', 'candy'],
-        '🍿': ['popcorn', 'snack'],
-        '☕': ['coffee', 'drink', 'hot'],
-        '🍵': ['tea', 'drink', 'hot'],
-        '🥤': ['soda', 'drink', 'cup'],
-        '🍺': ['beer', 'drink', 'alcohol'],
-        '🍷': ['wine', 'drink', 'alcohol'],
-        '🥂': ['cheers', 'champagne', 'celebration'],
-        '🍾': ['champagne', 'bottle', 'celebration'],
-        '🍸': ['cocktail', 'drink', 'alcohol'],
-
-        // Activities & Sports
-        '⚽': ['soccer', 'football', 'sport', 'ball'],
-        '🏀': ['basketball', 'sport', 'ball'],
-        '🏈': ['american', 'football', 'sport'],
-        '⚾': ['baseball', 'sport', 'ball'],
-        '🥎': ['softball', 'sport', 'ball'],
-        '🎾': ['tennis', 'sport', 'ball'],
-        '🏐': ['volleyball', 'sport', 'ball'],
-        '🏉': ['rugby', 'sport', 'ball'],
-        '🥏': ['frisbee', 'sport'],
-        '🎱': ['pool', 'billiards', 'eight', 'ball'],
-        '🏓': ['ping', 'pong', 'table', 'tennis'],
-        '🏸': ['badminton', 'sport'],
-        '🏒': ['ice', 'hockey', 'sport'],
-        '🏑': ['field', 'hockey', 'sport'],
-        '🥍': ['lacrosse', 'sport'],
-        '🏏': ['cricket', 'sport'],
-        '🥅': ['goal', 'net', 'sport'],
-        '⛳': ['golf', 'flag', 'sport'],
-        '🏹': ['archery', 'bow', 'arrow'],
-        '🎣': ['fishing', 'pole'],
-        '🥊': ['boxing', 'glove', 'sport'],
-        '🥋': ['martial', 'arts', 'karate'],
-        '🎽': ['running', 'shirt', 'sport'],
-        '🛹': ['skateboard', 'sport'],
-        '🛷': ['sled', 'winter'],
-        '⛸️': ['ice', 'skate', 'winter'],
-        '🥌': ['curling', 'stone', 'winter'],
-        '🎿': ['ski', 'winter', 'sport'],
-        '⛷️': ['skier', 'winter', 'sport'],
-        '🏂': ['snowboard', 'winter', 'sport'],
-
-        // Travel & Places
-        '🚗': ['car', 'vehicle', 'auto', 'drive'],
+        '🚗': ['car', 'vehicle', 'auto'],
         '🚕': ['taxi', 'car', 'vehicle'],
-        '🚙': ['suv', 'car', 'vehicle'],
-        '🚌': ['bus', 'vehicle', 'public'],
-        '🚎': ['trolley', 'bus', 'vehicle'],
-        '🏎️': ['race', 'car', 'fast'],
-        '🚓': ['police', 'car', 'vehicle'],
-        '🚑': ['ambulance', 'emergency', 'vehicle'],
-        '🚒': ['fire', 'truck', 'emergency'],
-        '🚐': ['van', 'vehicle'],
-        '🚚': ['truck', 'delivery', 'vehicle'],
-        '🚛': ['truck', 'semi', 'vehicle'],
-        '🚜': ['tractor', 'farm', 'vehicle'],
-        '🏍️': ['motorcycle', 'bike', 'vehicle'],
-        '🚲': ['bicycle', 'bike', 'cycle'],
-        '🛴': ['scooter', 'kick'],
-        '🚁': ['helicopter', 'aircraft'],
-        '✈️': ['airplane', 'plane', 'travel', 'flight'],
+        '✈️': ['airplane', 'plane', 'travel'],
         '🚀': ['rocket', 'space', 'travel'],
-        '🛸': ['ufo', 'alien', 'space'],
-        '🚢': ['ship', 'boat', 'cruise'],
-        '⛵': ['sailboat', 'boat', 'sail'],
-        '🏠': ['house', 'home', 'building'],
-        '🏡': ['house', 'garden', 'home'],
-        '🏢': ['office', 'building', 'work'],
-        '🏬': ['department', 'store', 'shopping'],
-        '🏭': ['factory', 'industry', 'building'],
-        '🏰': ['castle', 'palace', 'building'],
-        '🗼': ['tower', 'eiffel', 'building'],
-        '🌉': ['bridge', 'golden', 'gate'],
-        '🎡': ['ferris', 'wheel', 'amusement'],
-        '🎢': ['roller', 'coaster', 'amusement'],
-        '🎠': ['carousel', 'horse', 'amusement'],
-        '⛱️': ['beach', 'umbrella', 'vacation'],
-        '🏖️': ['beach', 'vacation', 'sand'],
-        '🏝️': ['island', 'desert', 'tropical'],
-
-        // Objects & Symbols
-        '💼': ['briefcase', 'work', 'business'],
-        '👔': ['necktie', 'formal', 'work'],
-        '👗': ['dress', 'clothing', 'formal'],
-        '👠': ['high', 'heel', 'shoe'],
-        '👓': ['glasses', 'eyewear'],
-        '🎓': ['graduation', 'cap', 'education'],
-        '📚': ['books', 'education', 'study'],
-        '📖': ['book', 'open', 'read'],
-        '📝': ['memo', 'note', 'write'],
-        '✏️': ['pencil', 'write', 'draw'],
-        '📌': ['pushpin', 'pin'],
-        '📎': ['paperclip', 'attach'],
-        '📋': ['clipboard', 'list'],
-        '📊': ['chart', 'bar', 'data'],
-        '📈': ['chart', 'trending', 'up'],
-        '📉': ['chart', 'trending', 'down'],
-        '💰': ['money', 'bag', 'cash', 'rich'],
-        '💵': ['money', 'dollar', 'cash'],
-        '💳': ['credit', 'card', 'payment'],
-        '💎': ['diamond', 'gem', 'precious', 'jewel'],
-        '⚖️': ['scale', 'justice', 'law'],
-        '🔧': ['wrench', 'tool', 'fix'],
-        '⚙️': ['gear', 'settings', 'cog'],
-        '🔨': ['hammer', 'tool', 'build'],
-
-        // Technology & Entertainment
-        '🎮': ['game', 'gaming', 'controller', 'video'],
-        '🕹️': ['joystick', 'game', 'arcade'],
-        '🎲': ['dice', 'game', 'random'],
-        '🃏': ['joker', 'card', 'game'],
-        '🎯': ['target', 'bullseye', 'dart'],
-        '🎪': ['circus', 'tent', 'entertainment'],
-        '🎨': ['art', 'palette', 'paint'],
-
-        // Transportation - Comprehensive
-        '🚗': ['car', 'vehicle', 'auto', 'drive', 'red'],
-        '🚕': ['taxi', 'car', 'vehicle', 'yellow', 'cab'],
-        '🚙': ['suv', 'car', 'vehicle', 'sport', 'utility'],
-        '🚌': ['bus', 'vehicle', 'public', 'transport'],
-        '🚎': ['trolley', 'bus', 'vehicle', 'electric'],
-        '🏎️': ['race', 'car', 'fast', 'formula', 'speed'],
-        '🚓': ['police', 'car', 'vehicle', 'cop'],
-        '🚑': ['ambulance', 'emergency', 'vehicle', 'medical'],
-        '🚒': ['fire', 'truck', 'emergency', 'firefighter'],
-        '🚐': ['van', 'vehicle', 'minivan'],
-        '🛻': ['pickup', 'truck', 'vehicle'],
-        '🚚': ['truck', 'delivery', 'vehicle', 'lorry'],
-        '🚛': ['truck', 'semi', 'vehicle', 'articulated'],
-        '🚜': ['tractor', 'farm', 'vehicle', 'agriculture'],
-        '🏍️': ['motorcycle', 'bike', 'vehicle', 'motorbike'],
-        '🛵': ['scooter', 'motor', 'moped'],
-        '🚲': ['bicycle', 'bike', 'cycle', 'pedal'],
-        '🛴': ['scooter', 'kick', 'push'],
-        '🛹': ['skateboard', 'skate', 'board'],
-        '🛼': ['roller', 'skate', 'wheels'],
-        '🚁': ['helicopter', 'aircraft', 'chopper'],
-        '🛸': ['ufo', 'alien', 'space', 'flying', 'saucer'],
-        '✈️': ['airplane', 'plane', 'travel', 'flight', 'aircraft'],
-        '🛩️': ['small', 'airplane', 'aircraft'],
-        '🛫': ['departure', 'takeoff', 'airplane'],
-        '🛬': ['arrival', 'landing', 'airplane'],
-        '🪂': ['parachute', 'skydiving', 'jump'],
-        '💺': ['seat', 'airplane', 'chair'],
-        '🚀': ['rocket', 'space', 'travel', 'launch'],
-        '🛰️': ['satellite', 'space', 'communication'],
-        '🚉': ['station', 'train', 'railway'],
-        '🚞': ['mountain', 'railway', 'train'],
-        '🚝': ['monorail', 'train', 'rail'],
-        '🚄': ['high', 'speed', 'train', 'bullet'],
-        '🚅': ['bullet', 'train', 'shinkansen'],
-        '🚈': ['light', 'rail', 'train'],
-        '🚂': ['locomotive', 'train', 'steam'],
-        '🚆': ['train', 'railway', 'passenger'],
-        '🚇': ['metro', 'subway', 'underground'],
-        '🚊': ['tram', 'trolley', 'streetcar'],
-        '🚟': ['suspension', 'railway', 'monorail'],
-        '🚠': ['mountain', 'cableway', 'cable'],
-        '🚡': ['aerial', 'tramway', 'cable'],
-        '⛵': ['sailboat', 'boat', 'sail', 'yacht'],
-        '🛶': ['canoe', 'boat', 'paddle'],
-        '🚤': ['speedboat', 'boat', 'motorboat'],
-        '🛥️': ['motor', 'boat', 'yacht'],
-        '🛳️': ['passenger', 'ship', 'cruise'],
-        '⛴️': ['ferry', 'boat', 'ship'],
-        '🚢': ['ship', 'boat', 'cruise', 'ocean'],
-        '⚓': ['anchor', 'ship', 'boat'],
-        '⛽': ['fuel', 'pump', 'gas', 'station'],
-        '🚧': ['construction', 'barrier', 'work'],
-        '🚨': ['police', 'car', 'light', 'emergency'],
-        '🚥': ['horizontal', 'traffic', 'light'],
-        '🚦': ['vertical', 'traffic', 'light'],
-        '🛑': ['stop', 'sign', 'octagon'],
-        '🚏': ['bus', 'stop', 'sign'],
-
-        // Weather & Nature - Comprehensive
-        '🌍': ['earth', 'globe', 'africa', 'europe', 'world'],
-        '🌎': ['earth', 'globe', 'americas', 'world'],
-        '🌏': ['earth', 'globe', 'asia', 'australia', 'world'],
-        '🌐': ['globe', 'meridians', 'world', 'internet'],
-        '🗺️': ['world', 'map', 'geography'],
-        '🗾': ['japan', 'map', 'silhouette'],
-        '🧭': ['compass', 'navigation', 'direction'],
-        '🏔️': ['snow', 'capped', 'mountain', 'peak'],
-        '⛰️': ['mountain', 'peak', 'hill'],
-        '🌋': ['volcano', 'eruption', 'lava'],
-        '🗻': ['mount', 'fuji', 'mountain'],
-        '🏕️': ['camping', 'tent', 'outdoor'],
-        '🏖️': ['beach', 'umbrella', 'vacation'],
-        '🏜️': ['desert', 'sand', 'dry'],
-        '🏝️': ['desert', 'island', 'tropical'],
-        '🏞️': ['national', 'park', 'landscape'],
-        '🏟️': ['stadium', 'arena', 'sports'],
-        '🏛️': ['classical', 'building', 'museum'],
-        '🏗️': ['building', 'construction', 'crane'],
-        '🧱': ['brick', 'wall', 'construction'],
-        '☀️': ['sun', 'sunny', 'bright', 'hot'],
-        '🌤️': ['sun', 'behind', 'small', 'cloud'],
-        '⛅': ['sun', 'behind', 'cloud', 'partly'],
-        '🌥️': ['sun', 'behind', 'large', 'cloud'],
-        '☁️': ['cloud', 'cloudy', 'overcast'],
-        '🌦️': ['sun', 'behind', 'rain', 'cloud'],
-        '🌧️': ['cloud', 'with', 'rain', 'rainy'],
-        '⛈️': ['cloud', 'lightning', 'rain', 'storm'],
-        '🌩️': ['cloud', 'lightning', 'storm'],
-        '🌨️': ['cloud', 'snow', 'snowy'],
-        '❄️': ['snowflake', 'snow', 'cold', 'winter'],
-        '☃️': ['snowman', 'snow', 'winter'],
-        '⛄': ['snowman', 'without', 'snow', 'winter'],
-        '🌬️': ['wind', 'face', 'blowing'],
-        '💨': ['dashing', 'away', 'wind', 'fast'],
-        '🌪️': ['tornado', 'cyclone', 'twister'],
-        '🌫️': ['fog', 'misty', 'cloudy'],
-        '🌈': ['rainbow', 'colorful', 'arc'],
-        '🌙': ['crescent', 'moon', 'night'],
-        '🌛': ['first', 'quarter', 'moon', 'face'],
-        '🌜': ['last', 'quarter', 'moon', 'face'],
-        '🌚': ['new', 'moon', 'face', 'dark'],
-        '🌕': ['full', 'moon', 'bright'],
-        '🌖': ['waning', 'gibbous', 'moon'],
-        '🌗': ['last', 'quarter', 'moon'],
-        '🌘': ['waning', 'crescent', 'moon'],
-        '🌑': ['new', 'moon', 'dark'],
-        '🌒': ['waxing', 'crescent', 'moon'],
-        '🌓': ['first', 'quarter', 'moon'],
-        '🌔': ['waxing', 'gibbous', 'moon'],
-        '🌝': ['full', 'moon', 'face', 'bright'],
-        '🌞': ['sun', 'with', 'face', 'bright'],
-        '🪐': ['saturn', 'planet', 'rings'],
-        '⭐': ['star', 'medium', 'white'],
-        '🌟': ['glowing', 'star', 'bright'],
-        '💫': ['dizzy', 'star', 'sparkle'],
-        '✨': ['sparkles', 'glitter', 'magic'],
-        '🌠': ['shooting', 'star', 'meteor'],
-        '🌌': ['milky', 'way', 'galaxy', 'space'],
-        '☄️': ['comet', 'space', 'tail'],
-        '💥': ['collision', 'explosion', 'boom'],
-        '🔥': ['fire', 'flame', 'hot', 'burn'],
-        '🌊': ['water', 'wave', 'ocean', 'sea'],
-
-        // Food Comprehensive - Fruits
-        '🍎': ['apple', 'fruit', 'red', 'healthy'],
-        '🍏': ['green', 'apple', 'fruit', 'sour'],
-        '🍊': ['orange', 'fruit', 'citrus', 'vitamin'],
-        '🍋': ['lemon', 'fruit', 'citrus', 'sour'],
-        '🍌': ['banana', 'fruit', 'yellow', 'potassium'],
-        '🍉': ['watermelon', 'fruit', 'summer', 'red'],
-        '🍇': ['grapes', 'fruit', 'bunch', 'wine'],
-        '🍓': ['strawberry', 'fruit', 'berry', 'red'],
-        '🫐': ['blueberries', 'fruit', 'berry', 'antioxidant'],
-        '🍈': ['melon', 'fruit', 'cantaloupe'],
-        '🍒': ['cherries', 'fruit', 'red', 'pair'],
-        '🍑': ['peach', 'fruit', 'fuzzy', 'sweet'],
-        '🥭': ['mango', 'fruit', 'tropical', 'sweet'],
-        '🍍': ['pineapple', 'fruit', 'tropical', 'spiky'],
-        '🥥': ['coconut', 'fruit', 'tropical', 'water'],
-        '🥝': ['kiwi', 'fruit', 'green', 'fuzzy'],
-
-        // Vegetables
-        '🍅': ['tomato', 'vegetable', 'red', 'salad'],
-        '🍆': ['eggplant', 'vegetable', 'purple', 'aubergine'],
-        '🥑': ['avocado', 'fruit', 'green', 'healthy'],
-        '🥦': ['broccoli', 'vegetable', 'green', 'tree'],
-        '🥬': ['leafy', 'greens', 'lettuce', 'salad'],
-        '🥒': ['cucumber', 'vegetable', 'green', 'fresh'],
-        '🌶️': ['hot', 'pepper', 'spicy', 'chili'],
-        '🫑': ['bell', 'pepper', 'capsicum', 'sweet'],
-        '🌽': ['corn', 'vegetable', 'cob', 'yellow'],
-        '🥕': ['carrot', 'vegetable', 'orange', 'root'],
-        '🫒': ['olive', 'fruit', 'oil', 'mediterranean'],
-        '🧄': ['garlic', 'vegetable', 'clove', 'pungent'],
-        '🧅': ['onion', 'vegetable', 'layers', 'tears'],
-        '🥔': ['potato', 'vegetable', 'starch', 'tuber'],
-        '🍠': ['roasted', 'sweet', 'potato', 'orange'],
-
-        // Bread & Grains
-        '🥐': ['croissant', 'bread', 'french', 'pastry'],
-        '🥯': ['bagel', 'bread', 'round', 'hole'],
-        '🍞': ['bread', 'loaf', 'slice', 'wheat'],
-        '🥖': ['baguette', 'bread', 'french', 'long'],
-        '🥨': ['pretzel', 'bread', 'twisted', 'salt'],
-        '🧀': ['cheese', 'dairy', 'wedge', 'yellow'],
-
-        // Meat & Protein
-        '🥚': ['egg', 'protein', 'chicken', 'breakfast'],
-        '🍳': ['cooking', 'egg', 'fried', 'pan'],
-        '🧈': ['butter', 'dairy', 'spread'],
-        '🥞': ['pancakes', 'breakfast', 'syrup', 'stack'],
-        '🧇': ['waffle', 'breakfast', 'grid', 'syrup'],
-        '🥓': ['bacon', 'meat', 'strip', 'pork'],
-        '🥩': ['cut', 'meat', 'steak', 'raw'],
-        '🍗': ['poultry', 'leg', 'chicken', 'drumstick'],
-        '🍖': ['meat', 'bone', 'barbecue'],
-        '🦴': ['bone', 'skeleton', 'dog'],
-        '🌭': ['hot', 'dog', 'sausage', 'bun'],
-        '🍔': ['hamburger', 'burger', 'fast', 'food'],
-        '🍟': ['french', 'fries', 'potato', 'golden'],
-        '🍕': ['pizza', 'slice', 'cheese', 'italian'],
-
-        // Music & Entertainment Comprehensive
-        '🎵': ['musical', 'note', 'music', 'melody'],
-        '🎶': ['musical', 'notes', 'music', 'song'],
-        '🎼': ['musical', 'score', 'sheet', 'music'],
-        '🎹': ['musical', 'keyboard', 'piano', 'keys'],
-        '🥁': ['drum', 'percussion', 'beat'],
-        '🪘': ['long', 'drum', 'percussion'],
-        '🎷': ['saxophone', 'sax', 'jazz', 'wind'],
-        '🎺': ['trumpet', 'brass', 'horn'],
-        '🎸': ['guitar', 'string', 'rock', 'acoustic'],
-        '🪕': ['banjo', 'string', 'country'],
-        '🎻': ['violin', 'string', 'classical'],
-        '🪗': ['accordion', 'squeeze', 'folk'],
-        '🪈': ['flute', 'wind', 'pipe'],
-        '🎤': ['microphone', 'mic', 'sing', 'karaoke'],
-        '🎧': ['headphones', 'listen', 'music'],
-        '📻': ['radio', 'broadcast', 'music'],
-        '🎙️': ['studio', 'microphone', 'podcast'],
-        '🎚️': ['level', 'slider', 'mixer'],
-        '🎛️': ['control', 'knobs', 'mixer'],
-
-        // Sports & Activities Comprehensive
-        '⚽': ['soccer', 'football', 'sport', 'ball', 'kick'],
-        '🏀': ['basketball', 'sport', 'ball', 'hoop'],
-        '🏈': ['american', 'football', 'sport', 'throw'],
-        '⚾': ['baseball', 'sport', 'ball', 'bat'],
-        '🥎': ['softball', 'sport', 'ball', 'underhand'],
-        '🎾': ['tennis', 'sport', 'ball', 'racket'],
-        '🏐': ['volleyball', 'sport', 'ball', 'net'],
-        '🏉': ['rugby', 'sport', 'ball', 'oval'],
-        '🥏': ['frisbee', 'disc', 'throw', 'ultimate'],
-        '🎱': ['pool', 'billiards', 'eight', 'ball', 'cue'],
-        '🪀': ['yo-yo', 'toy', 'string', 'up', 'down'],
-        '🏓': ['ping', 'pong', 'table', 'tennis', 'paddle'],
-        '🏸': ['badminton', 'sport', 'racket', 'shuttlecock'],
-        '🏒': ['ice', 'hockey', 'sport', 'stick'],
-        '🏑': ['field', 'hockey', 'sport', 'stick'],
-        '🥍': ['lacrosse', 'sport', 'stick', 'net'],
-        '🏏': ['cricket', 'sport', 'bat', 'wicket'],
-        '🪃': ['boomerang', 'throw', 'return'],
-        '🥅': ['goal', 'net', 'sport', 'soccer'],
-        '⛳': ['flag', 'hole', 'golf', 'course'],
-        '🪁': ['kite', 'fly', 'wind', 'string'],
-        '🏹': ['bow', 'arrow', 'archery', 'target'],
-        '🎣': ['fishing', 'pole', 'rod', 'hook'],
-        '🤿': ['diving', 'mask', 'snorkel', 'underwater'],
-        '🥊': ['boxing', 'glove', 'fight', 'punch'],
-        '🥋': ['martial', 'arts', 'uniform', 'karate'],
-        '🎽': ['running', 'shirt', 'tank', 'marathon'],
-        '🛹': ['skateboard', 'skate', 'board', 'wheels'],
-        '🛷': ['sled', 'sledding', 'snow', 'winter'],
-        '⛸️': ['ice', 'skates', 'skating', 'rink'],
-        '🥌': ['curling', 'stone', 'ice', 'sweep'],
-        '🎿': ['skis', 'skiing', 'snow', 'alpine'],
-        '⛷️': ['skier', 'skiing', 'downhill', 'snow'],
-        '🏂': ['snowboarder', 'snowboard', 'snow'],
-        '🪂': ['parachute', 'skydiving', 'jump'],
-        '🏆': ['trophy', 'winner', 'champion', 'gold'],
-        '🥇': ['first', 'place', 'medal', 'gold'],
-        '🥈': ['second', 'place', 'medal', 'silver'],
-        '🥉': ['third', 'place', 'medal', 'bronze'],
-        '🏅': ['sports', 'medal', 'achievement'],
-        '🎖️': ['military', 'medal', 'honor'],
-        '🏵️': ['rosette', 'flower', 'award'],
-        '🎗️': ['reminder', 'ribbon', 'awareness'],
-
-        // Technology & Objects Comprehensive
-        '⌚': ['watch', 'apple', 'time', 'wrist'],
-        '📱': ['mobile', 'phone', 'smartphone', 'cell'],
-        '📲': ['mobile', 'phone', 'arrow', 'receive'],
-        '💻': ['laptop', 'computer', 'pc', 'work'],
-        '⌨️': ['keyboard', 'computer', 'type'],
-        '🖥️': ['desktop', 'computer', 'monitor'],
-        '🖨️': ['printer', 'print', 'paper'],
-        '🖱️': ['computer', 'mouse', 'click'],
-        '🖲️': ['trackball', 'mouse', 'computer'],
-        '🕹️': ['joystick', 'game', 'controller'],
-        '🗜️': ['clamp', 'compress', 'tool'],
-        '💽': ['computer', 'disk', 'minidisc'],
-        '💾': ['floppy', 'disk', 'save'],
-        '💿': ['optical', 'disk', 'cd'],
-        '📀': ['dvd', 'disk', 'optical'],
-        '📼': ['videocassette', 'tape', 'vhs'],
-        '📷': ['camera', 'photo', 'picture'],
-        '📸': ['camera', 'flash', 'photo'],
-        '📹': ['video', 'camera', 'record'],
-        '🎥': ['movie', 'camera', 'film'],
-        '📽️': ['film', 'projector', 'movie'],
-        '🎞️': ['film', 'frames', 'movie'],
-        '📞': ['telephone', 'receiver', 'call'],
-        '☎️': ['telephone', 'phone', 'call'],
-        '📟': ['pager', 'beeper', 'message'],
-        '📠': ['fax', 'machine', 'document'],
-        '📺': ['television', 'tv', 'watch'],
-        '📻': ['radio', 'broadcast', 'listen'],
-        '🎙️': ['studio', 'microphone', 'broadcast'],
-        '🎚️': ['level', 'slider', 'audio'],
-        '🎛️': ['control', 'knobs', 'audio'],
-        '🧭': ['compass', 'navigation', 'direction'],
-        '⏱️': ['stopwatch', 'timer', 'time'],
-        '⏲️': ['timer', 'clock', 'countdown'],
-        '⏰': ['alarm', 'clock', 'time'],
-        '🕰️': ['mantelpiece', 'clock', 'time'],
-        '⌛': ['hourglass', 'done', 'time'],
-        '⏳': ['hourglass', 'not', 'done'],
-        '📡': ['satellite', 'antenna', 'communication'],
-        '🔋': ['battery', 'power', 'energy'],
-        '🔌': ['electric', 'plug', 'power'],
-        '💡': ['light', 'bulb', 'idea'],
-        '🔦': ['flashlight', 'torch', 'light'],
-        '🕯️': ['candle', 'light', 'wax'],
-        '🪔': ['diya', 'lamp', 'light'],
-        '🧯': ['fire', 'extinguisher', 'safety'],
-        '🛢️': ['oil', 'drum', 'barrel'],
-
-        // Books & Office Comprehensive
-        '📚': ['books', 'library', 'education', 'study'],
-        '📖': ['open', 'book', 'read', 'novel'],
-        '📗': ['green', 'book', 'textbook'],
-        '📘': ['blue', 'book', 'textbook'],
-        '📙': ['orange', 'book', 'textbook'],
-        '📕': ['closed', 'book', 'red'],
-        '📓': ['notebook', 'journal', 'write'],
-        '📔': ['notebook', 'decorative', 'cover'],
-        '📒': ['ledger', 'accounting', 'book'],
-        '📝': ['memo', 'note', 'write', 'document'],
-        '📄': ['page', 'facing', 'up', 'document'],
-        '📃': ['page', 'curl', 'document'],
-        '📑': ['bookmark', 'tabs', 'organize'],
-        '📜': ['scroll', 'ancient', 'document'],
-        '📰': ['newspaper', 'news', 'read'],
-        '🗞️': ['rolled', 'newspaper', 'delivery'],
-        '🔖': ['bookmark', 'save', 'page'],
-        '🏷️': ['label', 'tag', 'price'],
-
-        // Numbers & Symbols Comprehensive
-        '0️⃣': ['zero', 'number', 'digit', 'keycap'],
-        '1️⃣': ['one', 'number', 'digit', 'keycap'],
-        '2️⃣': ['two', 'number', 'digit', 'keycap'],
-        '3️⃣': ['three', 'number', 'digit', 'keycap'],
-        '4️⃣': ['four', 'number', 'digit', 'keycap'],
-        '5️⃣': ['five', 'number', 'digit', 'keycap'],
-        '6️⃣': ['six', 'number', 'digit', 'keycap'],
-        '7️⃣': ['seven', 'number', 'digit', 'keycap'],
-        '8️⃣': ['eight', 'number', 'digit', 'keycap'],
-        '9️⃣': ['nine', 'number', 'digit', 'keycap'],
-        '🔟': ['ten', 'number', 'keycap'],
-        '#️⃣': ['hash', 'number', 'sign', 'keycap'],
-        '*️⃣': ['asterisk', 'star', 'keycap'],
-        '⏏️': ['eject', 'button', 'symbol'],
-        '▶️': ['play', 'button', 'triangle'],
-        '⏸️': ['pause', 'button', 'double'],
-        '⏯️': ['play', 'pause', 'button'],
-        '⏹️': ['stop', 'button', 'square'],
-        '⏺️': ['record', 'button', 'circle'],
-        '⏭️': ['next', 'track', 'button'],
-        '⏮️': ['last', 'track', 'button'],
-        '⏩': ['fast', 'forward', 'button'],
-        '⏪': ['fast', 'reverse', 'button'],
-        '⏫': ['fast', 'up', 'button'],
-        '⏬': ['fast', 'down', 'button'],
-        '◀️': ['reverse', 'button', 'triangle'],
-        '🔼': ['upwards', 'button', 'triangle'],
-        '🔽': ['downwards', 'button', 'triangle'],
-        '➡️': ['right', 'arrow', 'direction'],
-        '⬅️': ['left', 'arrow', 'direction'],
-        '⬆️': ['up', 'arrow', 'direction'],
-        '⬇️': ['down', 'arrow', 'direction'],
-        '↗️': ['up', 'right', 'arrow'],
-        '↘️': ['down', 'right', 'arrow'],
-        '↙️': ['down', 'left', 'arrow'],
-        '↖️': ['up', 'left', 'arrow'],
-        '↕️': ['up', 'down', 'arrow'],
-        '↔️': ['left', 'right', 'arrow'],
-        '↪️': ['left', 'arrow', 'curving'],
-        '↩️': ['right', 'arrow', 'curving'],
-        '⤴️': ['right', 'arrow', 'curving', 'up'],
-        '⤵️': ['right', 'arrow', 'curving', 'down'],
-        '🔀': ['twisted', 'rightwards', 'arrows'],
-        '🔁': ['repeat', 'button', 'clockwise'],
-        '🔂': ['repeat', 'single', 'button'],
-        '🔄': ['counterclockwise', 'arrows', 'button'],
-        '🔃': ['clockwise', 'vertical', 'arrows'],
-        '➕': ['plus', 'add', 'math', 'cross'],
-        '➖': ['minus', 'subtract', 'math'],
-        '➗': ['divide', 'division', 'math'],
-        '✖️': ['multiply', 'times', 'math'],
-        '🟰': ['heavy', 'equals', 'sign'],
-        '♾️': ['infinity', 'unlimited', 'forever'],
-        '💲': ['heavy', 'dollar', 'sign'],
-        '💱': ['currency', 'exchange'],
-        '™️': ['trade', 'mark', 'trademark'],
-        '©️': ['copyright', 'symbol'],
-        '®️': ['registered', 'trademark'],
-        '〰️': ['wavy', 'dash'],
-        '➰': ['curly', 'loop'],
-        '➿': ['double', 'curly', 'loop'],
-        '🔚': ['end', 'arrow'],
-        '🔙': ['back', 'arrow'],
-        '🔛': ['on', 'arrow'],
-        '🔝': ['top', 'arrow'],
-        '🔜': ['soon', 'arrow'],
-
-        // Flags Comprehensive
-        '🏁': ['chequered', 'flag', 'race', 'finish'],
-        '🚩': ['triangular', 'flag', 'red'],
-        '🎌': ['crossed', 'flags', 'japan'],
-        '🏴': ['black', 'flag', 'waving'],
-        '🏳️': ['white', 'flag', 'surrender'],
-        '🏳️‍🌈': ['rainbow', 'flag', 'pride'],
-        '🏳️‍⚧️': ['transgender', 'flag', 'pride'],
-        '🏴‍☠️': ['pirate', 'flag', 'jolly', 'roger'],
-        '🇺🇸': ['united', 'states', 'america', 'usa'],
-        '🇨🇦': ['canada', 'maple', 'leaf'],
-        '🇲🇽': ['mexico', 'flag'],
-        '🇬🇧': ['united', 'kingdom', 'britain', 'uk'],
-        '🇫🇷': ['france', 'french', 'flag'],
-        '🇩🇪': ['germany', 'german', 'flag'],
-        '🇮🇹': ['italy', 'italian', 'flag'],
-        '🇪🇸': ['spain', 'spanish', 'flag'],
-        '🇯🇵': ['japan', 'japanese', 'flag'],
-        '🇨🇳': ['china', 'chinese', 'flag'],
-        '🇰🇷': ['south', 'korea', 'korean'],
-        '🇮🇳': ['india', 'indian', 'flag'],
-        '🇧🇷': ['brazil', 'brazilian', 'flag'],
-        '🇦🇺': ['australia', 'australian', 'flag'],
-        '🇷🇺': ['russia', 'russian', 'flag'],
-        '🇿🇦': ['south', 'africa', 'african']
+        '🍕': ['pizza', 'food'],
+        '🍔': ['burger', 'food'],
+        '🍟': ['fries', 'food'],
+        '☕': ['coffee', 'drink'],
+        '🍺': ['beer', 'drink'],
+        '⚽': ['soccer', 'football', 'sport'],
+        '🏀': ['basketball', 'sport'],
+        '🎮': ['game', 'gaming', 'controller'],
+        '📱': ['phone', 'mobile', 'device'],
+        '💻': ['laptop', 'computer', 'device'],
+        '💰': ['money', 'cash', 'bag'],
+        '💵': ['money', 'dollar', 'cash']
       };
       
       const names = emojiNames[emoji] || [];
@@ -1355,7 +680,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     });
     
     setShowEmojiPicker(false);
-    setEmojiSearchQuery(''); // Clear emoji search when emoji is selected
+    setSearchQuery(''); // Clear search when emoji is selected
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2486,7 +1811,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         </div>
                       ) : (
                         <div className="message-content">
-                          <div className="message-text">{renderTextWithBiggerEmojis(message.text)}</div>
+                          <div className="message-text">{message.text}</div>
                           <div className="message-meta">
                             <div className="message-timestamp">
                               {formatTime(message.timestamp)}
@@ -2811,7 +2136,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                     cursor: 'pointer',
                                     background: 'none',
                                     border: 'none',
-                                    fontSize: '30px',
+                                    fontSize: '20px',
                                     padding: '4px',
                                     borderRadius: '4px',
                                     transition: 'background-color 0.2s'
@@ -2825,9 +2150,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         )}
 
                         <div className="emoji-section">
-                          <div className="emoji-section-title">😀 Smileys & Emotion</div>
+                          <div className="emoji-section-title">😀 Smileys</div>
                           <div className="emoji-row">
-                            {filterEmojis(['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '😈', '👿', '👹', '👺', '🤡', '👻', '💀', '☠️', '👽', '👾', '🤖'], emojiSearchQuery).map((emoji, index) => (
+                            {filterEmojis(['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪'], emojiSearchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -2841,7 +2166,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                   cursor: 'pointer',
                                   background: 'none',
                                   border: 'none',
-                                  fontSize: '30px',
+                                  fontSize: '20px',
                                   padding: '4px',
                                   borderRadius: '4px',
                                   transition: 'background-color 0.2s'
@@ -2862,7 +2187,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div className="emoji-section">
                           <div className="emoji-section-title">�‍👩‍👧‍👦 People & Family</div>
                           <div className="emoji-row">
-                            {filterEmojis(['👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👵', '🧓', '👴', '👲', '👳‍♀️', '👳‍♂️', '🧕', '🤱', '👰‍♀️', '👰‍♂️', '🤵‍♀️', '🤵‍♂️', '👸', '🤴', '🦸‍♀️', '🦸‍♂️', '🦹‍♀️', '🦹‍♂️', '🧙‍♀️', '🧙‍♂️', '🧚‍♀️', '🧚‍♂️', '🧛‍♀️', '🧛‍♂️', '🧜‍♀️', '🧜‍♂️', '🧝‍♀️', '🧝‍♂️', '🧞‍♀️', '🧞‍♂️', '🧟‍♀️', '🧟‍♂️', '👻', '👽', '🤖', '👮‍♀️', '👮‍♂️', '🕵️‍♀️', '🕵️‍♂️', '💂‍♀️', '💂‍♂️', '🥷', '👷‍♀️', '👷‍♂️', '👩‍⚕️', '👨‍⚕️', '👩‍🌾', '👨‍🌾', '👩‍🍳', '👨‍🍳', '👩‍🎓', '👨‍🎓', '👩‍🎤', '👨‍🎤', '👩‍🏫', '👨‍🏫', '👩‍🏭', '👨‍🏭', '👩‍💻', '👨‍💻', '👩‍💼', '👨‍💼', '👩‍🔧', '👨‍🔧', '👩‍🔬', '👨‍🔬', '👩‍🎨', '👨‍🎨', '👩‍🚒', '👨‍🚒', '👩‍✈️', '👨‍✈️', '👩‍🚀', '👨‍🚀', '👩‍⚖️', '👨‍⚖️', '🤶', '🎅', '👨‍👩‍👧', '👨‍👩‍👦', '👨‍👩‍👧‍👦', '👨‍👨‍👧', '👨‍👨‍👦', '👨‍👨‍👧‍👦', '👩‍👩‍👧', '👩‍👩‍👦', '👩‍👩‍👧‍👦', '👨‍👧', '👨‍👦', '👨‍👧‍👦', '👩‍👧', '👩‍👦', '👩‍👧‍👦', '🗣️', '👤', '👥', '🫂', '👣'], emojiSearchQuery).map((emoji, index) => (
+                            {filterEmojis(['👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👵', '🧓', '👴', '👲', '👳‍♀️', '👳‍♂️', '🧕', '🤱', '👰‍♀️', '👰‍♂️', '🤵‍♀️', '🤵‍♂️', '👸', '🤴', '🦸‍♀️', '🦸‍♂️', '🦹‍♀️', '🦹‍♂️', '🧙‍♀️', '🧙‍♂️', '🧚‍♀️', '🧚‍♂️', '🧛‍♀️', '🧛‍♂️', '🧜‍♀️', '🧜‍♂️', '🧝‍♀️', '🧝‍♂️', '🧞‍♀️', '🧞‍♂️', '🧟‍♀️', '🧟‍♂️', '👻', '👽', '🤖', '👮‍♀️', '👮‍♂️', '🕵️‍♀️', '🕵️‍♂️'], emojiSearchQuery).map((emoji, index) => (
                               <button
                                 key={index}
                                 className="emoji-button"
@@ -3030,217 +2355,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             ))}
                           </div>
                         </div>
-
-                        {/* New comprehensive emoji sections */}
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🌍 Nature & Weather</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['🌍', '🌎', '🌏', '🌐', '🗺️', '🗾', '🧭', '🏔️', '⛰️', '🌋', '🗻', '🏕️', '🏖️', '🏜️', '🏝️', '🏞️', '🏟️', '🏛️', '🏗️', '🧱', '🏘️', '🏚️', '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏩', '🏪', '🏫', '🏬', '🏭', '🏯', '🏰', '🗼', '🗽', '⛪', '🕌', '🛕', '🕍', '⛩️', '🕋', '⛲', '⛺', '🌁', '🌃', '🏙️', '🌄', '🌅', '🌆', '🌇', '🌉', '♨️', '🎠', '🎡', '🎢', '💈', '🎪'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🌤️ Weather & Sky</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['☀️', '🌤️', '⛅', '🌥️', '☁️', '🌦️', '🌧️', '⛈️', '🌩️', '🌨️', '❄️', '☃️', '⛄', '🌬️', '💨', '🌪️', '🌫️', '🌈', '🌙', '🌛', '🌜', '🌚', '🌕', '🌖', '🌗', '🌘', '🌑', '🌒', '🌓', '🌔', '🌝', '🌞', '🪐', '⭐', '🌟', '💫', '✨', '🌠', '🌌', '☄️', '💥', '🔥', '🌊'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🍎 Food & Fruits</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['🍎', '🍏', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🍜 Meals & Drinks</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['🥪', '🌮', '🌯', '🫔', '🥙', '🧆', '🥚', '🍳', '🥘', '🍲', '🫕', '🥣', '🥗', '🍿', '🧈', '🧂', '🥫', '🍱', '🍘', '🍙', '🍚', '🍛', '🍜', '🍝', '🍠', '🍢', '🍣', '🍤', '🍥', '🥮', '🍡', '🥟', '🥠', '🥡', '🦀', '🦞', '🦐', '🦑', '🐙', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">☕ Beverages</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['☕', '🍵', '🧃', '🥤', '🧋', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🥛', '🧊', '🫖', '🍼'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🦁 Animals</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐻‍❄️', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🪱', '🐛', '🦋', '🐌', '🐞', '🐜', '🪰', '🪲', '🪳', '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦣', '🦏', '🦛', '🐪', '🐫', '🦒', '🦘', '🦬', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐈‍⬛', '🪶', '🐓', '🦃', '🦚', '🦜', '🦢', '🦩', '🕊️', '🐇', '🦝', '🦨', '🦡', '🦔'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">💎 Objects & Symbols</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '💽', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋', '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '🪙', '💰', '💳', '💎', '⚖️', '🪜', '🧰', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪓', '🪚', '🔩', '⚙️', '🪤', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '⚔️', '🛡️', '🚬', '⚰️', '🪦', '⚱️'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🎯 Activities & Hobbies</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['🎯', '🪀', '🪁', '🎱', '🔮', '🪩', '🧿', '🎮', '🕹️', '🎰', '🎲', '🧩', '🧸', '🪅', '🪆', '♠️', '♥️', '♦️', '♣️', '♟️', '🃏', '🀄', '🎴', '🎭', '🖼️', '🎨', '🧵', '🪡', '🧶', '🪢', '👓', '🕶️', '🥽', '🥼', '🦺', '👔', '👕', '👖', '🧣', '🧤', '🧥', '🧦', '👗', '👘', '🥻', '🩱', '🩲', '🩳', '👙', '👚', '👛', '👜', '👝', '🛍️', '🎒', '🩴', '👞', '👟', '🥾', '🥿', '👠', '👡', '🩰', '👢', '👑', '👒', '🎩', '🎓', '🧢', '🪖', '⛑️'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🚗 Transportation</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🏍️', '🛵', '🚲', '🛴', '🛹', '🛼', '🚁', '🛸', '✈️', '🛩️', '🛫', '🛬', '🪂', '💺', '🚀', '🛰️', '🚉', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇', '🚊', '🚟', '🚠', '🚡', '⛵', '🛶', '🚤', '🛥️', '🛳️', '⛴️', '🚢', '⚓', '⛽', '🚧', '🚨', '🚥', '🚦', '🛑', '🚏'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">⚽ Sports & Games</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🎵 Music & Arts</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['🎵', '🎶', '🎼', '🎹', '🥁', '🪘', '🎷', '🎺', '🎸', '🪕', '🎻', '🪗', '🪈', '🎤', '🎧', '📻', '🎙️', '🎚️', '🎛️', '🎭', '🎨', '🖌️', '🖍️', '✏️', '✒️', '🖋️', '🖊️', '✂️', '📐', '📏', '📌', '📍', '🧷', '🔗', '📎', '🖇️'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">📚 Books & Office</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['📚', '📖', '📗', '📘', '📙', '📕', '📓', '📔', '📒', '📝', '📄', '📃', '📑', '📜', '📰', '🗞️', '🔖', '🏷️', '💰', '🪙', '💴', '💵', '💶', '💷', '💸', '💳', '🧾', '💹', '✉️', '📧', '📨', '📩', '📤', '📥', '📦', '📫', '📪', '📬', '📭', '📮', '🗳️', '💼', '📁', '📂', '🗂️', '📅', '📆', '🗓️', '📇', '📈', '📉', '📊', '📋', '🗃️', '🗄️', '🗑️'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🔣 Symbols & Numbers</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '#️⃣', '*️⃣', '⏏️', '▶️', '⏸️', '⏯️', '⏹️', '⏺️', '⏭️', '⏮️', '⏩', '⏪', '⏫', '⏬', '◀️', '🔼', '🔽', '➡️', '⬅️', '⬆️', '⬇️', '↗️', '↘️', '↙️', '↖️', '↕️', '↔️', '↪️', '↩️', '⤴️', '⤵️', '🔀', '🔁', '🔂', '🔄', '🔃', '➕', '➖', '➗', '✖️', '🟰', '♾️', '💲', '💱', '™️', '©️', '®️', '〰️', '➰', '➿', '🔚', '🔙', '🔛', '🔝', '🔜'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="emoji-section">
-                          <div className="emoji-section-title">🏁 Flags</div>
-                          <div className="emoji-row">
-                            {filterEmojis(['🏁', '🚩', '🎌', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '🇺🇸', '🇨🇦', '🇲🇽', '🇬🇧', '🇫🇷', '🇩🇪', '🇮🇹', '🇪🇸', '🇯🇵', '🇨🇳', '🇰🇷', '🇮🇳', '🇧🇷', '🇦🇺', '🇷🇺', '🇿🇦', '🇪🇬', '🇳🇬', '🇦🇷', '🇨🇱', '🇨🇴', '🇵🇪', '🇻🇪', '🇳🇱', '🇧🇪', '🇨🇭', '🇦🇹', '🇸🇪', '🇳🇴', '🇩🇰', '🇫🇮', '🇵🇱', '🇺🇦', '🇷🇴', '🇬🇷', '🇹🇷', '🇮🇱', '🇸🇦', '🇦🇪', '🇮🇷', '🇮🇶', '🇵🇰', '🇧🇩', '🇹🇭', '🇻🇳', '🇲🇾', '🇸🇬', '🇮🇩', '🇵🇭', '🇳🇿'], emojiSearchQuery).map((emoji, index) => (
-                              <button
-                                key={index}
-                                className="emoji-button"
-                                onClick={() => handleEmojiSelect(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
                       </div>
                     )}
                     
@@ -3325,6 +2439,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             <div className="panel-header">
               <h3>🛒 {shopifyStore?.connected && shopifyStore?.shop ? shopifyStore.shop : 'E-commerce Store'}</h3>
             </div>
+            <ShopifyStatusWidget />
           </div>
         </div>
       </div>

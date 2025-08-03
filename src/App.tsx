@@ -8,6 +8,7 @@ import HomePage from './components/HomePage'
 import ContactsPage from './pages/ContactsPage'
 import MetaIntegrationPage from './components/MetaIntegrationPage'
 import GmailIntegration from './components/GmailIntegration'
+import ShopifyIntegration from './components/ShopifyIntegration'
 import './App.css'
 
 function App() {
@@ -19,7 +20,15 @@ function App() {
   const [showLogin, setShowLogin] = useState(false)
   const [showFacebook, setShowFacebook] = useState(false)
   const [showGmail, setShowGmail] = useState(false)
-  const [shopifyStore, setShopifyStore] = useState<{ shop: string; domain: string; connected: boolean } | undefined>(undefined)
+  const [showShopify, setShowShopify] = useState(false)
+  const [shopifyStore, setShopifyStore] = useState<{ 
+    name: string; 
+    shop: string; 
+    domain: string; 
+    connected: boolean; 
+    apiKey?: string; 
+    accessToken?: string;
+  } | undefined>(undefined)
 
   // Load saved Shopify connection on app start
   useEffect(() => {
@@ -47,6 +56,7 @@ function App() {
     setShowLogin(false)
     setShowFacebook(false)
     setShowGmail(false)
+    setShowShopify(false)
   }
 
   const handleLoginClick = () => {
@@ -71,7 +81,7 @@ function App() {
 
   const handleShopifyClick = () => {
     console.log('Shopify button clicked!')
-    setShowChat(true)
+    setShowShopify(true)
   }
 
   const handleContactsClick = () => {
@@ -122,6 +132,22 @@ function App() {
     setShowGmail(false)
   }
 
+  const handleCloseShopify = () => {
+    setShowShopify(false)
+  }
+
+  const handleShopifyStoreUpdate = (store: { 
+    name: string; 
+    shop: string; 
+    domain: string; 
+    connected: boolean; 
+    apiKey?: string; 
+    accessToken?: string;
+  } | null) => {
+    setShopifyStore(store || undefined)
+    console.log('🔄 Shopify store updated in App:', store)
+  }
+
   return (
     <>
       <ActionBar 
@@ -170,6 +196,13 @@ function App() {
 
       {showGmail && (
         <GmailIntegration onClose={handleCloseGmail} />
+      )}
+
+      {showShopify && (
+        <ShopifyIntegration 
+          onClose={handleCloseShopify} 
+          onStoreUpdate={handleShopifyStoreUpdate}
+        />
       )}
     </>
   )
