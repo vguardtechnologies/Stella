@@ -2,12 +2,13 @@
 import React from 'react';
 
 export interface ShopifyStore {
-  name: string;
-  shop: string;
-  domain: string;
+  name: string;           // Store identifier (e.g., "86e53e-a6")
+  shop: string;           // Store URL identifier
+  domain: string;         // Full domain (e.g., "86e53e-a6.myshopify.com")
   connected: boolean;
   apiKey?: string;
   accessToken?: string;
+  shopName?: string;      // Actual store name from Shopify API (e.g., "SUSA")
 }
 
 export class ShopifyService {
@@ -184,6 +185,33 @@ export class ShopifyService {
     } catch (error) {
       console.error('Error fetching inventory:', error);
       throw error;
+    }
+  }
+
+  // Fetch and update shop name from Shopify API
+  async updateShopName(): Promise<void> {
+    try {
+      const shopInfo = await this.getShopInfo();
+      const store = this.getStore();
+      
+      if (store && shopInfo?.shop?.name) {
+        const updatedStore = {
+          ...store,
+          shopName: shopInfo.shop.name
+        };
+        
+        localStorage.setItem('shopifyStore', JSON.stringify(updatedStore));
+        
+        // Trigger storage event to update components
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'shopifyStore',
+          newValue: JSON.stringify(updatedStore)
+        }));
+        
+        console.log(`✅ Updated shop name: ${shopInfo.shop.name}`);
+      }
+    } catch (error) {
+      console.error('Error updating shop name:', error);
     }
   }
 

@@ -4,7 +4,7 @@ import ContactManager from './ContactManager';
 import ImageModal from './ImageModal';
 import WhatsAppTemplateManager from './WhatsAppTemplateManager';
 import MediaBrowser from './MediaBrowser';
-import ShopifyStatusWidget from './ShopifyStatusWidget';
+import { shopifyService } from '../services/shopifyService';
 import './ChatPage.css';
 
 // Template interface for WhatsApp templates
@@ -249,6 +249,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [emojiSearchQuery, setEmojiSearchQuery] = useState('');
   const [recentlyUsedEmojis, setRecentlyUsedEmojis] = useState<string[]>([]);
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
+  const [actualShopName, setActualShopName] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -754,6 +755,50 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch actual shop name from Shopify API
+  useEffect(() => {
+    const fetchShopName = async () => {
+      if (shopifyStore?.connected && shopifyService.isConnected()) {
+        try {
+          // First check if we already have the shop name stored
+          const store = shopifyService.getStore();
+          if (store?.shopName) {
+            setActualShopName(store.shopName);
+            return;
+          }
+          
+          // If not, fetch it from API
+          await shopifyService.updateShopName();
+          const updatedStore = shopifyService.getStore();
+          if (updatedStore?.shopName) {
+            setActualShopName(updatedStore.shopName);
+          }
+        } catch (error) {
+          console.error('Error fetching shop name:', error);
+        }
+      }
+    };
+
+    fetchShopName();
+
+    // Listen for shop name updates
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'shopifyStore' && e.newValue) {
+        try {
+          const store = JSON.parse(e.newValue);
+          if (store?.shopName) {
+            setActualShopName(store.shopName);
+          }
+        } catch (error) {
+          console.error('Error parsing stored shop data:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [shopifyStore?.connected]);
 
   // Refresh messages when conversation changes
   useEffect(() => {
@@ -2437,9 +2482,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           {/* E-commerce Integration Panel */}
           <div className="shopify-panel">
             <div className="panel-header">
-              <h3>🛒 {shopifyStore?.connected && shopifyStore?.shop ? shopifyStore.shop : 'E-commerce Store'}</h3>
+              <h3>🛒 {shopifyStore?.connected && actualShopName ? actualShopName : shopifyStore?.connected && shopifyStore?.shop ? shopifyStore.shop : 'E-commerce Store'}</h3>
             </div>
-            <ShopifyStatusWidget />
           </div>
         </div>
       </div>
