@@ -250,6 +250,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [recentlyUsedEmojis, setRecentlyUsedEmojis] = useState<string[]>([]);
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const [actualShopName, setActualShopName] = useState<string>('');
+  const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [cartTotal, setCartTotal] = useState(0);
+  const [cartNotification, setCartNotification] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -362,7 +367,253 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     } catch (error) {
       console.error('Error fetching WhatsApp conversations:', error);
     }
-  };  // Fetch WhatsApp messages for a specific conversation
+  };
+
+  // Fetch Shopify products for display
+  const fetchShopifyProducts = async () => {
+    if (!shopifyStore?.connected || !shopifyService.isConnected()) {
+      // Show demo products if not connected
+      setShopifyProducts([
+        {
+          id: 'demo1',
+          title: 'Premium T-Shirt',
+          handle: 'premium-t-shirt',
+          vendor: 'SUSA',
+          product_type: 'Apparel',
+          status: 'active',
+          variants: [{ id: 'var1', price: '29.99', compare_at_price: '39.99' }],
+          images: [{ src: 'https://via.placeholder.com/150x150/4CAF50/white?text=T-Shirt' }],
+          tags: 'featured,clothing'
+        },
+        {
+          id: 'demo2', 
+          title: 'Wireless Headphones',
+          handle: 'wireless-headphones',
+          vendor: 'SUSA',
+          product_type: 'Electronics',
+          status: 'active',
+          variants: [{ id: 'var2', price: '79.99', compare_at_price: '99.99' }],
+          images: [{ src: 'https://via.placeholder.com/150x150/2196F3/white?text=Headphones' }],
+          tags: 'electronics,audio'
+        },
+        {
+          id: 'demo3',
+          title: 'Coffee Mug Set',
+          handle: 'coffee-mug-set', 
+          vendor: 'SUSA',
+          product_type: 'Home & Garden',
+          status: 'active',
+          variants: [{ id: 'var3', price: '24.99', compare_at_price: '34.99' }],
+          images: [{ src: 'https://via.placeholder.com/150x150/FF9800/white?text=Mugs' }],
+          tags: 'home,kitchen'
+        }
+      ]);
+      return;
+    }
+
+    setProductsLoading(true);
+    try {
+      const response = await shopifyService.getProducts(6); // Get 6 products
+      if (response?.products) {
+        setShopifyProducts(response.products);
+      }
+    } catch (error) {
+      console.error('Error fetching Shopify products:', error);
+      // Fallback to demo products
+      setShopifyProducts([]);
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  // Send product as message in chat
+  const sendProductInChat = async (product: any) => {
+    if (!selectedConversation) {
+      alert('Please select a conversation first');
+      return;
+    }
+
+    const productMessage = `🛍️ *${product.title}*\n\n` +
+      `💰 Price: $${product.variants?.[0]?.price || 'N/A'}\n` +
+      `🏷️ Type: ${product.product_type || 'Product'}\n` +
+      `🔗 Link: ${shopifyStore?.domain ? `https://${shopifyStore.domain}/products/${product.handle}` : '#'}\n\n` +
+      `Interested? Let me know if you'd like more details! 😊`;
+
+    try {
+      const phoneNumber = selectedConversation.replace('wa_', '');
+      
+      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phoneNumber,
+          message: productMessage
+        })
+      });
+
+      if (response.ok) {
+        // Add message to local state immediately
+        const newMessage: Message = {
+          id: `product_${Date.now()}`,
+          text: productMessage,
+          sender: 'agent',
+          timestamp: new Date(),
+          status: 'sent',
+          type: 'product',
+          direction: 'outgoing'
+        };
+        
+        setMessages(prev => [...prev, newMessage]);
+        console.log(`✅ Product sent: ${product.title}`);
+      } else {
+        console.error('Failed to send product message');
+        alert('Failed to send product. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending product message:', error);
+      alert('Error sending product. Please try again.');
+    }
+  };
+
+  // Cart management functions
+  const addToShopifyCart = (product: any, quantity: number = 1) => {
+    const existingItem = cartItems.find(item => item.id === product.id);
+    
+    if (existingItem) {
+      // Update quantity if item already exists
+      setCartItems(prev => prev.map(item => 
+        item.id === product.id 
+          ? { ...item, quantity: item.quantity + quantity }
+          : item
+      ));
+      setCartNotification(`Updated ${product.title} quantity in cart`);
+    } else {
+      // Add new item to cart
+      const cartItem = {
+        ...product,
+        quantity,
+        cartItemId: `cart_${product.id}_${Date.now()}`,
+        addedAt: new Date()
+      };
+      setCartItems(prev => [...prev, cartItem]);
+      setCartNotification(`Added ${product.title} to cart`);
+    }
+    
+    // Clear notification after 3 seconds
+    setTimeout(() => setCartNotification(''), 3000);
+    
+    console.log(`✅ Added to cart: ${product.title} (${quantity}x)`);
+  };
+
+  const removeFromCart = (cartItemId: string) => {
+    setCartItems(prev => prev.filter(item => item.cartItemId !== cartItemId));
+  };
+
+  const updateCartQuantity = (cartItemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(cartItemId);
+      return;
+    }
+    
+    setCartItems(prev => prev.map(item => 
+      item.cartItemId === cartItemId 
+        ? { ...item, quantity: newQuantity }
+        : item
+    ));
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+    setCartTotal(0);
+  };
+
+  // Send cart summary in chat
+  const sendCartInChat = async () => {
+    if (!selectedConversation) {
+      alert('Please select a conversation first');
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      alert('Cart is empty');
+      return;
+    }
+
+    let cartMessage = '🛒 *Shopping Cart Summary*\n\n';
+    
+    cartItems.forEach((item, index) => {
+      const price = parseFloat(item.variants?.[0]?.price || '0');
+      const itemTotal = price * item.quantity;
+      cartMessage += `${index + 1}. *${item.title}*\n`;
+      cartMessage += `   💰 $${price} x ${item.quantity} = $${itemTotal.toFixed(2)}\n\n`;
+    });
+    
+    cartMessage += `📊 *Total: $${cartTotal.toFixed(2)}*\n\n`;
+    cartMessage += `Ready to checkout? Let me know! 😊`;
+
+    try {
+      const phoneNumber = selectedConversation.replace('wa_', '');
+      
+      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phoneNumber,
+          message: cartMessage
+        })
+      });
+
+      if (response.ok) {
+        const newMessage: Message = {
+          id: `cart_${Date.now()}`,
+          text: cartMessage,
+          sender: 'agent',
+          timestamp: new Date(),
+          status: 'sent',
+          type: 'text',
+          direction: 'outgoing'
+        };
+        
+        setMessages(prev => [...prev, newMessage]);
+        console.log(`✅ Cart sent to chat`);
+      } else {
+        console.error('Failed to send cart message');
+        alert('Failed to send cart. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending cart message:', error);
+      alert('Error sending cart. Please try again.');
+    }
+  };
+
+  // Add product to cart from chat commands
+  const handleChatCartCommand = (productTitle: string, quantity: number = 1) => {
+    const product = shopifyProducts.find(p => 
+      p.title.toLowerCase().includes(productTitle.toLowerCase())
+    );
+    
+    if (product) {
+      addToShopifyCart(product, quantity);
+      return `✅ Added ${product.title} (${quantity}x) to cart!`;
+    } else {
+      return `❌ Product "${productTitle}" not found. Please check the spelling.`;
+    }
+  };
+
+  // Update cart total when cart items change
+  React.useEffect(() => {
+    const total = cartItems.reduce((sum, item) => {
+      const price = parseFloat(item.variants?.[0]?.price || '0');
+      return sum + (price * item.quantity);
+    }, 0);
+    setCartTotal(total);
+  }, [cartItems]);
+
+  // Fetch WhatsApp messages for a specific conversation
   const fetchWhatsAppMessages = async (phoneNumber: string, isAutoRefresh = false) => {
     try {
       console.log('Fetching messages for phone:', phoneNumber);
@@ -800,6 +1051,35 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [shopifyStore?.connected]);
 
+  // Fetch Shopify products when component mounts or connection changes
+  useEffect(() => {
+    fetchShopifyProducts();
+  }, [shopifyStore?.connected]);
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    const savedCart = localStorage.getItem('stella_cart');
+    if (savedCart) {
+      try {
+        const cartData = JSON.parse(savedCart);
+        setCartItems(cartData.items || []);
+        setCartTotal(cartData.total || 0);
+      } catch (error) {
+        console.error('Error loading cart from localStorage:', error);
+      }
+    }
+  }, []);
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    const cartData = {
+      items: cartItems,
+      total: cartTotal,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('stella_cart', JSON.stringify(cartData));
+  }, [cartItems, cartTotal]);
+
   // Refresh messages when conversation changes
   useEffect(() => {
     if (selectedConversation) {
@@ -862,6 +1142,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && selectedFiles.length === 0) || !selectedConversation) return;
+
+    // Check for cart commands before sending
+    if (newMessage.trim().toLowerCase().startsWith('add to cart ')) {
+      handleChatCartCommand(newMessage.trim());
+      setNewMessage('');
+      return;
+    }
 
     // Extract phone number from conversation ID
     const conversation = whatsappConversations.find(c => c.id === selectedConversation);
@@ -1435,6 +1722,26 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   return (
     <div className="chat-page">
+      {/* Cart Notification */}
+      {cartNotification && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#4CAF50',
+          color: 'white',
+          padding: '12px 20px',
+          borderRadius: '6px',
+          zIndex: 1000,
+          fontSize: '14px',
+          fontWeight: 'bold',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          animation: 'slideIn 0.3s ease-out'
+        }}>
+          {cartNotification}
+        </div>
+      )}
+      
       <div className="chat-container">
         <div className="chat-header">
           <h1>WhatsApp E-commerce Platform</h1>
@@ -2483,6 +2790,344 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           <div className="shopify-panel">
             <div className="panel-header">
               <h3>🛒 {shopifyStore?.connected && actualShopName ? actualShopName : shopifyStore?.connected && shopifyStore?.shop ? shopifyStore.shop : 'E-commerce Store'}</h3>
+            </div>
+            
+            {/* First Section - Products */}
+            <div className="shopify-section" style={{ padding: '10px', border: '1px solid #e0e0e0', margin: '10px 0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+                <h4 style={{ margin: 0, color: '#333', fontSize: '16px' }}>🛍️ Products</h4>
+                <button 
+                  onClick={fetchShopifyProducts}
+                  style={{ 
+                    padding: '4px 8px', 
+                    fontSize: '12px', 
+                    backgroundColor: '#4CAF50', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
+              
+              {productsLoading ? (
+                <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>Loading products...</div>
+              ) : shopifyProducts.length > 0 ? (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
+                  gap: '10px',
+                  maxHeight: '300px',
+                  overflowY: 'auto'
+                }}>
+                  {shopifyProducts.map((product) => (
+                    <div 
+                      key={product.id} 
+                      style={{ 
+                        border: '1px solid #ddd', 
+                        borderRadius: '8px', 
+                        padding: '8px', 
+                        backgroundColor: 'white',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        transition: 'transform 0.2s',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                      <img 
+                        src={product.images?.[0]?.src || 'https://via.placeholder.com/120x120/f0f0f0/666?text=No+Image'} 
+                        alt={product.title}
+                        style={{ 
+                          width: '100%', 
+                          height: '80px', 
+                          objectFit: 'cover', 
+                          borderRadius: '4px',
+                          marginBottom: '8px'
+                        }}
+                      />
+                      <h5 style={{ 
+                        margin: '0 0 4px 0', 
+                        fontSize: '12px', 
+                        fontWeight: 'bold',
+                        color: '#333',
+                        lineHeight: '1.2',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {product.title}
+                      </h5>
+                      <p style={{ 
+                        margin: '0 0 8px 0', 
+                        fontSize: '11px', 
+                        color: '#666',
+                        lineHeight: '1.2'
+                      }}>
+                        ${product.variants?.[0]?.price || 'N/A'}
+                      </p>
+                      <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                        <button
+                          onClick={() => addToShopifyCart(product, 1)}
+                          style={{
+                            width: '100%',
+                            padding: '6px',
+                            fontSize: '10px',
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#45a049'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4CAF50'}
+                        >
+                          Add to Cart
+                        </button>
+                        <button
+                          onClick={() => sendProductInChat(product)}
+                          style={{
+                            width: '100%',
+                            padding: '6px',
+                            fontSize: '10px',
+                            backgroundColor: '#2196F3',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1976D2'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2196F3'}
+                        >
+                          Send in Chat
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
+                  {shopifyStore?.connected ? 'No products found' : 'Connect Shopify to see products'}
+                </div>
+              )}
+            </div>
+            
+            {/* Second Section - Cart */}
+            <div className="shopify-section" style={{ padding: '10px', border: '1px solid #ddd', margin: '10px 0', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h4 style={{ margin: '0', fontSize: '14px', color: '#333' }}>
+                  🛒 Cart ({cartItems.length} item{cartItems.length !== 1 ? 's' : ''})
+                </h4>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#4CAF50' }}>
+                  Total: ${cartTotal.toFixed(2)}
+                </div>
+              </div>
+              
+              {cartItems.length > 0 ? (
+                <div>
+                  {/* Cart Items */}
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '10px' }}>
+                    {cartItems.map((item, index) => (
+                      <div key={index} style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '8px',
+                        backgroundColor: 'white',
+                        borderRadius: '4px',
+                        marginBottom: '5px',
+                        border: '1px solid #eee'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '2px' }}>
+                            {item.title}
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#666' }}>
+                            ${item.variants?.[0]?.price || item.price || 'N/A'} each
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <button
+                            onClick={() => updateCartQuantity(item.cartItemId || item.id, item.quantity - 1)}
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              padding: '0',
+                              fontSize: '12px',
+                              backgroundColor: '#ff4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '2px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            -
+                          </button>
+                          
+                          <span style={{ 
+                            minWidth: '25px', 
+                            textAlign: 'center', 
+                            fontSize: '11px',
+                            fontWeight: 'bold'
+                          }}>
+                            {item.quantity}
+                          </span>
+                          
+                          <button
+                            onClick={() => updateCartQuantity(item.cartItemId || item.id, item.quantity + 1)}
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              padding: '0',
+                              fontSize: '12px',
+                              backgroundColor: '#4CAF50',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '2px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            +
+                          </button>
+                          
+                          <button
+                            onClick={() => removeFromCart(item.cartItemId || item.id)}
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              padding: '0',
+                              fontSize: '10px',
+                              backgroundColor: '#666',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '2px',
+                              cursor: 'pointer',
+                              marginLeft: '5px'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Cart Actions */}
+                  <div style={{ display: 'flex', gap: '5px', flexDirection: 'column' }}>
+                    <button
+                      onClick={sendCartInChat}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        fontSize: '11px',
+                        backgroundColor: '#2196F3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      Send Cart in Chat
+                    </button>
+                    
+                    <button
+                      onClick={clearCart}
+                      style={{
+                        width: '100%',
+                        padding: '6px',
+                        fontSize: '10px',
+                        backgroundColor: '#ff4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Clear Cart
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ 
+                  textAlign: 'center', 
+                  color: '#666', 
+                  padding: '20px',
+                  fontSize: '12px' 
+                }}>
+                  Your cart is empty<br />
+                  <small>Add products from Section 1 above</small>
+                </div>
+              )}
+            </div>
+            
+            {/* Third Section - Quick Actions & Info */}
+            <div className="shopify-section" style={{ padding: '10px', border: '1px solid #ddd', margin: '10px 0', borderRadius: '4px', backgroundColor: '#f5f5f5' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#333' }}>
+                ⚡ Quick Actions
+              </h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '15px' }}>
+                <button
+                  onClick={() => {
+                    setCartNotification('Cart commands: "add to cart [product name]"');
+                    setTimeout(() => setCartNotification(''), 4000);
+                  }}
+                  style={{
+                    padding: '8px',
+                    fontSize: '10px',
+                    backgroundColor: '#2196F3',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📝 Cart Commands
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (cartItems.length > 0) {
+                      const summary = `Cart Summary:\n${cartItems.map(item => `• ${item.title} (${item.quantity}x)`).join('\n')}\nTotal: $${cartTotal.toFixed(2)}`;
+                      setCartNotification('Cart summary copied to clipboard!');
+                      navigator.clipboard.writeText(summary);
+                      setTimeout(() => setCartNotification(''), 3000);
+                    } else {
+                      setCartNotification('Cart is empty');
+                      setTimeout(() => setCartNotification(''), 3000);
+                    }
+                  }}
+                  style={{
+                    padding: '8px',
+                    fontSize: '10px',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📋 Copy Summary
+                </button>
+              </div>
+              
+              <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.4' }}>
+                <div style={{ marginBottom: '5px' }}>
+                  <strong>Cart Status:</strong> {cartItems.length === 0 ? 'Empty' : `${cartItems.length} items ($${cartTotal.toFixed(2)})`}
+                </div>
+                <div style={{ marginBottom: '5px' }}>
+                  <strong>Store:</strong> {actualShopName || shopifyStore?.domain || 'Not connected'}
+                </div>
+                <div>
+                  <strong>Chat Commands:</strong> Type "add to cart [product name]" in chat
+                </div>
+              </div>
             </div>
           </div>
         </div>
