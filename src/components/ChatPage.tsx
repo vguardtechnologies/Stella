@@ -3009,7 +3009,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'repeat(2, 1fr)', 
-                  gap: '15px',
+                  gap: '8px',
                   maxHeight: '400px',
                   overflowY: 'auto'
                 }}>
