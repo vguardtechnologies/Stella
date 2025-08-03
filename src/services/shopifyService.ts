@@ -53,25 +53,27 @@ export class ShopifyService {
     return null;
   }
 
-  // Make authenticated API calls to Shopify
+  // Make authenticated API calls to Shopify via backend proxy
   async makeApiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
     const credentials = this.getCredentials();
     if (!credentials) {
       throw new Error('Shopify not connected. Please connect your store first.');
     }
 
-    const baseUrl = `https://${credentials.shop}.myshopify.com/admin/api/2023-07`;
-    const url = `${baseUrl}${endpoint}`;
-
-    const headers = {
-      'X-Shopify-Access-Token': credentials.accessToken,
-      'Content-Type': 'application/json',
-      ...options.headers
-    };
-
-    const response = await fetch(url, {
-      ...options,
-      headers
+    // Use backend proxy to avoid CORS issues
+    const proxyUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/shopify/proxy`;
+    
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        endpoint,
+        shop: credentials.shop,
+        accessToken: credentials.accessToken,
+        method: options.method || 'GET'
+      })
     });
 
     if (!response.ok) {

@@ -43,9 +43,34 @@ const ShopifyIntegration: React.FC<ShopifyIntegrationProps> = ({ onClose, onStor
         const storeData = JSON.parse(savedStore);
         setStore(storeData);
         setIsConnected(storeData.connected);
+        return;
       } catch (error) {
         console.error('Error loading saved Shopify store:', error);
       }
+    }
+    
+    // Check if environment variables are available for auto-connection
+    const envShopifyKey = import.meta.env.VITE_SHOPIFY_API_KEY;
+    const envShopifyToken = import.meta.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN;
+    const envShopifyStore = import.meta.env.VITE_SHOPIFY_STORE_URL;
+    
+    if (envShopifyKey && envShopifyToken && envShopifyStore) {
+      console.log('🔑 Found Shopify environment variables, auto-connecting...');
+      const cleanStoreName = envShopifyStore.replace('.myshopify.com', '');
+      
+      const autoStore: ShopifyStore = {
+        name: cleanStoreName,
+        shop: cleanStoreName,
+        domain: `${cleanStoreName}.myshopify.com`,
+        connected: true,
+        apiKey: envShopifyKey,
+        accessToken: envShopifyToken
+      };
+      
+      localStorage.setItem('shopifyStore', JSON.stringify(autoStore));
+      setStore(autoStore);
+      setIsConnected(true);
+      onStoreUpdate?.(autoStore);
     }
   }, []);
 
@@ -54,11 +79,32 @@ const ShopifyIntegration: React.FC<ShopifyIntegrationProps> = ({ onClose, onStor
     setIsLoading(true);
 
     try {
-      // Simulate connection process
+      // Clean store name - remove .myshopify.com if present
+      const cleanStoreName = connectionForm.storeName.replace('.myshopify.com', '');
+      
+      // Test connection first
+      const testResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/shopify/test-connection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          shop: cleanStoreName,
+          accessToken: connectionForm.accessToken
+        })
+      });
+
+      const testResult = await testResponse.json();
+      
+      if (!testResult.connected) {
+        throw new Error(testResult.error || 'Failed to connect to Shopify store');
+      }
+      
+      // Connection successful - create store object
       const newStore: ShopifyStore = {
-        name: connectionForm.storeName,
-        shop: connectionForm.storeName,
-        domain: `${connectionForm.storeName}.myshopify.com`,
+        name: cleanStoreName,
+        shop: cleanStoreName,
+        domain: `${cleanStoreName}.myshopify.com`,
         connected: true,
         apiKey: connectionForm.apiKey,
         accessToken: connectionForm.accessToken
