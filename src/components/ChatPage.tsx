@@ -603,13 +603,45 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // Handle variant option selection
   const handleVariantOptionSelect = (productId: string, optionName: string, optionValue: string) => {
-    setSelectedVariants(prev => ({
-      ...prev,
-      [productId]: {
-        ...prev[productId],
+    setSelectedVariants(prev => {
+      const currentSelections = prev[productId] || {};
+      const newSelections = {
+        ...currentSelections,
         [optionName]: optionValue
+      };
+      
+      // If we're selecting a color, check if the currently selected size is available in this color
+      if (optionName.toLowerCase().includes('color') || optionName.toLowerCase().includes('colour')) {
+        const currentSize = currentSelections['Size'];
+        if (currentSize) {
+          // Find the product to check inventory
+          const product = shopifyProducts.find(p => p.id === productId);
+          if (product) {
+            // Check if this size is available in the new color
+            const variants = product.variants || [];
+            const sizeInColorInventory = variants.filter((variant: any) => {
+              const colorMatch = variant.option1?.toLowerCase() === optionValue.toLowerCase() ||
+                               variant.option2?.toLowerCase() === optionValue.toLowerCase() ||
+                               variant.option3?.toLowerCase() === optionValue.toLowerCase();
+              const sizeMatch = variant.option1?.toLowerCase() === currentSize.toLowerCase() ||
+                              variant.option2?.toLowerCase() === currentSize.toLowerCase() ||
+                              variant.option3?.toLowerCase() === currentSize.toLowerCase();
+              return colorMatch && sizeMatch;
+            }).reduce((total: number, variant: any) => total + (variant.inventory_quantity || 0), 0);
+            
+            // If the size is not available in the new color, remove the size selection
+            if (sizeInColorInventory === 0) {
+              delete newSelections['Size'];
+            }
+          }
+        }
       }
-    }));
+      
+      return {
+        ...prev,
+        [productId]: newSelections
+      };
+    });
   };
 
   // Send product with selected variant options in chat
@@ -3308,12 +3340,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
                                 {Array.from(sizes).map((size) => {
                                   const isSelected = selectedVariants[product.id]?.['Size'] === size;
-                                  const isSizeAvailable = isOptionValueAvailable('size', size);
                                   
-                                  // Get inventory for this size (considering selected color if any)
+                                  // Check if this size is available in the selected color (or any color if none selected)
                                   const sizeInventory = selectedColor 
                                     ? getVariantInventory(selectedColor, size) 
                                     : getVariantInventory(undefined, size);
+                                    
+                                  const isSizeAvailable = selectedColor 
+                                    ? sizeInventory > 0  // If color is selected, check specific combination
+                                    : isOptionValueAvailable('size', size); // If no color selected, check general availability
                                   
                                   return (
                                     <button
