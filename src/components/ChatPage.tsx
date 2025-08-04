@@ -267,6 +267,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [productImageIndices, setProductImageIndices] = useState<{[messageId: string]: number}>({});
 
   // WhatsApp Integration State
   const [whatsappConversations, setWhatsappConversations] = useState<Conversation[]>([]);
@@ -2225,7 +2226,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     >
                       {message.type === 'product' && message.productData ? (
                         <div className="product-message" style={{ 
-                          maxWidth: '350px',
+                          maxWidth: '450px',
                           margin: message.sender === 'agent' ? '0 0 0 auto' : '0 auto 0 0'
                         }}>
                           {(() => {
@@ -2243,6 +2244,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             // Check if this product has selected options
                             const selectedOptions = product.selectedOptions || {};
                             const hasSelectedOptions = Object.keys(selectedOptions).length > 0;
+                            
+                            // Image carousel state - using message ID as key
+                            const messageId = message.id;
+                            const currentImageIndex = productImageIndices[messageId] || 0;
+                            const productImages = product.images || [];
+                            const hasMultipleImages = productImages.length > 1;
 
                             return (
                               <div style={{ 
@@ -2270,32 +2277,178 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                   {isAvailable ? '✓ IN STOCK' : '✗ SOLD OUT'}
                                 </div>
 
-                                {/* Product Image */}
-                                <img 
-                                  src={product.images?.[0]?.src || 'https://via.placeholder.com/400x300/f0f0f0/666?text=No+Image'} 
-                                  alt={product.title}
-                                  style={{ 
-                                    width: '100%', 
-                                    height: '200px', 
-                                    objectFit: 'cover', 
-                                    borderRadius: '8px',
-                                    marginBottom: '8px',
-                                    cursor: 'pointer',
-                                    transition: 'transform 0.2s ease'
-                                  }}
-                                  onClick={() => {
-                                    // Open full size image in new tab
-                                    if (product.images?.[0]?.src) {
-                                      window.open(product.images[0].src, '_blank');
-                                    }
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.02)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                  }}
-                                />
+                                {/* Product Image Carousel */}
+                                <div style={{ position: 'relative', marginBottom: '8px' }}>
+                                  <img 
+                                    src={productImages[currentImageIndex]?.src || 'https://via.placeholder.com/400x300/f0f0f0/666?text=No+Image'} 
+                                    alt={`${product.title} - Image ${currentImageIndex + 1}`}
+                                    style={{ 
+                                      width: '100%', 
+                                      height: '280px', 
+                                      objectFit: 'cover', 
+                                      borderRadius: '8px',
+                                      cursor: 'pointer',
+                                      transition: 'transform 0.2s ease',
+                                      imageRendering: 'high-quality'
+                                    }}
+                                    onClick={() => {
+                                      // Open full size image in new tab
+                                      if (productImages[currentImageIndex]?.src) {
+                                        window.open(productImages[currentImageIndex].src, '_blank');
+                                      }
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.transform = 'scale(1.02)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.transform = 'scale(1)';
+                                    }}
+                                  />
+                                  
+                                  {/* Navigation Arrows - Only show if multiple images */}
+                                  {hasMultipleImages && (
+                                    <>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setProductImageIndices(prev => ({
+                                            ...prev,
+                                            [messageId]: currentImageIndex === 0 ? productImages.length - 1 : currentImageIndex - 1
+                                          }));
+                                        }}
+                                        style={{
+                                          position: 'absolute',
+                                          left: '8px',
+                                          top: '50%',
+                                          transform: 'translateY(-50%)',
+                                          background: 'rgba(0,0,0,0.6)',
+                                          border: 'none',
+                                          borderRadius: '50%',
+                                          width: '32px',
+                                          height: '32px',
+                                          color: 'white',
+                                          fontSize: '16px',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          transition: 'background-color 0.2s ease',
+                                          zIndex: 2
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.6)';
+                                        }}
+                                      >
+                                        ‹
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setProductImageIndices(prev => ({
+                                            ...prev,
+                                            [messageId]: currentImageIndex === productImages.length - 1 ? 0 : currentImageIndex + 1
+                                          }));
+                                        }}
+                                        style={{
+                                          position: 'absolute',
+                                          right: '8px',
+                                          top: '50%',
+                                          transform: 'translateY(-50%)',
+                                          background: 'rgba(0,0,0,0.6)',
+                                          border: 'none',
+                                          borderRadius: '50%',
+                                          width: '32px',
+                                          height: '32px',
+                                          color: 'white',
+                                          fontSize: '16px',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          transition: 'background-color 0.2s ease',
+                                          zIndex: 2
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.6)';
+                                        }}
+                                      >
+                                        ›
+                                      </button>
+                                    </>
+                                  )}
+                                  
+                                  {/* Dot Indicators - Only show if multiple images */}
+                                  {hasMultipleImages && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      bottom: '12px',
+                                      left: '50%',
+                                      transform: 'translateX(-50%)',
+                                      display: 'flex',
+                                      gap: '6px',
+                                      zIndex: 2
+                                    }}>
+                                      {productImages.map((_, index) => (
+                                        <button
+                                          key={index}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setProductImageIndices(prev => ({
+                                              ...prev,
+                                              [messageId]: index
+                                            }));
+                                          }}
+                                          style={{
+                                            width: '8px',
+                                            height: '8px',
+                                            borderRadius: '50%',
+                                            border: 'none',
+                                            backgroundColor: index === currentImageIndex 
+                                              ? 'white' 
+                                              : 'rgba(255,255,255,0.5)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            if (index !== currentImageIndex) {
+                                              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.8)';
+                                            }
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            if (index !== currentImageIndex) {
+                                              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.5)';
+                                            }
+                                          }}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Image Counter */}
+                                  {hasMultipleImages && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '8px',
+                                      left: '8px',
+                                      background: 'rgba(0,0,0,0.6)',
+                                      color: 'white',
+                                      padding: '4px 8px',
+                                      borderRadius: '12px',
+                                      fontSize: '10px',
+                                      fontWeight: 'bold',
+                                      zIndex: 2
+                                    }}>
+                                      {currentImageIndex + 1}/{productImages.length}
+                                    </div>
+                                  )}
+                                </div>
 
                                 {/* Product Title */}
                                 <h5 style={{ 
