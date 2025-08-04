@@ -250,6 +250,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [recentlyUsedEmojis, setRecentlyUsedEmojis] = useState<string[]>([]);
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const [actualShopName, setActualShopName] = useState<string>('');
+  const [shopNameLoading, setShopNameLoading] = useState(true);
   const [isShopifyConfigured, setIsShopifyConfigured] = useState(false);
   const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -1274,15 +1275,22 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   // Fetch actual shop name from database-first API
   useEffect(() => {
     const fetchShopName = async () => {
+      setShopNameLoading(true);
       try {
         const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
         
         // Check Shopify configuration status
         const statusResponse = await fetch(`${baseUrl}/api/shopify/status`);
-        if (!statusResponse.ok) return;
+        if (!statusResponse.ok) {
+          setShopNameLoading(false);
+          return;
+        }
         
         const statusData = await statusResponse.json();
-        if (!statusData.isConfigured) return;
+        if (!statusData.isConfigured) {
+          setShopNameLoading(false);
+          return;
+        }
         
         // Get configuration data which includes store name
         const configResponse = await fetch(`${baseUrl}/api/shopify/config`);
@@ -1290,40 +1298,65 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         
         const configData = await configResponse.json();
         if (configData.success && configData.data) {
-          // Try to get actual shop name from Shopify API
-          if (configData.data.name && configData.data.name !== 'undefined') {
-            setActualShopName(configData.data.name);
-          } else {
-            // If no name in config, fetch from Shopify shop API
-            try {
-              const shopResponse = await fetch(`${baseUrl}/api/shopify/proxy`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  endpoint: '/shop.json',
-                  method: 'GET'
-                })
-              });
-              
-              if (shopResponse.ok) {
-                const shopData = await shopResponse.json();
-                if (shopData.shop?.name) {
-                  setActualShopName(shopData.shop.name);
+          // Always fetch the actual business name from Shopify shop API
+          try {
+            const shopResponse = await fetch(`${baseUrl}/api/shopify/proxy`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                endpoint: '/shop.json',
+                method: 'GET'
+              })
+            });
+            
+            if (shopResponse.ok) {
+              const shopData = await shopResponse.json();
+              if (shopData.shop?.name) {
+                console.log('✅ Setting actual shop name:', shopData.shop.name);
+                setActualShopName(shopData.shop.name);
+                setShopNameLoading(false);
+              } else {
+                // Fallback to config name if available
+                if (configData.data.name && configData.data.name !== 'undefined') {
+                  setActualShopName(configData.data.name);
                 }
+                setShopNameLoading(false);
               }
-            } catch (error) {
-              console.error('Error fetching shop details:', error);
+            } else {
+              // Fallback to config name if API call fails
+              if (configData.data.name && configData.data.name !== 'undefined') {
+                setActualShopName(configData.data.name);
+              }
+              setShopNameLoading(false);
             }
+          } catch (error) {
+            console.error('Error fetching shop details:', error);
+            // Fallback to config name if available
+            if (configData.data.name && configData.data.name !== 'undefined') {
+              setActualShopName(configData.data.name);
+            }
+            setShopNameLoading(false);
           }
         }
       } catch (error) {
         console.error('Error fetching shop name from database API:', error);
+        setShopNameLoading(false);
       }
     };
 
     fetchShopName();
+
+    // Retry fetching shop name every 10 seconds if it's still loading or empty
+    const retryInterval = setInterval(() => {
+      if (shopNameLoading || !actualShopName) {
+        console.log('🔄 Retrying shop name fetch...');
+        fetchShopName();
+      } else {
+        clearInterval(retryInterval);
+      }
+    }, 10000);
 
     // Listen for shop name updates from localStorage (backup)
     const handleStorageChange = (e: StorageEvent) => {
@@ -1332,6 +1365,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           const store = JSON.parse(e.newValue);
           if (store?.shopName) {
             setActualShopName(store.shopName);
+            setShopNameLoading(false);
           }
         } catch (error) {
           console.error('Error parsing stored shop data:', error);
@@ -1340,8 +1374,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [shopifyStore?.connected]);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(retryInterval);
+    };
+  }, []);
 
   // Fetch Shopify products when component mounts or when database configuration changes
   useEffect(() => {
@@ -3442,7 +3479,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           <div className="shopify-panel">
             <div style={{ padding: '4px 8px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
-                🛒 {actualShopName || 'E-commerce Store'}
+                🛒 {shopNameLoading ? 'Loading store...' : (actualShopName || 'E-commerce Store')}
                 {isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#22c55e', fontWeight: 'normal' }}>● Connected</span>}
                 {!isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 'normal' }}>● Demo Mode</span>}
               </h3>
