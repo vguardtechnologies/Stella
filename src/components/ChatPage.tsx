@@ -250,6 +250,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [recentlyUsedEmojis, setRecentlyUsedEmojis] = useState<string[]>([]);
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const [actualShopName, setActualShopName] = useState<string>('');
+  const [isShopifyConfigured, setIsShopifyConfigured] = useState(false);
   const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -377,68 +378,98 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  // Fetch Shopify products for display
+  // Fetch Shopify products for display using new database-first API
   const fetchShopifyProducts = async () => {
-    if (!shopifyStore?.connected || !shopifyService.isConnected()) {
-      // Show demo products if not connected
-      setShopifyProducts([
-        {
-          id: 'demo1',
-          title: 'Premium T-Shirt',
-          handle: 'premium-t-shirt',
-          vendor: 'SUSA',
-          product_type: 'Apparel',
-          status: 'active',
-          variants: [{ id: 'var1', price: '29.99', compare_at_price: '39.99' }],
-          images: [{ src: 'https://via.placeholder.com/150x150/4CAF50/white?text=T-Shirt' }],
-          tags: 'featured,clothing'
-        },
-        {
-          id: 'demo2', 
-          title: 'Wireless Headphones',
-          handle: 'wireless-headphones',
-          vendor: 'SUSA',
-          product_type: 'Electronics',
-          status: 'active',
-          variants: [{ id: 'var2', price: '79.99', compare_at_price: '99.99' }],
-          images: [{ src: 'https://via.placeholder.com/150x150/2196F3/white?text=Headphones' }],
-          tags: 'electronics,audio'
-        },
-        {
-          id: 'demo3',
-          title: 'Coffee Mug Set',
-          handle: 'coffee-mug-set', 
-          vendor: 'SUSA',
-          product_type: 'Home & Garden',
-          status: 'active',
-          variants: [{ id: 'var3', price: '24.99', compare_at_price: '34.99' }],
-          images: [{ src: 'https://via.placeholder.com/150x150/FF9800/white?text=Mugs' }],
-          tags: 'home,kitchen'
-        }
-      ]);
+    // Check if Shopify is configured via database-first API
+    try {
+      const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      const statusResponse = await fetch(`${baseUrl}/api/shopify/status`);
+      const statusData = await statusResponse.json();
+      
+      setIsShopifyConfigured(statusData.isConfigured || false);
+      
+      if (!statusData.isConfigured) {
+        // Show demo products if not connected
+        setShopifyProducts([
+          {
+            id: 'demo1',
+            title: 'Premium T-Shirt',
+            handle: 'premium-t-shirt',
+            vendor: 'SUSA',
+            product_type: 'Apparel',
+            status: 'active',
+            variants: [{ id: 'var1', price: '29.99', compare_at_price: '39.99' }],
+            images: [{ src: 'https://via.placeholder.com/150x150/4CAF50/white?text=T-Shirt' }],
+            tags: 'featured,clothing'
+          },
+          {
+            id: 'demo2', 
+            title: 'Wireless Headphones',
+            handle: 'wireless-headphones',
+            vendor: 'SUSA',
+            product_type: 'Electronics',
+            status: 'active',
+            variants: [{ id: 'var2', price: '79.99', compare_at_price: '99.99' }],
+            images: [{ src: 'https://via.placeholder.com/150x150/2196F3/white?text=Headphones' }],
+            tags: 'electronics,audio'
+          },
+          {
+            id: 'demo3',
+            title: 'Coffee Mug Set',
+            handle: 'coffee-mug-set', 
+            vendor: 'SUSA',
+            product_type: 'Home & Garden',
+            status: 'active',
+            variants: [{ id: 'var3', price: '24.99', compare_at_price: '34.99' }],
+            images: [{ src: 'https://via.placeholder.com/150x150/FF9800/white?text=Mugs' }],
+            tags: 'home,kitchen'
+          }
+        ]);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking Shopify status:', error);
+      setIsShopifyConfigured(false);
+      setShopifyProducts([]);
       return;
     }
 
     setProductsLoading(true);
     try {
-      // Fetch ALL products using pagination (Shopify limit is 250 per request)
+      // Fetch ALL products using new database-first API with pagination
       let allProducts: any[] = [];
       let hasMore = true;
-      let sinceId = null;
+      let sinceId: string | null = null;
       
       while (hasMore) {
-        const endpoint = sinceId 
+        const endpoint: string = sinceId 
           ? `/products.json?limit=250&since_id=${sinceId}`
           : '/products.json?limit=250';
           
-        const response = await shopifyService.makeApiCall(endpoint);
+        const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+        const response: Response = await fetch(`${baseUrl}/api/shopify/proxy`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            endpoint: endpoint,
+            method: 'GET'
+          })
+        });
         
-        if (response?.products && response.products.length > 0) {
-          allProducts = [...allProducts, ...response.products];
+        if (!response.ok) {
+          throw new Error(`API call failed: ${response.status}`);
+        }
+        
+        const data: any = await response.json();
+        
+        if (data?.products && data.products.length > 0) {
+          allProducts = [...allProducts, ...data.products];
           
           // Check if we got the full limit, indicating there might be more
-          if (response.products.length === 250) {
-            sinceId = response.products[response.products.length - 1].id;
+          if (data.products.length === 250) {
+            sinceId = data.products[data.products.length - 1].id;
           } else {
             hasMore = false;
           }
@@ -453,7 +484,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         }
       }
       
-      console.log(`✅ Fetched ${allProducts.length} products from Shopify`);
+      console.log(`✅ Fetched ${allProducts.length} products from Shopify via database-first API`);
       setShopifyProducts(allProducts);
       setProductsLastUpdated(new Date());
       setRetryCount(0);
@@ -1240,33 +1271,61 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch actual shop name from Shopify API
+  // Fetch actual shop name from database-first API
   useEffect(() => {
     const fetchShopName = async () => {
-      if (shopifyStore?.connected && shopifyService.isConnected()) {
-        try {
-          // First check if we already have the shop name stored
-          const store = shopifyService.getStore();
-          if (store?.shopName) {
-            setActualShopName(store.shopName);
-            return;
+      try {
+        const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+        
+        // Check Shopify configuration status
+        const statusResponse = await fetch(`${baseUrl}/api/shopify/status`);
+        if (!statusResponse.ok) return;
+        
+        const statusData = await statusResponse.json();
+        if (!statusData.isConfigured) return;
+        
+        // Get configuration data which includes store name
+        const configResponse = await fetch(`${baseUrl}/api/shopify/config`);
+        if (!configResponse.ok) return;
+        
+        const configData = await configResponse.json();
+        if (configData.success && configData.data) {
+          // Try to get actual shop name from Shopify API
+          if (configData.data.name && configData.data.name !== 'undefined') {
+            setActualShopName(configData.data.name);
+          } else {
+            // If no name in config, fetch from Shopify shop API
+            try {
+              const shopResponse = await fetch(`${baseUrl}/api/shopify/proxy`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  endpoint: '/shop.json',
+                  method: 'GET'
+                })
+              });
+              
+              if (shopResponse.ok) {
+                const shopData = await shopResponse.json();
+                if (shopData.shop?.name) {
+                  setActualShopName(shopData.shop.name);
+                }
+              }
+            } catch (error) {
+              console.error('Error fetching shop details:', error);
+            }
           }
-          
-          // If not, fetch it from API
-          await shopifyService.updateShopName();
-          const updatedStore = shopifyService.getStore();
-          if (updatedStore?.shopName) {
-            setActualShopName(updatedStore.shopName);
-          }
-        } catch (error) {
-          console.error('Error fetching shop name:', error);
         }
+      } catch (error) {
+        console.error('Error fetching shop name from database API:', error);
       }
     };
 
     fetchShopName();
 
-    // Listen for shop name updates
+    // Listen for shop name updates from localStorage (backup)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'shopifyStore' && e.newValue) {
         try {
@@ -1284,10 +1343,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [shopifyStore?.connected]);
 
-  // Fetch Shopify products when component mounts or connection changes
+  // Fetch Shopify products when component mounts or when database configuration changes
   useEffect(() => {
+    // Always attempt to fetch products using database-first approach
     fetchShopifyProducts();
-  }, [shopifyStore?.connected]);
+    
+    // Set up an interval to periodically check for configuration changes
+    const checkInterval = setInterval(() => {
+      fetchShopifyProducts();
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(checkInterval);
+  }, []); // Remove dependency on shopifyStore?.connected since we're using database-first
 
   // Update filtered products when products, search query, or filter changes
   useEffect(() => {
@@ -3374,7 +3441,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           {/* E-commerce Integration Panel */}
           <div className="shopify-panel">
             <div style={{ padding: '4px 8px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>🛒 {shopifyStore?.connected && actualShopName ? actualShopName : shopifyStore?.connected && shopifyStore?.shop ? shopifyStore.shop : 'E-commerce Store'}</h3>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>🛒 {actualShopName || 'E-commerce Store'}</h3>
             </div>
             
             {/* First Section - Products */}
