@@ -259,9 +259,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [cartTotal, setCartTotal] = useState(0);
   const [productsLastUpdated, setProductsLastUpdated] = useState<Date | null>(null);
-  const autoUpdateEnabled = true; // Always enabled
   const updateInterval = 300000; // Fixed at 5 minutes
-  const [updateError, setUpdateError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [cartNotification, setCartNotification] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -424,7 +422,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setProductsLoading(true);
     try {
       // Fetch ALL products using pagination (Shopify limit is 250 per request)
-      let allProducts = [];
+      let allProducts: any[] = [];
       let hasMore = true;
       let sinceId = null;
       
@@ -458,12 +456,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       console.log(`✅ Fetched ${allProducts.length} products from Shopify`);
       setShopifyProducts(allProducts);
       setProductsLastUpdated(new Date());
-      setUpdateError(null);
       setRetryCount(0);
       
     } catch (error) {
       console.error('Error fetching Shopify products:', error);
-      setUpdateError(error.message || 'Failed to update products');
       setRetryCount(prev => prev + 1);
       
       // Keep existing products if fetch fails
@@ -1677,11 +1673,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  const addToCart = (product: Product, _quantity: number = 1, _size?: string) => {
-    // Placeholder for potential future e-commerce functionality
-    console.log('Product added to cart:', product.name);
-  };
-
   // Contact Management Functions
   // const checkContactStatus = async (phoneNumber: string) => {
   //   try {
@@ -2231,10 +2222,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         }}>
                           {(() => {
                             const product = message.productData;
-                            const variants = product.variants || [];
+                            const variants = (product as any).variants || [];
                             const availableVariants = variants.filter((v: any) => (v.inventory_quantity || 0) > 0);
                             const isAvailable = availableVariants.length > 0;
-                            const totalStock = variants.reduce((sum: number, v: any) => sum + (v.inventory_quantity || 0), 0);
                             
                             const prices = variants.map((v: any) => parseFloat(v.price || '0')).filter((p: number) => p > 0);
                             const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
@@ -2242,13 +2232,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             const priceRange = minPrice === maxPrice ? `$${minPrice.toFixed(2)}` : `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
 
                             // Check if this product has selected options
-                            const selectedOptions = product.selectedOptions || {};
+                            const selectedOptions = (product as any).selectedOptions || {};
                             const hasSelectedOptions = Object.keys(selectedOptions).length > 0;
                             
                             // Image carousel state - using message ID as key
                             const messageId = message.id;
                             const currentImageIndex = productImageIndices[messageId] || 0;
-                            const productImages = product.images || [];
+                            const productImages = (product as any).images || [];
                             const hasMultipleImages = productImages.length > 1;
 
                             return (
@@ -2281,16 +2271,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                 <div style={{ position: 'relative', marginBottom: '8px' }}>
                                   <img 
                                     src={productImages[currentImageIndex]?.src || 'https://via.placeholder.com/400x300/f0f0f0/666?text=No+Image'} 
-                                    alt={`${product.title} - Image ${currentImageIndex + 1}`}
+                                    alt={`${(product as any).title} - Image ${currentImageIndex + 1}`}
                                     style={{ 
                                       width: '100%', 
                                       height: '280px', 
                                       objectFit: 'cover', 
                                       borderRadius: '8px',
                                       cursor: 'pointer',
-                                      transition: 'transform 0.2s ease',
-                                      imageRendering: 'high-quality'
-                                    }}
+                                      transition: 'transform 0.2s ease'
+                                    } as React.CSSProperties}
                                     onClick={() => {
                                       // Open full size image in new tab
                                       if (productImages[currentImageIndex]?.src) {
@@ -2394,7 +2383,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                       gap: '6px',
                                       zIndex: 2
                                     }}>
-                                      {productImages.map((_, index) => (
+                                      {productImages.map((_: any, index: number) => (
                                         <button
                                           key={index}
                                           onClick={(e) => {
@@ -2459,7 +2448,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                   lineHeight: '1.2',
                                   textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                                 }}>
-                                  {product.title}
+                                  {(product as any).title}
                                 </h5>
 
                                 {/* Selected Options (if any) */}
@@ -2480,13 +2469,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                     }}>
                                       📋 Selected Options:
                                     </div>
-                                    {Object.entries(selectedOptions).map(([name, value]) => (
+                                    {Object.entries(selectedOptions).map(([name, value]: [string, unknown]) => (
                                       <div key={name} style={{
                                         color: '#cbd5e1',
                                         fontSize: '10px',
                                         textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                                       }}>
-                                        • {name}: {value}
+                                        • {name}: {String(value)}
                                       </div>
                                     ))}
                                   </div>
@@ -2525,7 +2514,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                   </button>
                                   
                                   <a
-                                    href={shopifyStore?.domain ? `https://${shopifyStore.domain}/products/${product.handle}` : '#'}
+                                    href={shopifyStore?.domain ? `https://${shopifyStore.domain}/products/${(product as any).handle}` : '#'}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
@@ -3508,10 +3497,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     };
 
                     // Helper function to check if a specific option value is available
-                    const isOptionValueAvailable = (optionName: string, optionValue: string) => {
+                    const isOptionValueAvailable = (_optionName: string, optionValue: string) => {
                       // Find variants that match this specific option value
                       const matchingVariants = variants.filter((variant: any) => {
-                        const variantOptions = variant.option1 || variant.option2 || variant.option3;
                         // Check if this variant has the specified option value
                         return variant.option1?.toLowerCase() === optionValue.toLowerCase() || 
                                variant.option2?.toLowerCase() === optionValue.toLowerCase() || 
