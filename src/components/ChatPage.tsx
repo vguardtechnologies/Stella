@@ -3111,20 +3111,54 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       }
                     });
 
+                    // Helper function to get specific inventory for color/size combination
+                    const getVariantInventory = (color?: string, size?: string) => {
+                      if (!color && !size) return 0;
+                      
+                      const matchingVariants = variants.filter((variant: any) => {
+                        let colorMatch = !color; // If no color specified, match all
+                        let sizeMatch = !size;   // If no size specified, match all
+                        
+                        // Check color match
+                        if (color) {
+                          colorMatch = variant.option1?.toLowerCase() === color.toLowerCase() ||
+                                     variant.option2?.toLowerCase() === color.toLowerCase() ||
+                                     variant.option3?.toLowerCase() === color.toLowerCase();
+                        }
+                        
+                        // Check size match  
+                        if (size) {
+                          sizeMatch = variant.option1?.toLowerCase() === size.toLowerCase() ||
+                                    variant.option2?.toLowerCase() === size.toLowerCase() ||
+                                    variant.option3?.toLowerCase() === size.toLowerCase();
+                        }
+                        
+                        return colorMatch && sizeMatch;
+                      });
+                      
+                      return matchingVariants.reduce((total: number, variant: any) => 
+                        total + (variant.inventory_quantity || 0), 0);
+                    };
+
                     // Helper function to check if a specific option value is available
                     const isOptionValueAvailable = (optionName: string, optionValue: string) => {
                       // Find variants that match this specific option value
                       const matchingVariants = variants.filter((variant: any) => {
                         const variantOptions = variant.option1 || variant.option2 || variant.option3;
                         // Check if this variant has the specified option value
-                        return variant.option1 === optionValue || 
-                               variant.option2 === optionValue || 
-                               variant.option3 === optionValue;
+                        return variant.option1?.toLowerCase() === optionValue.toLowerCase() || 
+                               variant.option2?.toLowerCase() === optionValue.toLowerCase() || 
+                               variant.option3?.toLowerCase() === optionValue.toLowerCase();
                       });
                       
                       // Check if any matching variant has inventory
                       return matchingVariants.some((variant: any) => (variant.inventory_quantity || 0) > 0);
                     };
+
+                    // Get selected color and size for inventory calculation
+                    const selectedColor = selectedVariants[product.id]?.['Color'] || selectedVariants[product.id]?.['Colour'];
+                    const selectedSize = selectedVariants[product.id]?.['Size'];
+                    const selectedInventory = getVariantInventory(selectedColor, selectedSize);
 
                     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
                     const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
@@ -3222,6 +3256,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                 {Array.from(colors).map((color) => {
                                   const isSelected = selectedVariants[product.id]?.['Color'] === color || selectedVariants[product.id]?.['Colour'] === color;
                                   const isColorAvailable = isOptionValueAvailable('color', color);
+                                  const colorInventory = getVariantInventory(color);
+                                  
                                   return (
                                     <button
                                       key={color}
@@ -3233,6 +3269,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                         handleVariantOptionSelect(product.id, colorOptionName, color);
                                       }}
                                       disabled={!isColorAvailable}
+                                      title={`${color}: ${colorInventory} in stock`}
                                       style={{
                                         padding: '1px 3px',
                                         fontSize: '7px',
@@ -3242,10 +3279,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                         color: isSelected && isColorAvailable ? 'white' : !isColorAvailable ? '#999' : '#555',
                                         cursor: isColorAvailable ? 'pointer' : 'not-allowed',
                                         transition: 'all 0.2s',
-                                        opacity: isColorAvailable ? 1 : 0.5
+                                        opacity: isColorAvailable ? 1 : 0.5,
+                                        position: 'relative'
                                       }}
                                     >
                                       {color}
+                                      {isColorAvailable && (
+                                        <span style={{ 
+                                          fontSize: '6px', 
+                                          marginLeft: '2px', 
+                                          opacity: 0.8,
+                                          fontWeight: 'bold'
+                                        }}>
+                                          ({colorInventory})
+                                        </span>
+                                      )}
                                     </button>
                                   );
                                 })}
@@ -3261,6 +3309,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                 {Array.from(sizes).map((size) => {
                                   const isSelected = selectedVariants[product.id]?.['Size'] === size;
                                   const isSizeAvailable = isOptionValueAvailable('size', size);
+                                  
+                                  // Get inventory for this size (considering selected color if any)
+                                  const sizeInventory = selectedColor 
+                                    ? getVariantInventory(selectedColor, size) 
+                                    : getVariantInventory(undefined, size);
+                                  
                                   return (
                                     <button
                                       key={size}
@@ -3272,6 +3326,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                         handleVariantOptionSelect(product.id, sizeOptionName, size);
                                       }}
                                       disabled={!isSizeAvailable}
+                                      title={selectedColor 
+                                        ? `${size} in ${selectedColor}: ${sizeInventory} in stock`
+                                        : `${size}: ${sizeInventory} in stock`}
                                       style={{
                                         padding: '1px 3px',
                                         fontSize: '7px',
@@ -3285,9 +3342,31 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                       }}
                                     >
                                       {size}
+                                      {isSizeAvailable && (
+                                        <span style={{ 
+                                          fontSize: '6px', 
+                                          marginLeft: '2px', 
+                                          opacity: 0.8,
+                                          fontWeight: 'bold'
+                                        }}>
+                                          ({sizeInventory})
+                                        </span>
+                                      )}
                                     </button>
                                   );
                                 })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Current Selection Inventory */}
+                          {(selectedColor || selectedSize) && (
+                            <div style={{ marginBottom: '2px', padding: '2px 4px', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                              <div style={{ color: '#3b82f6', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                                📦 Selected: {selectedColor && selectedSize ? `${selectedColor} - ${selectedSize}` : selectedColor || selectedSize} 
+                                <span style={{ color: selectedInventory > 0 ? '#22c55e' : '#ef4444', marginLeft: '4px' }}>
+                                  ({selectedInventory} in stock)
+                                </span>
                               </div>
                             </div>
                           )}
