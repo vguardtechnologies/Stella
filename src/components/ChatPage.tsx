@@ -253,7 +253,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
-  const [productSearchFilter, setProductSearchFilter] = useState('all'); // 'all', 'price', 'color', 'size', 'availability'
+  const productSearchFilter = 'all'; // Always search all fields
   const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<{[productId: string]: {[optionName: string]: string}}>({});
   const [cartItems, setCartItems] = useState<any[]>([]);
@@ -3066,47 +3066,29 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 </button>
               </div>
 
-              {/* Dynamic Search Bar */}
+              {/* Search Bar */}
               <div style={{ marginBottom: '8px' }}>
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                  <input
-                    type="text"
-                    placeholder="Search products..."
-                    value={productSearchQuery}
-                    onChange={(e) => setProductSearchQuery(e.target.value)}
-                    style={{
-                      flex: 1,
-                      padding: '4px 8px',
-                      border: '1px solid #ddd',
-                      borderRadius: '3px',
-                      fontSize: '10px',
-                      outline: 'none'
-                    }}
-                  />
-                  <select
-                    value={productSearchFilter}
-                    onChange={(e) => setProductSearchFilter(e.target.value)}
-                    style={{
-                      padding: '4px',
-                      border: '1px solid #ddd',
-                      borderRadius: '3px',
-                      fontSize: '9px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value="all">🔍 All Fields</option>
-                    <option value="price">💰 Price</option>
-                    <option value="color">🎨 Color</option>
-                    <option value="size">📏 Size</option>
-                    <option value="availability">📦 Availability</option>
-                  </select>
-                </div>
+                <input
+                  type="text"
+                  placeholder="Search all products..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    outline: 'none',
+                    backgroundColor: 'white',
+                    boxSizing: 'border-box'
+                  }}
+                />
                 
                 {productSearchQuery && (
-                  <div style={{ fontSize: '8px', color: '#cccccc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '8px', color: '#cccccc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                     <span>
-                      Searching {productSearchFilter === 'all' ? 'all fields' : productSearchFilter} for "{productSearchQuery}"
+                      Searching all fields for "{productSearchQuery}"
                     </span>
                     <span>
                       {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} found
@@ -3417,7 +3399,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               ) : (
                 <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
                   {productSearchQuery 
-                    ? `No products found for "${productSearchQuery}" in ${productSearchFilter === 'all' ? 'any field' : productSearchFilter}`
+                    ? `No products found for "${productSearchQuery}"`
                     : shopifyStore?.connected 
                       ? 'No products found' 
                       : 'Connect Shopify to see products'
@@ -3427,7 +3409,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       <button
                         onClick={() => {
                           setProductSearchQuery('');
-                          setProductSearchFilter('all');
                         }}
                         style={{
                           padding: '4px 8px',
