@@ -617,55 +617,27 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     });
   };
 
-  // Send product as message in chat
+  // Send product as visual card in chat (not WhatsApp message)
   const sendProductInChat = async (product: any) => {
     if (!selectedConversation) {
       alert('Please select a conversation first');
       return;
     }
 
-    const productMessage = `🛍️ *${product.title}*\n\n` +
-      `💰 Price: $${product.variants?.[0]?.price || 'N/A'}\n` +
-      `🏷️ Type: ${product.product_type || 'Product'}\n` +
-      `🔗 Link: ${shopifyStore?.domain ? `https://${shopifyStore.domain}/products/${product.handle}` : '#'}\n\n` +
-      `Interested? Let me know if you'd like more details! 😊`;
-
-    try {
-      const phoneNumber = selectedConversation.replace('wa_', '');
-      
-      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phoneNumber,
-          message: productMessage
-        })
-      });
-
-      if (response.ok) {
-        // Add message to local state immediately
-        const newMessage: Message = {
-          id: `product_${Date.now()}`,
-          text: productMessage,
-          sender: 'agent',
-          timestamp: new Date(),
-          status: 'sent',
-          type: 'product',
-          direction: 'outgoing'
-        };
-        
-        setMessages(prev => [...prev, newMessage]);
-        console.log(`✅ Product sent: ${product.title}`);
-      } else {
-        console.error('Failed to send product message');
-        alert('Failed to send product. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error sending product message:', error);
-      alert('Error sending product. Please try again.');
-    }
+    // Add product card as a visual message in the chat
+    const newMessage: Message = {
+      id: `product_${Date.now()}`,
+      text: `Product: ${product.title}`,
+      sender: 'agent',
+      timestamp: new Date(),
+      status: 'sent',
+      type: 'product',
+      direction: 'outgoing',
+      productData: product // Store product data for rendering the card
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    console.log(`✅ Product card added to chat: ${product.title}`);
   };
 
   // Handle variant option selection
@@ -712,6 +684,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   };
 
   // Send product with selected variant options in chat
+  // Send product with selected variants as visual card in chat
   const sendSelectedVariantInChat = async (product: any) => {
     if (!selectedConversation) {
       alert('Please select a conversation first');
@@ -719,54 +692,24 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
 
     const selectedOptions = selectedVariants[product.id] || {};
-    const optionStrings = Object.entries(selectedOptions).map(([name, value]) => `${name}: ${value}`);
     
-    let productMessage = `🛍️ *${product.title}*\n\n`;
-    
-    if (optionStrings.length > 0) {
-      productMessage += `📋 *Selected Options:*\n${optionStrings.map(opt => `• ${opt}`).join('\n')}\n\n`;
-    }
-    
-    productMessage += `💰 Price: $${product.variants?.[0]?.price || 'N/A'}\n` +
-      `🔗 Link: ${shopifyStore?.domain ? `https://${shopifyStore.domain}/products/${product.handle}` : '#'}\n\n` +
-      `To add this item to your cart, simply reply: *"add to cart"* 🛒\n\n` +
-      `Interested? Let me know if you'd like more details! 😊`;
-
-    try {
-      const phoneNumber = selectedConversation.replace('wa_', '');
-      
-      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phoneNumber,
-          message: productMessage
-        })
-      });
-
-      if (response.ok) {
-        const newMessage: Message = {
-          id: `product_variant_${Date.now()}`,
-          text: productMessage,
-          sender: 'agent',
-          timestamp: new Date(),
-          status: 'sent',
-          type: 'text',
-          direction: 'outgoing'
-        };
-        
-        setMessages(prev => [...prev, newMessage]);
-        console.log(`✅ Product with selected options sent: ${product.title}`);
-      } else {
-        console.error('Failed to send product with variant message');
-        alert('Failed to send product. Please try again.');
+    // Add product card with selected options as a visual message in the chat
+    const newMessage: Message = {
+      id: `product_variant_${Date.now()}`,
+      text: `Product with options: ${product.title}`,
+      sender: 'agent',
+      timestamp: new Date(),
+      status: 'sent',
+      type: 'product',
+      direction: 'outgoing',
+      productData: {
+        ...product,
+        selectedOptions // Include selected options in the product data
       }
-    } catch (error) {
-      console.error('Error sending product with variant message:', error);
-      alert('Failed to send product. Please try again.');
-    }
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    console.log(`✅ Product card with selected options added to chat: ${product.title}`);
   };
 
   // Cart management functions
@@ -854,8 +797,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phoneNumber,
-          message: cartMessage
+          to: phoneNumber,  // Fix: API expects 'to', not 'phoneNumber'
+          message: cartMessage,
+          type: 'text'
         })
       });
 
@@ -2280,21 +2224,164 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       className={`message ${message.sender === 'agent' ? 'agent-message' : 'user-message'}`}
                     >
                       {message.type === 'product' && message.productData ? (
-                        <div className="product-message">
-                          <div className="product-card">
-                            <div className="product-image">{message.productData.image}</div>
-                            <div className="product-details">
-                              <h4>{message.productData.name}</h4>
-                              <p>{message.productData.description}</p>
-                              <div className="product-price">${message.productData.price}</div>
-                              <button 
-                                className="add-to-cart-btn"
-                                onClick={() => addToCart(message.productData!)}
-                              >
-                                Add to Cart
-                              </button>
-                            </div>
-                          </div>
+                        <div className="product-message" style={{ 
+                          maxWidth: '280px',
+                          margin: message.sender === 'agent' ? '0 0 0 auto' : '0 auto 0 0'
+                        }}>
+                          {(() => {
+                            const product = message.productData;
+                            const variants = product.variants || [];
+                            const availableVariants = variants.filter((v: any) => (v.inventory_quantity || 0) > 0);
+                            const isAvailable = availableVariants.length > 0;
+                            const totalStock = variants.reduce((sum: number, v: any) => sum + (v.inventory_quantity || 0), 0);
+                            
+                            const prices = variants.map((v: any) => parseFloat(v.price || '0')).filter((p: number) => p > 0);
+                            const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+                            const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+                            const priceRange = minPrice === maxPrice ? `$${minPrice.toFixed(2)}` : `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+
+                            // Check if this product has selected options
+                            const selectedOptions = product.selectedOptions || {};
+                            const hasSelectedOptions = Object.keys(selectedOptions).length > 0;
+
+                            return (
+                              <div style={{ 
+                                border: '1px solid rgba(255,255,255,0.2)', 
+                                borderRadius: '8px', 
+                                padding: '8px', 
+                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                backdropFilter: 'blur(10px)',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                                position: 'relative'
+                              }}>
+                                {/* Availability Badge */}
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  right: '8px',
+                                  padding: '3px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '9px',
+                                  fontWeight: 'bold',
+                                  backgroundColor: isAvailable ? '#4CAF50' : '#f44336',
+                                  color: 'white',
+                                  zIndex: 1
+                                }}>
+                                  {isAvailable ? `✓ ${totalStock} in stock` : '✗ SOLD OUT'}
+                                </div>
+
+                                {/* Product Image */}
+                                <img 
+                                  src={product.images?.[0]?.src || 'https://via.placeholder.com/200x150/f0f0f0/666?text=No+Image'} 
+                                  alt={product.title}
+                                  style={{ 
+                                    width: '100%', 
+                                    height: '120px', 
+                                    objectFit: 'cover', 
+                                    borderRadius: '8px',
+                                    marginBottom: '8px'
+                                  }}
+                                />
+
+                                {/* Product Title */}
+                                <h5 style={{ 
+                                  margin: '0 0 4px 0', 
+                                  fontSize: '14px', 
+                                  fontWeight: 'bold',
+                                  color: '#ffffff',
+                                  lineHeight: '1.2',
+                                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                }}>
+                                  {product.title}
+                                </h5>
+
+                                {/* Selected Options (if any) */}
+                                {hasSelectedOptions && (
+                                  <div style={{
+                                    margin: '0 0 8px 0',
+                                    padding: '4px 8px',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(59, 130, 246, 0.3)'
+                                  }}>
+                                    <div style={{ 
+                                      color: '#60a5fa', 
+                                      fontWeight: 'bold', 
+                                      fontSize: '11px',
+                                      marginBottom: '2px',
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                    }}>
+                                      📋 Selected Options:
+                                    </div>
+                                    {Object.entries(selectedOptions).map(([name, value]) => (
+                                      <div key={name} style={{
+                                        color: '#cbd5e1',
+                                        fontSize: '10px',
+                                        textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                      }}>
+                                        • {name}: {value}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Price Range */}
+                                <div style={{ 
+                                  margin: '0 0 8px 0', 
+                                  fontSize: '16px', 
+                                  fontWeight: 'bold',
+                                  color: '#60a5fa',
+                                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                }}>
+                                  {priceRange}
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                                  <button
+                                    onClick={() => addToShopifyCart(product, 1)}
+                                    disabled={!isAvailable}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px',
+                                      fontSize: '12px',
+                                      backgroundColor: isAvailable ? '#4CAF50' : '#ccc',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: isAvailable ? 'pointer' : 'not-allowed',
+                                      transition: 'background-color 0.2s',
+                                      fontWeight: 'bold'
+                                    }}
+                                  >
+                                    {isAvailable ? '🛒 Add to Cart' : '❌ Unavailable'}
+                                  </button>
+                                  
+                                  <a
+                                    href={shopifyStore?.domain ? `https://${shopifyStore.domain}/products/${product.handle}` : '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px',
+                                      fontSize: '11px',
+                                      backgroundColor: '#2196F3',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s',
+                                      textDecoration: 'none',
+                                      textAlign: 'center',
+                                      display: 'block'
+                                    }}
+                                  >
+                                    🔗 View Product
+                                  </a>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       ) : message.type === 'order' && message.orderData ? (
                         <div className="order-message">
