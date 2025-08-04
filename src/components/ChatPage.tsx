@@ -258,6 +258,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [selectedVariants, setSelectedVariants] = useState<{[productId: string]: {[optionName: string]: string}}>({});
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [cartTotal, setCartTotal] = useState(0);
+  const [productsLastUpdated, setProductsLastUpdated] = useState<Date | null>(null);
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
+  const [updateInterval, setUpdateInterval] = useState(300000); // 5 minutes default
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [cartNotification, setCartNotification] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -417,14 +422,53 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     setProductsLoading(true);
     try {
-      const response = await shopifyService.getProducts(6); // Get 6 products
-      if (response?.products) {
-        setShopifyProducts(response.products);
+      // Fetch ALL products using pagination (Shopify limit is 250 per request)
+      let allProducts = [];
+      let hasMore = true;
+      let sinceId = null;
+      
+      while (hasMore) {
+        const endpoint = sinceId 
+          ? `/products.json?limit=250&since_id=${sinceId}`
+          : '/products.json?limit=250';
+          
+        const response = await shopifyService.makeApiCall(endpoint);
+        
+        if (response?.products && response.products.length > 0) {
+          allProducts = [...allProducts, ...response.products];
+          
+          // Check if we got the full limit, indicating there might be more
+          if (response.products.length === 250) {
+            sinceId = response.products[response.products.length - 1].id;
+          } else {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+        
+        // Safety break to prevent infinite loops
+        if (allProducts.length > 10000) {
+          console.warn('Product fetch limit reached (10,000). Breaking pagination.');
+          break;
+        }
       }
+      
+      console.log(`✅ Fetched ${allProducts.length} products from Shopify`);
+      setShopifyProducts(allProducts);
+      setProductsLastUpdated(new Date());
+      setUpdateError(null);
+      setRetryCount(0);
+      
     } catch (error) {
       console.error('Error fetching Shopify products:', error);
-      // Fallback to demo products
-      setShopifyProducts([]);
+      setUpdateError(error.message || 'Failed to update products');
+      setRetryCount(prev => prev + 1);
+      
+      // Keep existing products if fetch fails
+      if (shopifyProducts.length === 0) {
+        setShopifyProducts([]);
+      }
     } finally {
       setProductsLoading(false);
     }
@@ -1210,6 +1254,50 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     const filtered = filterProducts(shopifyProducts, productSearchQuery, productSearchFilter);
     setFilteredProducts(filtered);
   }, [shopifyProducts, productSearchQuery, productSearchFilter]);
+
+  // Auto-update products from Shopify store
+  useEffect(() => {
+    if (!autoUpdateEnabled || !shopifyStore?.connected || !shopifyService.isConnected()) {
+      return;
+    }
+
+    const intervalId = setInterval(async () => {
+      console.log('🔄 Auto-updating Shopify products...');
+      try {
+        await fetchShopifyProducts();
+      } catch (error) {
+        console.error('Auto-update failed:', error);
+        // If retry count is less than 3, try again in half the interval
+        if (retryCount < 3) {
+          setTimeout(() => {
+            console.log(`🔄 Retrying auto-update (attempt ${retryCount + 1}/3)...`);
+            fetchShopifyProducts();
+          }, updateInterval / 2);
+        }
+      }
+    }, updateInterval);
+
+    return () => clearInterval(intervalId);
+  }, [autoUpdateEnabled, updateInterval, shopifyStore?.connected, retryCount]);
+
+  // Check for product updates when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && autoUpdateEnabled && shopifyStore?.connected && shopifyService.isConnected()) {
+        const now = new Date();
+        const lastUpdate = productsLastUpdated;
+        
+        // If it's been more than 10 minutes since last update, refresh
+        if (!lastUpdate || (now.getTime() - lastUpdate.getTime()) > 600000) {
+          console.log('🔄 Tab visible - refreshing products...');
+          fetchShopifyProducts();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [autoUpdateEnabled, shopifyStore?.connected, productsLastUpdated]);
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -2952,6 +3040,89 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               {/* Products Header - Moved Up */}
               <div style={{ marginBottom: '6px' }}>
                 <h4 style={{ margin: 0, color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>🛍️ Products</h4>
+              </div>
+
+              {/* Auto-Update Controls */}
+              <div style={{ 
+                marginBottom: '12px', 
+                padding: '8px', 
+                backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+                borderRadius: '6px',
+                fontSize: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-primary)' }}>Auto-Update:</span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={autoUpdateEnabled}
+                        onChange={(e) => setAutoUpdateEnabled(e.target.checked)}
+                        style={{ margin: 0 }}
+                      />
+                      <span style={{ color: 'var(--text-secondary)' }}>Enabled</span>
+                    </label>
+                  </div>
+                  <button
+                    onClick={() => fetchShopifyProducts()}
+                    disabled={productsLoading || !shopifyStore?.connected}
+                    style={{
+                      background: productsLoading ? 'rgba(255, 152, 0, 0.8)' : 'rgba(76, 175, 80, 0.8)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '9px',
+                      cursor: productsLoading ? 'not-allowed' : 'pointer',
+                      opacity: productsLoading || !shopifyStore?.connected ? 0.5 : 1,
+                      animation: productsLoading ? 'spin 1s linear infinite' : 'none'
+                    }}
+                  >
+                    {productsLoading ? '🔄' : '🔄 Refresh'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Interval:</span>
+                  <select
+                    value={updateInterval}
+                    onChange={(e) => setUpdateInterval(Number(e.target.value))}
+                    disabled={!autoUpdateEnabled}
+                    style={{
+                      padding: '2px 4px',
+                      border: '1px solid #ddd',
+                      borderRadius: '3px',
+                      fontSize: '9px',
+                      backgroundColor: 'white',
+                      opacity: autoUpdateEnabled ? 1 : 0.5
+                    }}
+                  >
+                    <option value={60000}>1 minute</option>
+                    <option value={300000}>5 minutes</option>
+                    <option value={900000}>15 minutes</option>
+                    <option value={1800000}>30 minutes</option>
+                    <option value={3600000}>1 hour</option>
+                  </select>
+                  {productsLastUpdated && (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '8px' }}>
+                      Last: {productsLastUpdated.toLocaleTimeString()}
+                    </span>
+                  )}
+                  <span style={{ color: 'var(--text-primary)', fontSize: '8px', fontWeight: 'bold' }}>
+                    📦 {shopifyProducts.length} products loaded
+                  </span>
+                </div>
+                {updateError && (
+                  <div style={{ 
+                    color: '#ff4757', 
+                    fontSize: '8px', 
+                    marginTop: '4px',
+                    padding: '2px 4px',
+                    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+                    borderRadius: '2px'
+                  }}>
+                    ⚠️ Error: {updateError} {retryCount > 0 && `(Retries: ${retryCount}/3)`}
+                  </div>
+                )}
               </div>
 
               {/* Dynamic Search Bar */}
