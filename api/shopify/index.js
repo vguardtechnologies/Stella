@@ -1,7 +1,6 @@
 const express = require('express');
-const fetch = require('node-fetch');
 const router = express.Router();
-const shopifyConfigService = require('../services/shopifyConfigService');
+const shopifyConfigService = require('../../services/shopifyConfigService');
 
 // In-memory cache for quick access (refreshed from database)
 let shopifyConfig = null;
@@ -216,60 +215,6 @@ router.get('/config', (req, res) => {
       accessToken: shopifyConfig.accessToken ? '***' + shopifyConfig.accessToken.slice(-4) : ''
     }
   });
-});
-
-// Legacy proxy endpoint for backward compatibility
-router.post('/proxy', async (req, res) => {
-  try {
-    const { endpoint, shop, accessToken, method = 'GET' } = req.body;
-
-    // Use stored config if no credentials provided
-    const finalAccessToken = accessToken || shopifyConfig.accessToken;
-    const finalShop = shop || shopifyConfig.storeName;
-
-    if (!endpoint || !finalShop || !finalAccessToken) {
-      return res.status(400).json({ 
-        error: 'Missing required parameters: endpoint, shop, accessToken' 
-      });
-    }
-
-    // Clean shop name - remove .myshopify.com if present
-    const cleanShop = finalShop.replace('.myshopify.com', '');
-    
-    // Build Shopify API URL
-    const baseUrl = `https://${cleanShop}.myshopify.com/admin/api/2023-10`;
-    const url = `${baseUrl}${endpoint}`;
-
-    console.log(`🛍️ Shopify API Call: ${method} ${url}`);
-
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'X-Shopify-Access-Token': finalAccessToken,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ Shopify API Error: ${response.status} ${response.statusText}`, errorText);
-      return res.status(response.status).json({ 
-        error: `Shopify API error: ${response.status} ${response.statusText}`,
-        details: errorText
-      });
-    }
-
-    const data = await response.json();
-    console.log(`✅ Shopify API Success: ${Object.keys(data).join(', ')}`);
-    
-    res.json(data);
-  } catch (error) {
-    console.error('❌ Shopify Proxy Error:', error);
-    res.status(500).json({ 
-      error: 'Shopify API proxy failed',
-      details: error.message
-    });
-  }
 });
 
 module.exports = router;

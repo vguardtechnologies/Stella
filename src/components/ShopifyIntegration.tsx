@@ -74,6 +74,41 @@ const ShopifyIntegration: React.FC<ShopifyIntegrationProps> = ({ onClose, onStor
     }
   }, []);
 
+  // Load configuration from database on component mount
+  useEffect(() => {
+    const loadDatabaseConfiguration = async () => {
+      try {
+        const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+        const response = await fetch(`${baseUrl}/api/shopify/status`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          
+          if (result.isConfigured) {
+            // Get the full configuration (without sensitive data)
+            const configResponse = await fetch(`${baseUrl}/api/shopify/config`);
+            if (configResponse.ok) {
+              const configData = await configResponse.json();
+              const dbStore = configData.data;
+              
+              // Update the state with database configuration
+              setStore(dbStore);
+              setIsConnected(dbStore.connected);
+              onStoreUpdate?.(dbStore);
+              
+              console.log('✅ Loaded Shopify configuration from database:', dbStore.name);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading database configuration:', error);
+        // Fallback to localStorage if database fails (handled by existing useEffect)
+      }
+    };
+
+    loadDatabaseConfiguration();
+  }, []);
+
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -81,37 +116,44 @@ const ShopifyIntegration: React.FC<ShopifyIntegrationProps> = ({ onClose, onStor
     try {
       // Clean store name - remove .myshopify.com if present
       const cleanStoreName = connectionForm.storeName.replace('.myshopify.com', '');
+      const shopDomain = `${cleanStoreName}.myshopify.com`;
       
-      // Test connection first
-      const testResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/shopify/test-connection`, {
+      // Test connection and save to database
+      const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      const response = await fetch(`${baseUrl}/api/shopify/configure`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          shop: cleanStoreName,
-          accessToken: connectionForm.accessToken
+          apiKey: connectionForm.apiKey,
+          accessToken: connectionForm.accessToken,
+          shopDomain: shopDomain,
+          storeName: cleanStoreName
         })
       });
 
-      const testResult = await testResponse.json();
+      const result = await response.json();
       
-      if (!testResult.connected) {
-        throw new Error(testResult.error || 'Failed to connect to Shopify store');
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to connect to Shopify store');
       }
       
       // Connection successful - create store object
       const newStore: ShopifyStore = {
         name: cleanStoreName,
         shop: cleanStoreName,
-        domain: `${cleanStoreName}.myshopify.com`,
+        domain: shopDomain,
         connected: true,
         apiKey: connectionForm.apiKey,
         accessToken: connectionForm.accessToken
       };
 
-      // Save to localStorage
+      // Save to localStorage as backup
       localStorage.setItem('shopifyStore', JSON.stringify(newStore));
+      localStorage.setItem('shopify_api_key', connectionForm.apiKey);
+      localStorage.setItem('shopify_access_token', connectionForm.accessToken);
+      localStorage.setItem('shopify_store_name', cleanStoreName);
       
       setStore(newStore);
       setIsConnected(true);
@@ -128,8 +170,26 @@ const ShopifyIntegration: React.FC<ShopifyIntegrationProps> = ({ onClose, onStor
     }
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
+    try {
+      // Clear from database
+      const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      await fetch(`${baseUrl}/api/shopify/clear`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      console.error('Error clearing database configuration:', error);
+    }
+
+    // Clear from localStorage
     localStorage.removeItem('shopifyStore');
+    localStorage.removeItem('shopify_api_key');
+    localStorage.removeItem('shopify_access_token');
+    localStorage.removeItem('shopify_store_name');
+    
     setStore(null);
     setIsConnected(false);
     setConnectionForm({ storeName: '', apiKey: '', accessToken: '' });
