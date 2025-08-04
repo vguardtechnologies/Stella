@@ -2225,7 +2225,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     >
                       {message.type === 'product' && message.productData ? (
                         <div className="product-message" style={{ 
-                          maxWidth: '280px',
+                          maxWidth: '350px',
                           margin: message.sender === 'agent' ? '0 0 0 auto' : '0 auto 0 0'
                         }}>
                           {(() => {
@@ -2272,14 +2272,28 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
                                 {/* Product Image */}
                                 <img 
-                                  src={product.images?.[0]?.src || 'https://via.placeholder.com/200x150/f0f0f0/666?text=No+Image'} 
+                                  src={product.images?.[0]?.src || 'https://via.placeholder.com/400x300/f0f0f0/666?text=No+Image'} 
                                   alt={product.title}
                                   style={{ 
                                     width: '100%', 
-                                    height: '120px', 
+                                    height: '200px', 
                                     objectFit: 'cover', 
                                     borderRadius: '8px',
-                                    marginBottom: '8px'
+                                    marginBottom: '8px',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s ease'
+                                  }}
+                                  onClick={() => {
+                                    // Open full size image in new tab
+                                    if (product.images?.[0]?.src) {
+                                      window.open(product.images[0].src, '_blank');
+                                    }
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.02)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
                                   }}
                                 />
 
