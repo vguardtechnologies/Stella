@@ -3038,32 +3038,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             {/* First Section - Products */}
             <div className="shopify-section" style={{ padding: '10px', border: '1px solid #334155', margin: '10px 0', borderRadius: '8px', backgroundColor: '#1e293b' }}>
               {/* Products Header */}
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between', 
-                marginBottom: '8px' 
-              }}>
+              <div style={{ marginBottom: '8px' }}>
                 <h4 style={{ margin: 0, color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>
                   🛍️ Products ({shopifyProducts.length})
                 </h4>
-                <button
-                  onClick={() => fetchShopifyProducts()}
-                  disabled={productsLoading || !shopifyStore?.connected}
-                  style={{
-                    background: productsLoading ? 'rgba(255, 152, 0, 0.8)' : 'rgba(76, 175, 80, 0.8)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '9px',
-                    cursor: productsLoading ? 'not-allowed' : 'pointer',
-                    opacity: productsLoading || !shopifyStore?.connected ? 0.5 : 1,
-                    animation: productsLoading ? 'spin 1s linear infinite' : 'none'
-                  }}
-                >
-                  {productsLoading ? '🔄' : '🔄 Refresh'}
-                </button>
               </div>
 
               {/* Search Bar */}
