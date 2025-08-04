@@ -817,7 +817,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     let selectedVariant = product.variants?.[0]; // Default to first variant
     if (Object.keys(selectedOptions).length > 0 && product.variants) {
       selectedVariant = product.variants.find((variant: any) => {
-        return Object.entries(selectedOptions).every(([optionName, optionValue]) => {
+        return Object.entries(selectedOptions).every(([, optionValue]) => {
           return variant.option1?.toLowerCase() === optionValue.toLowerCase() ||
                  variant.option2?.toLowerCase() === optionValue.toLowerCase() ||
                  variant.option3?.toLowerCase() === optionValue.toLowerCase();
