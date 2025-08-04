@@ -1924,20 +1924,12 @@ mark {
   background: linear-gradient(135deg, #20b358, #0f7a6b);
 }
 
-/* Custom scrollbar for product grid container */
-.custom-scrollbar::-webkit-scrollbar {
-  width: thin;
+/* Hide scrollbar completely for product grid container */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #1e293b;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+.no-scrollbar {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
 }

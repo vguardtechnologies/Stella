@@ -3012,10 +3012,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   gap: '8px',
                   maxHeight: '400px',
                   overflowY: 'auto',
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: 'rgba(255,255,255,0.3) #1e293b'
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
                 }}
-                className="custom-scrollbar"
+                className="no-scrollbar"
                 >
                   {(productSearchQuery ? filteredProducts : shopifyProducts).map((product) => {
                     // Calculate availability and variants info
