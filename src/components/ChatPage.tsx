@@ -480,6 +480,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     const searchTerm = query.toLowerCase();
     
+    // Debug logging for price searches
+    if (searchTerm.match(/^\$?\d+\.?\d*$/)) {
+      console.log('🔍 Price search detected:', searchTerm);
+      console.log('📊 Sample product prices:', products.slice(0, 3).map(p => ({
+        title: p.title?.substring(0, 30),
+        price: p.variants?.[0]?.price,
+        priceType: typeof p.variants?.[0]?.price
+      })));
+    }
+    
     // Helper function to safely handle tags (can be string or array)
     const getTagsString = (tags: any) => {
       if (!tags) return '';
@@ -508,7 +518,30 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       switch (filterType) {
         case 'price':
           const price = product.variants?.[0]?.price || '0';
-          return price.toString().includes(searchTerm);
+          // Enhanced price search
+          const normalizedPrice = price.toString().replace(/[$£€¥]/g, '').trim();
+          const normalizedSearchTerm = searchTerm.replace(/[$£€¥]/g, '').trim();
+          
+          const matches = normalizedPrice === normalizedSearchTerm ||
+                         normalizedPrice.startsWith(normalizedSearchTerm) ||
+                         normalizedPrice.includes(normalizedSearchTerm) ||
+                         `$${normalizedPrice}`.includes(searchTerm) ||
+                         price.toString().includes(searchTerm);
+          
+          // Debug specific product
+          if (searchTerm.match(/^\$?\d+\.?\d*$/)) {
+            console.log('🔍 Price comparison:', {
+              productTitle: product.title?.substring(0, 30),
+              originalPrice: price,
+              priceType: typeof price,
+              normalizedPrice,
+              searchTerm,
+              normalizedSearchTerm,
+              matches
+            });
+          }
+          
+          return matches;
         
         case 'color':
           // Search in title, tags, and options for color-related terms
@@ -531,21 +564,89 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         
         case 'availability':
           const availability = product.variants?.[0]?.inventory_quantity > 0 ? 'in stock' : 'out of stock';
+          const totalInventory = product.variants?.reduce((sum: number, variant: any) => sum + (variant.inventory_quantity || 0), 0) || 0;
+          const isInStock = totalInventory > 0;
+          
           return availability.includes(searchTerm) || 
-                 (searchTerm.includes('available') && product.variants?.[0]?.inventory_quantity > 0) ||
-                 (searchTerm.includes('unavailable') && product.variants?.[0]?.inventory_quantity <= 0);
+                 (searchTerm.includes('available') && isInStock) ||
+                 (searchTerm.includes('unavailable') && !isInStock) ||
+                 (searchTerm.includes('sold out') && !isInStock) ||
+                 (searchTerm.includes('soldout') && !isInStock) ||
+                 (searchTerm.includes('out of stock') && !isInStock) ||
+                 (searchTerm.includes('outofstock') && !isInStock) ||
+                 (searchTerm.includes('in stock') && isInStock) ||
+                 (searchTerm.includes('instock') && isInStock) ||
+                 (searchTerm.includes('stock') && (isInStock ? searchTerm.includes('in') : searchTerm.includes('out')));
         
         case 'all':
         default:
-          // Search across all fields
+          // Enhanced price search function
+          const searchInPrice = (priceStr: string, searchTerm: string) => {
+            if (!priceStr) return false;
+            
+            // Remove currency symbols and normalize
+            const normalizedPrice = priceStr.replace(/[$£€¥]/g, '').trim();
+            const normalizedSearch = searchTerm.replace(/[$£€¥]/g, '').trim();
+            
+            // Check exact match
+            if (normalizedPrice === normalizedSearch) return true;
+            
+            // Check if search term is at start of price (e.g., "16" matches "160")
+            if (normalizedPrice.startsWith(normalizedSearch)) return true;
+            
+            // Check if price contains search term
+            if (normalizedPrice.includes(normalizedSearch)) return true;
+            
+            // Check formatted price with dollar sign
+            if (`$${normalizedPrice}`.includes(searchTerm)) return true;
+            if (priceStr.includes(searchTerm)) return true;
+            
+            return false;
+          };
+
+          // Enhanced inventory search function
+          const searchInInventory = (product: any, searchTerm: string) => {
+            const totalInventory = product.variants?.reduce((sum: number, variant: any) => sum + (variant.inventory_quantity || 0), 0) || 0;
+            const isInStock = totalInventory > 0;
+            
+            // Check various stock status terms
+            if (searchTerm.includes('sold out') || searchTerm.includes('soldout')) return !isInStock;
+            if (searchTerm.includes('out of stock') || searchTerm.includes('outofstock')) return !isInStock;
+            if (searchTerm.includes('in stock') || searchTerm.includes('instock')) return isInStock;
+            if (searchTerm.includes('available') && !searchTerm.includes('unavailable')) return isInStock;
+            if (searchTerm.includes('unavailable')) return !isInStock;
+            if (searchTerm === 'stock') return true; // Show all products when just "stock" is searched
+            
+            return false;
+          };
+
+          // Get price for search
+          const productPrice = product.variants?.[0]?.price?.toString() || '';
+          
+          // Debug price search in 'all' mode
+          const isPriceSearch = searchTerm.match(/^\$?\d+\.?\d*$/);
+          if (isPriceSearch) {
+            const priceMatch = searchInPrice(productPrice, searchTerm);
+            console.log('🔍 All-mode price search:', {
+              productTitle: product.title?.substring(0, 30),
+              productPrice,
+              priceType: typeof product.variants?.[0]?.price,
+              searchTerm,
+              priceMatch
+            });
+          }
+          
+          // Search across all fields including enhanced price search and inventory
           const allFields = [
             product.title?.toLowerCase() || '',
             product.body_html?.toLowerCase() || '',
             getTagsString(product.tags),
-            product.variants?.[0]?.price?.toString() || '',
             getOptionsString(product.options)
           ].join(' ');
-          return allFields.includes(searchTerm);
+          
+          return allFields.includes(searchTerm) || 
+                 searchInPrice(productPrice, searchTerm) || 
+                 searchInInventory(product, searchTerm);
       }
     });
   };
@@ -3077,7 +3178,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               </div>
 
               {/* Search Bar */}
-              <div style={{ marginBottom: '8px' }}>
+              <div style={{ marginBottom: '6px' }}>
                 <input
                   type="text"
                   placeholder="Search all products..."
@@ -3085,13 +3186,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   onChange={(e) => setProductSearchQuery(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '6px 12px',
+                    padding: '4px 8px',
                     border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '12px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
                     outline: 'none',
                     backgroundColor: 'white',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    height: '28px'
                   }}
                 />
                 
