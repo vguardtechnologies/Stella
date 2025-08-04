@@ -480,16 +480,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     const searchTerm = query.toLowerCase();
     
-    // Debug logging for price searches
-    if (searchTerm.match(/^\$?\d+\.?\d*$/)) {
-      console.log('🔍 Price search detected:', searchTerm);
-      console.log('📊 Sample product prices:', products.slice(0, 3).map(p => ({
-        title: p.title?.substring(0, 30),
-        price: p.variants?.[0]?.price,
-        priceType: typeof p.variants?.[0]?.price
-      })));
-    }
-    
     // Helper function to safely handle tags (can be string or array)
     const getTagsString = (tags: any) => {
       if (!tags) return '';
@@ -518,30 +508,19 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       switch (filterType) {
         case 'price':
           const price = product.variants?.[0]?.price || '0';
-          // Enhanced price search
-          const normalizedPrice = price.toString().replace(/[$£€¥]/g, '').trim();
+          // Enhanced price search with better matching
+          const priceStr = price.toString();
+          const normalizedPrice = priceStr.replace(/[$£€¥]/g, '').trim();
           const normalizedSearchTerm = searchTerm.replace(/[$£€¥]/g, '').trim();
           
-          const matches = normalizedPrice === normalizedSearchTerm ||
-                         normalizedPrice.startsWith(normalizedSearchTerm) ||
-                         normalizedPrice.includes(normalizedSearchTerm) ||
-                         `$${normalizedPrice}`.includes(searchTerm) ||
-                         price.toString().includes(searchTerm);
+          // Multiple matching strategies
+          const exactMatch = normalizedPrice === normalizedSearchTerm;
+          const startsWithMatch = normalizedPrice.startsWith(normalizedSearchTerm);
+          const containsMatch = normalizedPrice.includes(normalizedSearchTerm);
+          const formattedMatch = `$${normalizedPrice}`.toLowerCase().includes(searchTerm);
+          const rawMatch = priceStr.toLowerCase().includes(searchTerm);
           
-          // Debug specific product
-          if (searchTerm.match(/^\$?\d+\.?\d*$/)) {
-            console.log('🔍 Price comparison:', {
-              productTitle: product.title?.substring(0, 30),
-              originalPrice: price,
-              priceType: typeof price,
-              normalizedPrice,
-              searchTerm,
-              normalizedSearchTerm,
-              matches
-            });
-          }
-          
-          return matches;
+          return exactMatch || startsWithMatch || containsMatch || formattedMatch || rawMatch;
         
         case 'color':
           // Search in title, tags, and options for color-related terms
@@ -622,19 +601,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
           // Get price for search
           const productPrice = product.variants?.[0]?.price?.toString() || '';
-          
-          // Debug price search in 'all' mode
-          const isPriceSearch = searchTerm.match(/^\$?\d+\.?\d*$/);
-          if (isPriceSearch) {
-            const priceMatch = searchInPrice(productPrice, searchTerm);
-            console.log('🔍 All-mode price search:', {
-              productTitle: product.title?.substring(0, 30),
-              productPrice,
-              priceType: typeof product.variants?.[0]?.price,
-              searchTerm,
-              priceMatch
-            });
-          }
           
           // Search across all fields including enhanced price search and inventory
           const allFields = [
@@ -3223,7 +3189,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 }}
                 className="no-scrollbar"
                 >
-                  {(productSearchQuery ? filteredProducts : shopifyProducts).map((product) => {
+                  {(productSearchQuery ? filteredProducts : shopifyProducts)
+                    .sort((a, b) => {
+                      // Sort by availability: in-stock products first, sold-out products last
+                      const aVariants = a.variants || [];
+                      const bVariants = b.variants || [];
+                      const aInStock = aVariants.some((v: any) => (v.inventory_quantity || 0) > 0);
+                      const bInStock = bVariants.some((v: any) => (v.inventory_quantity || 0) > 0);
+                      
+                      // In stock products come first (true = 1, false = 0, so we reverse the comparison)
+                      if (aInStock && !bInStock) return -1; // a comes first
+                      if (!aInStock && bInStock) return 1;  // b comes first
+                      return 0; // keep original order for products with same availability status
+                    })
+                    .map((product) => {
                     // Calculate availability and variants info
                     const variants = product.variants || [];
                     const availableVariants = variants.filter((v: any) => (v.inventory_quantity || 0) > 0);
