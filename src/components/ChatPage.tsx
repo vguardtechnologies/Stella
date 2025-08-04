@@ -646,27 +646,105 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     });
   };
 
-  // Send product as visual card in chat (not WhatsApp message)
+  // Send product as WhatsApp message with product details
   const sendProductInChat = async (product: any) => {
     if (!selectedConversation) {
       alert('Please select a conversation first');
       return;
     }
 
-    // Add product card as a visual message in the chat
+    // Extract phone number from conversation
+    const conversation = whatsappConversations.find(c => c.id === selectedConversation);
+    let phoneNumber: string;
+    if (!conversation) {
+      if (selectedConversation.startsWith('wa_')) {
+        phoneNumber = '+' + selectedConversation.replace('wa_', '');
+      } else {
+        console.error('No conversation found for ID:', selectedConversation);
+        return;
+      }
+    } else {
+      phoneNumber = conversation.customerPhone;
+    }
+
+    // Create a formatted product message
+    const variant = product.variants?.[0];
+    const price = variant?.price ? `$${variant.price} TTD` : 'Price on request';
+    const comparePrice = variant?.compare_at_price && variant.compare_at_price !== variant.price 
+      ? ` (was $${variant.compare_at_price} TTD)` : '';
+    
+    const productMessage = `🛍️ *${product.title}*\n\n` +
+      `💰 *Price:* ${price}${comparePrice}\n` +
+      `📦 *Type:* ${product.product_type || 'General'}\n` +
+      `🏢 *Brand:* ${product.vendor || 'SUSA'}\n` +
+      `📋 *Status:* ${product.status === 'active' ? '✅ Available' : '❌ Not Available'}\n\n` +
+      `${product.body_html ? product.body_html.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : 'Premium quality product from our collection.'}\n\n` +
+      `🔗 Product ID: ${product.handle || product.id}`;
+
+    // Add product card as a visual message in the chat (optimistic update)
     const newMessage: Message = {
       id: `product_${Date.now()}`,
-      text: `Product: ${product.title}`,
+      text: productMessage,
       sender: 'agent',
       timestamp: new Date(),
-      status: 'sent',
+      status: 'sending',
       type: 'product',
       direction: 'outgoing',
-      productData: product // Store product data for rendering the card
+      productData: product
     };
     
     setMessages(prev => [...prev, newMessage]);
-    console.log(`✅ Product card added to chat: ${product.title}`);
+
+    try {
+      // Send the product message via WhatsApp API
+      const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: phoneNumber.replace(/[^\d]/g, ''),
+          text: productMessage,
+          type: 'text'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Product message sent successfully:', product.title);
+        
+        // Update message status to sent
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id ? { 
+            ...msg, 
+            status: 'sent',
+            whatsapp_message_id: result.messageId 
+          } : msg
+        ));
+      } else {
+        console.error('❌ Failed to send product message:', result.error);
+        
+        // Update message status to failed
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id ? { 
+            ...msg, 
+            status: 'failed'
+          } : msg
+        ));
+      }
+    } catch (error) {
+      console.error('❌ Error sending product message:', error);
+      
+      // Update message status to failed
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id ? { 
+          ...msg, 
+          status: 'failed'
+        } : msg
+      ));
+    }
   };
 
   // Handle variant option selection
@@ -712,33 +790,128 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     });
   };
 
-  // Send product with selected variant options in chat
-  // Send product with selected variants as visual card in chat
+  // Send product with selected variants as WhatsApp message
   const sendSelectedVariantInChat = async (product: any) => {
     if (!selectedConversation) {
       alert('Please select a conversation first');
       return;
     }
 
+    // Extract phone number from conversation
+    const conversation = whatsappConversations.find(c => c.id === selectedConversation);
+    let phoneNumber: string;
+    if (!conversation) {
+      if (selectedConversation.startsWith('wa_')) {
+        phoneNumber = '+' + selectedConversation.replace('wa_', '');
+      } else {
+        console.error('No conversation found for ID:', selectedConversation);
+        return;
+      }
+    } else {
+      phoneNumber = conversation.customerPhone;
+    }
+
     const selectedOptions = selectedVariants[product.id] || {};
     
-    // Add product card with selected options as a visual message in the chat
+    // Find the specific variant based on selected options
+    let selectedVariant = product.variants?.[0]; // Default to first variant
+    if (Object.keys(selectedOptions).length > 0 && product.variants) {
+      selectedVariant = product.variants.find((variant: any) => {
+        return Object.entries(selectedOptions).every(([optionName, optionValue]) => {
+          return variant.option1?.toLowerCase() === optionValue.toLowerCase() ||
+                 variant.option2?.toLowerCase() === optionValue.toLowerCase() ||
+                 variant.option3?.toLowerCase() === optionValue.toLowerCase();
+        });
+      }) || product.variants[0];
+    }
+
+    // Build selected options text
+    const optionsText = Object.keys(selectedOptions).length > 0 
+      ? Object.entries(selectedOptions).map(([key, value]) => `${key}: ${value}`).join(', ')
+      : 'Default variant';
+
+    // Create a formatted product message with selected options
+    const price = selectedVariant?.price ? `$${selectedVariant.price} TTD` : 'Price on request';
+    const comparePrice = selectedVariant?.compare_at_price && selectedVariant.compare_at_price !== selectedVariant.price 
+      ? ` (was $${selectedVariant.compare_at_price} TTD)` : '';
+    
+    const productMessage = `🛍️ *${product.title}*\n\n` +
+      `✅ *Selected Options:* ${optionsText}\n` +
+      `💰 *Price:* ${price}${comparePrice}\n` +
+      `📦 *Type:* ${product.product_type || 'General'}\n` +
+      `🏢 *Brand:* ${product.vendor || 'SUSA'}\n` +
+      `📋 *Availability:* ${selectedVariant?.inventory_quantity > 0 ? `✅ In Stock (${selectedVariant.inventory_quantity})` : '❌ Out of Stock'}\n\n` +
+      `${product.body_html ? product.body_html.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : 'Premium quality product from our collection.'}\n\n` +
+      `🔗 Product ID: ${product.handle || product.id}`;
+
+    // Add product card with selected options as a visual message in the chat (optimistic update)
     const newMessage: Message = {
       id: `product_variant_${Date.now()}`,
-      text: `Product with options: ${product.title}`,
+      text: productMessage,
       sender: 'agent',
       timestamp: new Date(),
-      status: 'sent',
+      status: 'sending',
       type: 'product',
       direction: 'outgoing',
       productData: {
         ...product,
-        selectedOptions // Include selected options in the product data
+        selectedOptions,
+        selectedVariant
       }
     };
     
     setMessages(prev => [...prev, newMessage]);
-    console.log(`✅ Product card with selected options added to chat: ${product.title}`);
+
+    try {
+      // Send the product message via WhatsApp API
+      const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: phoneNumber.replace(/[^\d]/g, ''),
+          text: productMessage,
+          type: 'text'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Product variant message sent successfully:', product.title);
+        
+        // Update message status to sent
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id ? { 
+            ...msg, 
+            status: 'sent',
+            whatsapp_message_id: result.messageId 
+          } : msg
+        ));
+      } else {
+        console.error('❌ Failed to send product variant message:', result.error);
+        
+        // Update message status to failed
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id ? { 
+            ...msg, 
+            status: 'failed'
+          } : msg
+        ));
+      }
+    } catch (error) {
+      console.error('❌ Error sending product variant message:', error);
+      
+      // Update message status to failed
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id ? { 
+          ...msg, 
+          status: 'failed'
+        } : msg
+      ));
+    }
   };
 
   // Cart management functions
