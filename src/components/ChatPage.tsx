@@ -2267,7 +2267,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                   color: 'white',
                                   zIndex: 1
                                 }}>
-                                  {isAvailable ? `✓ ${totalStock} in stock` : '✗ SOLD OUT'}
+                                  {isAvailable ? '✓ IN STOCK' : '✗ SOLD OUT'}
                                 </div>
 
                                 {/* Product Image */}
