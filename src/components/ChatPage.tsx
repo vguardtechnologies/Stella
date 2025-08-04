@@ -3441,7 +3441,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           {/* E-commerce Integration Panel */}
           <div className="shopify-panel">
             <div style={{ padding: '4px 8px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>🛒 {actualShopName || 'E-commerce Store'}</h3>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
+                🛒 {actualShopName || 'E-commerce Store'}
+                {isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#22c55e', fontWeight: 'normal' }}>● Connected</span>}
+                {!isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 'normal' }}>● Demo Mode</span>}
+              </h3>
             </div>
             
             {/* First Section - Products */}
@@ -3450,6 +3454,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               <div style={{ marginBottom: '8px' }}>
                 <h4 style={{ margin: 0, color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>
                   🛍️ Products ({shopifyProducts.length})
+                  {!isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#fbbf24', fontWeight: 'normal' }}>(Demo Products)</span>}
                 </h4>
               </div>
 
