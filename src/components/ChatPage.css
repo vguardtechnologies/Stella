@@ -1923,3 +1923,21 @@ mark {
 .whatsapp-reply-active .send-btn:hover {
   background: linear-gradient(135deg, #20b358, #0f7a6b);
 }
+
+/* Custom scrollbar for product grid container */
+.custom-scrollbar::-webkit-scrollbar {
+  width: thin;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
