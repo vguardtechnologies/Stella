@@ -259,8 +259,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [cartTotal, setCartTotal] = useState(0);
   const [productsLastUpdated, setProductsLastUpdated] = useState<Date | null>(null);
-  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
-  const [updateInterval, setUpdateInterval] = useState(300000); // 5 minutes default
+  const autoUpdateEnabled = true; // Always enabled
+  const updateInterval = 300000; // Fixed at 5 minutes
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [cartNotification, setCartNotification] = useState<string>('');
@@ -1255,9 +1255,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setFilteredProducts(filtered);
   }, [shopifyProducts, productSearchQuery, productSearchFilter]);
 
-  // Auto-update products from Shopify store
+  // Auto-update products from Shopify store every 5 minutes
   useEffect(() => {
-    if (!autoUpdateEnabled || !shopifyStore?.connected || !shopifyService.isConnected()) {
+    if (!shopifyStore?.connected || !shopifyService.isConnected()) {
       return;
     }
 
@@ -1278,12 +1278,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }, updateInterval);
 
     return () => clearInterval(intervalId);
-  }, [autoUpdateEnabled, updateInterval, shopifyStore?.connected, retryCount]);
+  }, [shopifyStore?.connected, retryCount]);
 
   // Check for product updates when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && autoUpdateEnabled && shopifyStore?.connected && shopifyService.isConnected()) {
+      if (!document.hidden && shopifyStore?.connected && shopifyService.isConnected()) {
         const now = new Date();
         const lastUpdate = productsLastUpdated;
         
@@ -1297,7 +1297,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [autoUpdateEnabled, shopifyStore?.connected, productsLastUpdated]);
+  }, [shopifyStore?.connected, productsLastUpdated]);
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -3037,92 +3037,33 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             
             {/* First Section - Products */}
             <div className="shopify-section" style={{ padding: '10px', border: '1px solid #334155', margin: '10px 0', borderRadius: '8px', backgroundColor: '#1e293b' }}>
-              {/* Products Header - Moved Up */}
-              <div style={{ marginBottom: '6px' }}>
-                <h4 style={{ margin: 0, color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>🛍️ Products</h4>
-              </div>
-
-              {/* Auto-Update Controls */}
+              {/* Products Header */}
               <div style={{ 
-                marginBottom: '12px', 
-                padding: '8px', 
-                backgroundColor: 'rgba(255, 255, 255, 0.1)', 
-                borderRadius: '6px',
-                fontSize: '10px'
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                marginBottom: '8px' 
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: 'var(--text-primary)' }}>Auto-Update:</span>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={autoUpdateEnabled}
-                        onChange={(e) => setAutoUpdateEnabled(e.target.checked)}
-                        style={{ margin: 0 }}
-                      />
-                      <span style={{ color: 'var(--text-secondary)' }}>Enabled</span>
-                    </label>
-                  </div>
-                  <button
-                    onClick={() => fetchShopifyProducts()}
-                    disabled={productsLoading || !shopifyStore?.connected}
-                    style={{
-                      background: productsLoading ? 'rgba(255, 152, 0, 0.8)' : 'rgba(76, 175, 80, 0.8)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '9px',
-                      cursor: productsLoading ? 'not-allowed' : 'pointer',
-                      opacity: productsLoading || !shopifyStore?.connected ? 0.5 : 1,
-                      animation: productsLoading ? 'spin 1s linear infinite' : 'none'
-                    }}
-                  >
-                    {productsLoading ? '🔄' : '🔄 Refresh'}
-                  </button>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Interval:</span>
-                  <select
-                    value={updateInterval}
-                    onChange={(e) => setUpdateInterval(Number(e.target.value))}
-                    disabled={!autoUpdateEnabled}
-                    style={{
-                      padding: '2px 4px',
-                      border: '1px solid #ddd',
-                      borderRadius: '3px',
-                      fontSize: '9px',
-                      backgroundColor: 'white',
-                      opacity: autoUpdateEnabled ? 1 : 0.5
-                    }}
-                  >
-                    <option value={60000}>1 minute</option>
-                    <option value={300000}>5 minutes</option>
-                    <option value={900000}>15 minutes</option>
-                    <option value={1800000}>30 minutes</option>
-                    <option value={3600000}>1 hour</option>
-                  </select>
-                  {productsLastUpdated && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '8px' }}>
-                      Last: {productsLastUpdated.toLocaleTimeString()}
-                    </span>
-                  )}
-                  <span style={{ color: 'var(--text-primary)', fontSize: '8px', fontWeight: 'bold' }}>
-                    📦 {shopifyProducts.length} products loaded
-                  </span>
-                </div>
-                {updateError && (
-                  <div style={{ 
-                    color: '#ff4757', 
-                    fontSize: '8px', 
-                    marginTop: '4px',
-                    padding: '2px 4px',
-                    backgroundColor: 'rgba(255, 71, 87, 0.1)',
-                    borderRadius: '2px'
-                  }}>
-                    ⚠️ Error: {updateError} {retryCount > 0 && `(Retries: ${retryCount}/3)`}
-                  </div>
-                )}
+                <h4 style={{ margin: 0, color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>
+                  🛍️ Products ({shopifyProducts.length})
+                </h4>
+                <button
+                  onClick={() => fetchShopifyProducts()}
+                  disabled={productsLoading || !shopifyStore?.connected}
+                  style={{
+                    background: productsLoading ? 'rgba(255, 152, 0, 0.8)' : 'rgba(76, 175, 80, 0.8)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '9px',
+                    cursor: productsLoading ? 'not-allowed' : 'pointer',
+                    opacity: productsLoading || !shopifyStore?.connected ? 0.5 : 1,
+                    animation: productsLoading ? 'spin 1s linear infinite' : 'none'
+                  }}
+                >
+                  {productsLoading ? '🔄' : '🔄 Refresh'}
+                </button>
               </div>
 
               {/* Dynamic Search Bar */}
