@@ -3013,7 +3013,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   maxHeight: '400px',
                   overflowY: 'auto',
                   scrollbarWidth: 'thin',
-                  scrollbarColor: 'rgba(255,255,255,0.3) transparent'
+                  scrollbarColor: 'rgba(255,255,255,0.3) #1e293b'
                 }}
                 className="custom-scrollbar"
                 >
