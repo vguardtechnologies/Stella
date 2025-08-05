@@ -63,6 +63,10 @@ try {
   const facebookHandler = require('./api/facebook.js');
   app.use('/api/facebook', facebookHandler);
   console.log('✅ Facebook routes loaded');
+
+  const shopifyWhatsappHandler = require('./api/shopify-whatsapp/index.js');
+  app.use('/api/shopify-whatsapp', shopifyWhatsappHandler);
+  console.log('✅ Shopify-WhatsApp integration routes loaded');
   
 } catch (error) {
   console.log('⚠️ API routes error:', error.message);

@@ -116,6 +116,95 @@ router.get('/config-status', (req, res) => {
   });
 });
 
+// Get catalog ID for product messages
+router.get('/catalog-id', async (req, res) => {
+  try {
+    if (!whatsappConfig.isConfigured) {
+      return res.status(400).json({
+        success: false,
+        message: 'WhatsApp not configured'
+      });
+    }
+
+    // Check if we have a Shopify-synced catalog
+    const shopifyWhatsappSyncService = require('../../services/shopifyWhatsappSyncService');
+    const syncStatus = shopifyWhatsappSyncService.getSyncStatus();
+    
+    if (syncStatus.catalogId) {
+      return res.json({
+        success: true,
+        catalogId: syncStatus.catalogId,
+        source: 'shopify-integration',
+        message: 'Using Shopify-synced catalog'
+      });
+    }
+
+    // Fallback to discovering existing catalogs
+    try {
+      const businessResponse = await axios.get(
+        `https://graph.facebook.com/v18.0/${whatsappConfig.phoneNumberId}?fields=account_id`,
+        {
+          headers: {
+            'Authorization': `Bearer ${whatsappConfig.accessToken}`
+          }
+        }
+      );
+
+      const accountId = businessResponse.data.account_id;
+      
+      const catalogsResponse = await axios.get(
+        `https://graph.facebook.com/v18.0/${accountId}/product_catalogs`,
+        {
+          headers: {
+            'Authorization': `Bearer ${whatsappConfig.accessToken}`
+          }
+        }
+      );
+
+      const catalogs = catalogsResponse.data.data;
+      
+      if (catalogs && catalogs.length > 0) {
+        // Prefer Shopify catalog if available
+        const shopifyCatalog = catalogs.find(catalog => 
+          catalog.name && (
+            catalog.name.toLowerCase().includes('shopify') || 
+            catalog.name.toLowerCase().includes('stella')
+          )
+        );
+        
+        const catalogId = shopifyCatalog ? shopifyCatalog.id : catalogs[0].id;
+        
+        return res.json({
+          success: true,
+          catalogId: catalogId,
+          source: shopifyCatalog ? 'existing-shopify' : 'existing-generic',
+          message: `Using ${shopifyCatalog ? 'Shopify' : 'existing'} catalog`
+        });
+      } else {
+        return res.json({
+          success: false,
+          message: 'No product catalog found. Consider setting up Shopify-WhatsApp integration.',
+          suggestion: 'Use /api/shopify-whatsapp/setup-official-integration to create a catalog'
+        });
+      }
+    } catch (error) {
+      console.error('Error getting catalog:', error.response?.data || error.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to get catalog ID',
+        error: error.message
+      });
+    }
+  } catch (error) {
+    console.error('Catalog ID endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
 // Save WhatsApp configuration
 router.post('/configure', async (req, res) => {
   try {
@@ -299,10 +388,217 @@ router.post('/send-message', async (req, res) => {
         };
         break;
 
+      case 'interactive':
+        // Handle interactive messages (buttons, lists, etc.)
+        const { interactive } = req.body;
+        if (!interactive) {
+          return res.status(400).json({
+            success: false,
+            message: 'Interactive data is required for interactive messages'
+          });
+        }
+        messageData.interactive = interactive;
+        break;
+
+      case 'product':
+        // Handle single product messages
+        const { productData } = req.body;
+        if (!productData) {
+          return res.status(400).json({
+            success: false,
+            message: 'Product data is required for product messages'
+          });
+        }
+
+        // Get proper catalog ID from Shopify integration or existing catalogs
+        let actualCatalogId = productData.catalogId;
+        if (!actualCatalogId || actualCatalogId === 'default') {
+          try {
+            const shopifyWhatsappSyncService = require('../../services/shopifyWhatsappSyncService');
+            const syncStatus = shopifyWhatsappSyncService.getSyncStatus();
+            actualCatalogId = syncStatus.catalogId;
+            
+            if (!actualCatalogId) {
+              // Try to get from WhatsApp Business Manager
+              const businessResponse = await axios.get(
+                `https://graph.facebook.com/v18.0/${whatsappConfig.phoneNumberId}?fields=account_id`,
+                { headers: { 'Authorization': `Bearer ${whatsappConfig.accessToken}` } }
+              );
+              
+              const catalogsResponse = await axios.get(
+                `https://graph.facebook.com/v18.0/${businessResponse.data.account_id}/product_catalogs`,
+                { headers: { 'Authorization': `Bearer ${whatsappConfig.accessToken}` } }
+              );
+              
+              const catalogs = catalogsResponse.data.data;
+              if (catalogs && catalogs.length > 0) {
+                actualCatalogId = catalogs[0].id;
+              }
+            }
+          } catch (error) {
+            console.warn('Could not get catalog ID:', error.message);
+          }
+        }
+
+        if (!actualCatalogId) {
+          return res.status(400).json({
+            success: false,
+            message: 'No product catalog available. Please set up Shopify-WhatsApp integration first.',
+            suggestion: 'Use /api/shopify-whatsapp/setup-official-integration'
+          });
+        }
+
+        // Create interactive product message with buttons
+        messageData.type = 'interactive';
+        messageData.interactive = {
+          type: 'product',
+          body: {
+            text: productData.description || `Check out this product: ${productData.title}`
+          },
+          footer: {
+            text: productData.footer || 'Powered by SUSA'
+          },
+          action: {
+            catalog_id: actualCatalogId,
+            product_retailer_id: productData.id || productData.retailerId
+          }
+        };
+        break;
+
+      case 'product_list':
+        // Handle product catalog/list messages
+        const { products, catalogId: providedCatalogId, headerText, bodyText, footerText } = req.body;
+        if (!products || !Array.isArray(products) || products.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Products array is required for product list messages'
+          });
+        }
+
+        // Get proper catalog ID from Shopify integration or existing catalogs
+        let listCatalogId = providedCatalogId;
+        if (!listCatalogId || listCatalogId === 'default') {
+          try {
+            const shopifyWhatsappSyncService = require('../../services/shopifyWhatsappSyncService');
+            const syncStatus = shopifyWhatsappSyncService.getSyncStatus();
+            listCatalogId = syncStatus.catalogId;
+            
+            if (!listCatalogId) {
+              // Try to get from WhatsApp Business Manager
+              const businessResponse = await axios.get(
+                `https://graph.facebook.com/v18.0/${whatsappConfig.phoneNumberId}?fields=account_id`,
+                { headers: { 'Authorization': `Bearer ${whatsappConfig.accessToken}` } }
+              );
+              
+              const catalogsResponse = await axios.get(
+                `https://graph.facebook.com/v18.0/${businessResponse.data.account_id}/product_catalogs`,
+                { headers: { 'Authorization': `Bearer ${whatsappConfig.accessToken}` } }
+              );
+              
+              const catalogs = catalogsResponse.data.data;
+              if (catalogs && catalogs.length > 0) {
+                listCatalogId = catalogs[0].id;
+              }
+            }
+          } catch (error) {
+            console.warn('Could not get catalog ID for product list:', error.message);
+          }
+        }
+
+        if (!listCatalogId) {
+          return res.status(400).json({
+            success: false,
+            message: 'No product catalog available. Please set up Shopify-WhatsApp integration first.',
+            suggestion: 'Use /api/shopify-whatsapp/setup-official-integration'
+          });
+        }
+
+        messageData.type = 'interactive';
+        messageData.interactive = {
+          type: 'product_list',
+          header: headerText ? { type: 'text', text: headerText } : undefined,
+          body: {
+            text: bodyText || 'Here are some products you might like:'
+          },
+          footer: {
+            text: footerText || 'Powered by SUSA'
+          },
+          action: {
+            catalog_id: listCatalogId,
+            sections: [
+              {
+                title: 'Featured Products',
+                product_items: products.map(product => ({
+                  product_retailer_id: product.id || product.retailerId
+                }))
+              }
+            ]
+          }
+        };
+        break;
+
+      case 'button':
+        // Handle button messages
+        const { buttons, buttonText } = req.body;
+        if (!buttons || !Array.isArray(buttons) || buttons.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Buttons array is required for button messages'
+          });
+        }
+
+        messageData.type = 'interactive';
+        messageData.interactive = {
+          type: 'button',
+          body: {
+            text: buttonText || message || 'Please choose an option:'
+          },
+          action: {
+            buttons: buttons.map((btn, index) => ({
+              type: 'reply',
+              reply: {
+                id: btn.id || `btn_${index}`,
+                title: btn.title || btn.text
+              }
+            }))
+          }
+        };
+        break;
+
+      case 'list':
+        // Handle list messages
+        const { sections, listText, buttonTitle } = req.body;
+        if (!sections || !Array.isArray(sections) || sections.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Sections array is required for list messages'
+          });
+        }
+
+        messageData.type = 'interactive';
+        messageData.interactive = {
+          type: 'list',
+          body: {
+            text: listText || message || 'Please choose from the options below:'
+          },
+          action: {
+            button: buttonTitle || 'View Options',
+            sections: sections.map(section => ({
+              title: section.title,
+              rows: section.rows.map(row => ({
+                id: row.id,
+                title: row.title,
+                description: row.description
+              }))
+            }))
+          }
+        };
+        break;
+
       default:
         return res.status(400).json({
           success: false,
-          message: 'Unsupported message type. Supported types: text, image, video, audio, document'
+          message: 'Unsupported message type. Supported types: text, image, video, audio, document, interactive, product, product_list, button, list'
         });
     }
 

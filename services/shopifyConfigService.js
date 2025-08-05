@@ -24,26 +24,32 @@ class ShopifyConfigService {
       
       // Fallback to environment variables if no database config
       return {
-        storeName: process.env.VITE_SHOPIFY_STORE_NAME || '',
-        shopDomain: process.env.VITE_SHOPIFY_STORE_URL || '',
-        apiKey: process.env.VITE_SHOPIFY_API_KEY || '',
-        accessToken: process.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN || '',
-        storefrontAccessToken: process.env.VITE_SHOPIFY_STOREFRONT_ACCESS_TOKEN || '',
-        webhookUrl: process.env.VITE_SHOPIFY_WEBHOOK_URL || '',
-        isConfigured: !!(process.env.VITE_SHOPIFY_API_KEY && process.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN),
+        storeName: process.env.VITE_SHOPIFY_STORE_NAME || process.env.SHOPIFY_STORE_NAME || '',
+        shopDomain: process.env.VITE_SHOPIFY_STORE_URL || process.env.SHOPIFY_STORE_URL || '',
+        apiKey: process.env.VITE_SHOPIFY_API_KEY || process.env.SHOPIFY_API_KEY || '',
+        accessToken: process.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || '',
+        storefrontAccessToken: process.env.VITE_SHOPIFY_STOREFRONT_ACCESS_TOKEN || process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || '',
+        webhookUrl: process.env.VITE_SHOPIFY_WEBHOOK_URL || process.env.SHOPIFY_WEBHOOK_URL || '',
+        isConfigured: !!(
+          (process.env.VITE_SHOPIFY_API_KEY || process.env.SHOPIFY_API_KEY) && 
+          (process.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN)
+        ),
         lastConfigured: null
       };
     } catch (error) {
       console.error('Error getting Shopify config:', error);
       // Return environment variables as fallback
       return {
-        storeName: process.env.VITE_SHOPIFY_STORE_NAME || '',
-        shopDomain: process.env.VITE_SHOPIFY_STORE_URL || '',
-        apiKey: process.env.VITE_SHOPIFY_API_KEY || '',
-        accessToken: process.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN || '',
-        storefrontAccessToken: process.env.VITE_SHOPIFY_STOREFRONT_ACCESS_TOKEN || '',
-        webhookUrl: process.env.VITE_SHOPIFY_WEBHOOK_URL || '',
-        isConfigured: !!(process.env.VITE_SHOPIFY_API_KEY && process.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN),
+        storeName: process.env.VITE_SHOPIFY_STORE_NAME || process.env.SHOPIFY_STORE_NAME || '',
+        shopDomain: process.env.VITE_SHOPIFY_STORE_URL || process.env.SHOPIFY_STORE_URL || '',
+        apiKey: process.env.VITE_SHOPIFY_API_KEY || process.env.SHOPIFY_API_KEY || '',
+        accessToken: process.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || '',
+        storefrontAccessToken: process.env.VITE_SHOPIFY_STOREFRONT_ACCESS_TOKEN || process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || '',
+        webhookUrl: process.env.VITE_SHOPIFY_WEBHOOK_URL || process.env.SHOPIFY_WEBHOOK_URL || '',
+        isConfigured: !!(
+          (process.env.VITE_SHOPIFY_API_KEY || process.env.SHOPIFY_API_KEY) && 
+          (process.env.VITE_SHOPIFY_ADMIN_ACCESS_TOKEN || process.env.SHOPIFY_ADMIN_ACCESS_TOKEN)
+        ),
         lastConfigured: null
       };
     }

@@ -4,6 +4,7 @@ import ContactManager from './ContactManager';
 import ImageModal from './ImageModal';
 import WhatsAppTemplateManager from './WhatsAppTemplateManager';
 import MediaBrowser from './MediaBrowser';
+import ShopifyWhatsAppIntegration from './ShopifyWhatsAppIntegration';
 import { shopifyService } from '../services/shopifyService';
 import './ChatPage.css';
 
@@ -282,6 +283,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState('');
   const [modalImageCaption, setModalImageCaption] = useState('');
+
+  // Shopify WhatsApp Integration State
+  const [showShopifyWhatsAppIntegration, setShowShopifyWhatsAppIntegration] = useState(false);
 
   // Attachment Menu State
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
@@ -646,7 +650,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     });
   };
 
-  // Send product as WhatsApp message with product details
+  // Send product as WhatsApp message with proper product card support
   const sendProductInChat = async (product: any) => {
     if (!selectedConversation) {
       alert('Please select a conversation first');
@@ -673,7 +677,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     const comparePrice = variant?.compare_at_price && variant.compare_at_price !== variant.price 
       ? ` (was $${variant.compare_at_price} TTD)` : '';
     
-    const productMessage = `🛍️ *${product.title}*\n\n` +
+    const productDescription = `🛍️ *${product.title}*\n\n` +
       `💰 *Price:* ${price}${comparePrice}\n` +
       `📦 *Type:* ${product.product_type || 'General'}\n` +
       `🏢 *Brand:* ${product.vendor || 'SUSA'}\n` +
@@ -687,11 +691,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     // Add product card as a visual message in the chat (optimistic update)
     const newMessage: Message = {
       id: `product_${Date.now()}`,
-      text: productMessage,
+      text: productDescription,
       sender: 'agent',
       timestamp: new Date(),
       status: 'sending',
-      type: productImageUrl ? 'image' : 'product',
+      type: 'product',
       direction: 'outgoing',
       productData: product,
       media_url: productImageUrl
@@ -702,49 +706,159 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     try {
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
-      // Send as image with caption if product has image, otherwise send as text
-      const messagePayload = productImageUrl ? {
+      // Try to send as proper WhatsApp product message first
+      const productPayload = {
         to: phoneNumber.replace(/[^\d]/g, ''),
-        type: 'image',
-        mediaUrl: productImageUrl,
-        caption: productMessage
-      } : {
-        to: phoneNumber.replace(/[^\d]/g, ''),
-        message: productMessage,
-        type: 'text'
+        type: 'product',
+        productData: {
+          id: product.id || product.handle,
+          retailerId: product.handle || product.id,
+          title: product.title,
+          description: productDescription,
+          catalogId: 'susa_catalog', // You may need to set up a product catalog
+          footer: 'SUSA - Premium Quality Products'
+        }
       };
 
-      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+      const productResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(messagePayload),
+        body: JSON.stringify(productPayload),
       });
 
-      const result = await response.json();
+      const productResult = await productResponse.json();
       
-      if (result.success) {
-        console.log('✅ Product card sent successfully:', product.title, productImageUrl ? 'with image' : 'as text');
+      if (productResult.success) {
+        console.log('✅ Product card sent successfully as interactive product message:', product.title);
         
         // Update message status to sent
         setMessages(prev => prev.map(msg => 
           msg.id === newMessage.id ? { 
             ...msg, 
             status: 'sent',
-            whatsapp_message_id: result.messageId 
+            whatsapp_message_id: productResult.data.messageId 
           } : msg
         ));
       } else {
-        console.error('❌ Failed to send product card:', result.error);
+        console.warn('⚠️ Product message failed, falling back to image+caption:', productResult.message);
         
-        // Update message status to failed
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id ? { 
-            ...msg, 
-            status: 'failed'
-          } : msg
-        ));
+        // Fallback 1: Send as image with caption if product has image
+        if (productImageUrl) {
+          const imagePayload = {
+            to: phoneNumber.replace(/[^\d]/g, ''),
+            type: 'image',
+            mediaUrl: productImageUrl,
+            caption: productDescription
+          };
+
+          const imageResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(imagePayload),
+          });
+
+          const imageResult = await imageResponse.json();
+          
+          if (imageResult.success) {
+            console.log('✅ Product card sent successfully with image fallback:', product.title);
+            
+            // Update message status to sent
+            setMessages(prev => prev.map(msg => 
+              msg.id === newMessage.id ? { 
+                ...msg, 
+                status: 'sent',
+                whatsapp_message_id: imageResult.data.messageId 
+              } : msg
+            ));
+          } else {
+            console.warn('⚠️ Image fallback failed, using text fallback:', imageResult.message);
+            
+            // Fallback 2: Send as text-only message
+            const textPayload = {
+              to: phoneNumber.replace(/[^\d]/g, ''),
+              message: productDescription,
+              type: 'text'
+            };
+
+            const textResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(textPayload),
+            });
+
+            const textResult = await textResponse.json();
+            
+            if (textResult.success) {
+              console.log('✅ Product card sent successfully as text fallback:', product.title);
+              
+              // Update message to remove failed image URL and mark as sent
+              setMessages(prev => prev.map(msg => 
+                msg.id === newMessage.id ? { 
+                  ...msg, 
+                  media_url: undefined,
+                  status: 'sent',
+                  whatsapp_message_id: textResult.data.messageId 
+                } : msg
+              ));
+            } else {
+              console.error('❌ All fallbacks failed:', textResult.message);
+              
+              // Update message status to failed
+              setMessages(prev => prev.map(msg => 
+                msg.id === newMessage.id ? { 
+                  ...msg, 
+                  status: 'failed'
+                } : msg
+              ));
+            }
+          }
+        } else {
+          // No image available, send as text directly
+          const textPayload = {
+            to: phoneNumber.replace(/[^\d]/g, ''),
+            message: productDescription,
+            type: 'text'
+          };
+
+          const textResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(textPayload),
+          });
+
+          const textResult = await textResponse.json();
+          
+          if (textResult.success) {
+            console.log('✅ Product card sent successfully as text:', product.title);
+            
+            // Update message status to sent
+            setMessages(prev => prev.map(msg => 
+              msg.id === newMessage.id ? { 
+                ...msg, 
+                status: 'sent',
+                whatsapp_message_id: textResult.data.messageId 
+              } : msg
+            ));
+          } else {
+            console.error('❌ Failed to send product card as text:', textResult.message);
+            
+            // Update message status to failed
+            setMessages(prev => prev.map(msg => 
+              msg.id === newMessage.id ? { 
+                ...msg, 
+                status: 'failed'
+              } : msg
+            ));
+          }
+        }
       }
     } catch (error) {
       console.error('❌ Error sending product card:', error);
@@ -866,14 +980,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       sender: 'agent',
       timestamp: new Date(),
       status: 'sending',
-      type: productImageUrl ? 'image' : 'product',
+      type: 'product', // Always use product type for consistent UI formatting
       direction: 'outgoing',
       productData: {
         ...product,
         selectedOptions,
         selectedVariant
       },
-      media_url: productImageUrl
+      media_url: productImageUrl // Include image URL if available
     };
     
     setMessages(prev => [...prev, newMessage]);
@@ -881,49 +995,121 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     try {
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
-      // Send as image with caption if product has image, otherwise send as text
-      const messagePayload = productImageUrl ? {
-        to: phoneNumber.replace(/[^\d]/g, ''),
-        type: 'image',
-        mediaUrl: productImageUrl,
-        caption: productMessage
-      } : {
-        to: phoneNumber.replace(/[^\d]/g, ''),
-        message: productMessage,
-        type: 'text'
-      };
+      // First, try to send as image with caption if product has image
+      if (productImageUrl) {
+        const imagePayload = {
+          to: phoneNumber.replace(/[^\d]/g, ''),
+          type: 'image',
+          mediaUrl: productImageUrl,
+          caption: productMessage
+        };
 
-      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(messagePayload),
-      });
+        const imageResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(imagePayload),
+        });
 
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log('✅ Product variant card sent successfully:', product.title, productImageUrl ? 'with image' : 'as text');
+        const imageResult = await imageResponse.json();
         
-        // Update message status to sent
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id ? { 
-            ...msg, 
-            status: 'sent',
-            whatsapp_message_id: result.messageId 
-          } : msg
-        ));
+        if (imageResult.success) {
+          console.log('✅ Product variant card sent successfully with image:', product.title);
+          
+          // Update message status to sent with image
+          setMessages(prev => prev.map(msg => 
+            msg.id === newMessage.id ? { 
+              ...msg, 
+              status: 'sent',
+              whatsapp_message_id: imageResult.messageId 
+            } : msg
+          ));
+        } else {
+          console.warn('⚠️ Image send failed, falling back to text:', imageResult.error);
+          
+          // Fallback: Send as text-only message
+          const textPayload = {
+            to: phoneNumber.replace(/[^\d]/g, ''),
+            message: productMessage,
+            type: 'text'
+          };
+
+          const textResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(textPayload),
+          });
+
+          const textResult = await textResponse.json();
+          
+          if (textResult.success) {
+            console.log('✅ Product variant card sent successfully as text fallback:', product.title);
+            
+            // Update message to text type and mark as sent
+            setMessages(prev => prev.map(msg => 
+              msg.id === newMessage.id ? { 
+                ...msg, 
+                type: 'product', // Keep as product type for UI formatting
+                media_url: undefined, // Remove failed image URL
+                status: 'sent',
+                whatsapp_message_id: textResult.messageId 
+              } : msg
+            ));
+          } else {
+            console.error('❌ Text fallback also failed:', textResult.error);
+            
+            // Update message status to failed
+            setMessages(prev => prev.map(msg => 
+              msg.id === newMessage.id ? { 
+                ...msg, 
+                status: 'failed'
+              } : msg
+            ));
+          }
+        }
       } else {
-        console.error('❌ Failed to send product variant card:', result.error);
+        // No image available, send as text directly
+        const textPayload = {
+          to: phoneNumber.replace(/[^\d]/g, ''),
+          message: productMessage,
+          type: 'text'
+        };
+
+        const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(textPayload),
+        });
+
+        const result = await response.json();
         
-        // Update message status to failed
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id ? { 
-            ...msg, 
-            status: 'failed'
-          } : msg
-        ));
+        if (result.success) {
+          console.log('✅ Product variant card sent successfully as text:', product.title);
+          
+          // Update message status to sent
+          setMessages(prev => prev.map(msg => 
+            msg.id === newMessage.id ? { 
+              ...msg, 
+              status: 'sent',
+              whatsapp_message_id: result.messageId 
+            } : msg
+          ));
+        } else {
+          console.error('❌ Failed to send product variant card:', result.error);
+          
+          // Update message status to failed
+          setMessages(prev => prev.map(msg => 
+            msg.id === newMessage.id ? { 
+              ...msg, 
+              status: 'failed'
+            } : msg
+          ));
+        }
       }
     } catch (error) {
       console.error('❌ Error sending product variant card:', error);
@@ -2512,6 +2698,25 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       }}
                     >
                       📝 Templates
+                    </button>
+                    <button 
+                      className="action-btn" 
+                      onClick={() => setShowShopifyWhatsAppIntegration(true)}
+                      style={{
+                        backgroundColor: '#128C7E',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginLeft: '8px'
+                      }}
+                    >
+                      🛒📱 Shopify + WhatsApp
                     </button>
                   </div>
                 </div>
@@ -4344,6 +4549,17 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         <MediaBrowser
           onClose={() => setShowMediaBrowser(false)}
           onSelectMedia={handleMediaFromBrowser}
+        />
+      )}
+
+      {/* Shopify WhatsApp Integration */}
+      {showShopifyWhatsAppIntegration && (
+        <ShopifyWhatsAppIntegration
+          onClose={() => setShowShopifyWhatsAppIntegration(false)}
+          onSuccess={(result) => {
+            console.log('✅ Shopify WhatsApp integration setup complete:', result);
+            // Optionally refresh product data or show success message
+          }}
         />
       )}
     </div>
