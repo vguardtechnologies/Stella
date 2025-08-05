@@ -1521,13 +1521,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     fetchShopName();
 
-    // Retry fetching shop name every 10 seconds if it's still loading or empty
+    // Only retry if we don't have a shop name AND we're not currently loading
     const retryInterval = setInterval(() => {
-      if (shopNameLoading || !actualShopName) {
+      if (!actualShopName && !shopNameLoading) {
         console.log('🔄 Retrying shop name fetch...');
         fetchShopName();
-      } else {
-        clearInterval(retryInterval);
       }
     }, 10000);
 
@@ -1552,6 +1550,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       clearInterval(retryInterval);
     };
   }, []);
+
+  // Clear retry behavior when shop name is successfully fetched  
+  useEffect(() => {
+    if (actualShopName) {
+      setShopNameLoading(false);
+      console.log('✅ Shop name loaded, stopping retry:', actualShopName);
+    }
+  }, [actualShopName]);
 
   // Fetch Shopify products when component mounts or when database configuration changes
   useEffect(() => {
