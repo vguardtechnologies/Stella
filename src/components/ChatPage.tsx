@@ -681,6 +681,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       `${product.body_html ? product.body_html.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : 'Premium quality product from our collection.'}\n\n` +
       `🔗 Product ID: ${product.handle || product.id}`;
 
+    // Get product image URL (use first image if available)
+    const productImageUrl = product.images?.[0]?.src || product.image?.src;
+
     // Add product card as a visual message in the chat (optimistic update)
     const newMessage: Message = {
       id: `product_${Date.now()}`,
@@ -688,32 +691,41 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       sender: 'agent',
       timestamp: new Date(),
       status: 'sending',
-      type: 'product',
+      type: productImageUrl ? 'image' : 'product',
       direction: 'outgoing',
-      productData: product
+      productData: product,
+      media_url: productImageUrl
     };
     
     setMessages(prev => [...prev, newMessage]);
 
     try {
-      // Send the product message via WhatsApp API
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      
+      // Send as image with caption if product has image, otherwise send as text
+      const messagePayload = productImageUrl ? {
+        to: phoneNumber.replace(/[^\d]/g, ''),
+        type: 'image',
+        mediaUrl: productImageUrl,
+        caption: productMessage
+      } : {
+        to: phoneNumber.replace(/[^\d]/g, ''),
+        message: productMessage,
+        type: 'text'
+      };
+
       const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          to: phoneNumber.replace(/[^\d]/g, ''),
-          message: productMessage,
-          type: 'text'
-        }),
+        body: JSON.stringify(messagePayload),
       });
 
       const result = await response.json();
       
       if (result.success) {
-        console.log('✅ Product message sent successfully:', product.title);
+        console.log('✅ Product card sent successfully:', product.title, productImageUrl ? 'with image' : 'as text');
         
         // Update message status to sent
         setMessages(prev => prev.map(msg => 
@@ -724,7 +736,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           } : msg
         ));
       } else {
-        console.error('❌ Failed to send product message:', result.error);
+        console.error('❌ Failed to send product card:', result.error);
         
         // Update message status to failed
         setMessages(prev => prev.map(msg => 
@@ -735,7 +747,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         ));
       }
     } catch (error) {
-      console.error('❌ Error sending product message:', error);
+      console.error('❌ Error sending product card:', error);
       
       // Update message status to failed
       setMessages(prev => prev.map(msg => 
@@ -844,6 +856,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       `${product.body_html ? product.body_html.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : 'Premium quality product from our collection.'}\n\n` +
       `🔗 Product ID: ${product.handle || product.id}`;
 
+    // Get product image URL (use first image if available)
+    const productImageUrl = product.images?.[0]?.src || product.image?.src;
+
     // Add product card with selected options as a visual message in the chat (optimistic update)
     const newMessage: Message = {
       id: `product_variant_${Date.now()}`,
@@ -851,36 +866,45 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       sender: 'agent',
       timestamp: new Date(),
       status: 'sending',
-      type: 'product',
+      type: productImageUrl ? 'image' : 'product',
       direction: 'outgoing',
       productData: {
         ...product,
         selectedOptions,
         selectedVariant
-      }
+      },
+      media_url: productImageUrl
     };
     
     setMessages(prev => [...prev, newMessage]);
 
     try {
-      // Send the product message via WhatsApp API
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      
+      // Send as image with caption if product has image, otherwise send as text
+      const messagePayload = productImageUrl ? {
+        to: phoneNumber.replace(/[^\d]/g, ''),
+        type: 'image',
+        mediaUrl: productImageUrl,
+        caption: productMessage
+      } : {
+        to: phoneNumber.replace(/[^\d]/g, ''),
+        message: productMessage,
+        type: 'text'
+      };
+
       const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          to: phoneNumber.replace(/[^\d]/g, ''),
-          message: productMessage,
-          type: 'text'
-        }),
+        body: JSON.stringify(messagePayload),
       });
 
       const result = await response.json();
       
       if (result.success) {
-        console.log('✅ Product variant message sent successfully:', product.title);
+        console.log('✅ Product variant card sent successfully:', product.title, productImageUrl ? 'with image' : 'as text');
         
         // Update message status to sent
         setMessages(prev => prev.map(msg => 
@@ -891,7 +915,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           } : msg
         ));
       } else {
-        console.error('❌ Failed to send product variant message:', result.error);
+        console.error('❌ Failed to send product variant card:', result.error);
         
         // Update message status to failed
         setMessages(prev => prev.map(msg => 
@@ -902,7 +926,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         ));
       }
     } catch (error) {
-      console.error('❌ Error sending product variant message:', error);
+      console.error('❌ Error sending product variant card:', error);
       
       // Update message status to failed
       setMessages(prev => prev.map(msg => 
