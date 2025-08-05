@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { shopifyService } from '../services/shopifyService';
+import ShopifyWhatsAppIntegration from './ShopifyWhatsAppIntegration';
 import './ShopifyIntegration.css';
 
 interface ShopifyIntegrationProps {
@@ -34,6 +35,7 @@ const ShopifyIntegration: React.FC<ShopifyIntegrationProps> = ({ onClose, onStor
     totalRevenue: 0
   });
   const [dataLoading, setDataLoading] = useState(false);
+  const [showWhatsAppIntegration, setShowWhatsAppIntegration] = useState(false);
 
   useEffect(() => {
     // Check for existing Shopify connection
@@ -380,6 +382,12 @@ const ShopifyIntegration: React.FC<ShopifyIntegrationProps> = ({ onClose, onStor
                 >
                   📋 Orders
                 </button>
+                <button
+                  className={`tab-button ${activeTab === 'whatsapp' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('whatsapp')}
+                >
+                  📱 WhatsApp
+                </button>
               </div>
 
               <div className="tab-content">
@@ -460,11 +468,130 @@ const ShopifyIntegration: React.FC<ShopifyIntegrationProps> = ({ onClose, onStor
                     )}
                   </div>
                 )}
+
+                {activeTab === 'whatsapp' && (
+                  <div className="whatsapp-integration-content">
+                    <div style={{ 
+                      background: '#f8f9fa', 
+                      border: '1px solid #e3f2fd', 
+                      borderRadius: '8px', 
+                      padding: '20px', 
+                      marginBottom: '20px' 
+                    }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: '#1976d2', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🛒📱 Shopify + WhatsApp Integration
+                      </h4>
+                      <p style={{ margin: '0 0 16px 0', color: '#666', lineHeight: 1.5 }}>
+                        Connect your Shopify store with WhatsApp to enable product catalogs, automated messages, and seamless customer communication.
+                      </p>
+                      
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => setShowWhatsAppIntegration(true)}
+                          style={{
+                            backgroundColor: '#128C7E',
+                            color: 'white',
+                            border: 'none',
+                            padding: '12px 24px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          ⚙️ Setup WhatsApp Integration
+                        </button>
+                        
+                        <button
+                          onClick={async () => {
+                            try {
+                              const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+                              const response = await fetch(`${baseUrl}/api/shopify-whatsapp/sync-products`, {
+                                method: 'POST'
+                              });
+                              const result = await response.json();
+                              if (result.success) {
+                                alert(`✅ Successfully synced ${result.data.syncedCount} products to WhatsApp catalog!`);
+                              } else {
+                                alert(`❌ Sync failed: ${result.message}`);
+                              }
+                            } catch (error) {
+                              alert('❌ Error syncing products');
+                              console.error('Sync error:', error);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: '#0084ff',
+                            color: 'white',
+                            border: 'none',
+                            padding: '12px 24px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          🔄 Sync Products to WhatsApp
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      background: '#fff3cd', 
+                      border: '1px solid #ffecb5', 
+                      borderRadius: '8px', 
+                      padding: '16px',
+                      marginBottom: '20px'
+                    }}>
+                      <h5 style={{ margin: '0 0 8px 0', color: '#856404' }}>✨ Integration Features</h5>
+                      <ul style={{ margin: '0', paddingLeft: '20px', color: '#856404' }}>
+                        <li>Product catalog sync with TTD pricing</li>
+                        <li>Interactive product cards in WhatsApp</li>
+                        <li>Automated order notifications</li>
+                        <li>Customer support integration</li>
+                        <li>Real-time inventory updates</li>
+                      </ul>
+                    </div>
+
+                    <div style={{ 
+                      background: '#d1ecf1', 
+                      border: '1px solid #bee5eb', 
+                      borderRadius: '8px', 
+                      padding: '16px' 
+                    }}>
+                      <h5 style={{ margin: '0 0 8px 0', color: '#0c5460' }}>📋 Setup Status</h5>
+                      <div style={{ color: '#0c5460' }}>
+                        <p style={{ margin: '4px 0' }}>• Shopify Connection: {isConnected ? '✅ Connected' : '❌ Not Connected'}</p>
+                        <p style={{ margin: '4px 0' }}>• WhatsApp Business API: ✅ Active</p>
+                        <p style={{ margin: '4px 0' }}>• Product Catalog: 🔄 Ready for Sync</p>
+                        <p style={{ margin: '4px 0' }}>• Currency Support: 🇹🇹 TTD Configured</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Shopify WhatsApp Integration Modal */}
+      {showWhatsAppIntegration && (
+        <ShopifyWhatsAppIntegration
+          onClose={() => setShowWhatsAppIntegration(false)}
+          onSuccess={(result) => {
+            console.log('✅ Shopify WhatsApp integration setup complete:', result);
+            setShowWhatsAppIntegration(false);
+            // Optionally refresh integration status here
+          }}
+        />
+      )}
     </div>
   );
 };

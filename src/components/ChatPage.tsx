@@ -4,7 +4,6 @@ import ContactManager from './ContactManager';
 import ImageModal from './ImageModal';
 import WhatsAppTemplateManager from './WhatsAppTemplateManager';
 import MediaBrowser from './MediaBrowser';
-import ShopifyWhatsAppIntegration from './ShopifyWhatsAppIntegration';
 import { shopifyService } from '../services/shopifyService';
 import './ChatPage.css';
 
@@ -283,9 +282,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState('');
   const [modalImageCaption, setModalImageCaption] = useState('');
-
-  // Shopify WhatsApp Integration State
-  const [showShopifyWhatsAppIntegration, setShowShopifyWhatsAppIntegration] = useState(false);
 
   // Attachment Menu State
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
@@ -680,7 +676,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     const productDescription = `🛍️ *${product.title}*\n\n` +
       `💰 *Price:* ${price}${comparePrice}\n` +
       `📦 *Type:* ${product.product_type || 'General'}\n` +
-      `🏢 *Brand:* ${product.vendor || 'SUSA'}\n` +
+      `🏢 *Brand:* ${product.vendor || 'SUSA SHAPEWEAR'}\n` +
       `📋 *Status:* ${product.status === 'active' ? '✅ Available' : '❌ Not Available'}\n\n` +
       `${product.body_html ? product.body_html.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : 'Premium quality product from our collection.'}\n\n` +
       `🔗 Product ID: ${product.handle || product.id}`;
@@ -706,17 +702,19 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     try {
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
-      // Try to send as proper WhatsApp product message first
+      // Try to send as proper WhatsApp interactive product message first
       const productPayload = {
         to: phoneNumber.replace(/[^\d]/g, ''),
-        type: 'product',
-        productData: {
-          id: product.id || product.handle,
-          retailerId: product.handle || product.id,
-          title: product.title,
-          description: productDescription,
-          catalogId: 'susa_catalog', // You may need to set up a product catalog
-          footer: 'SUSA - Premium Quality Products'
+        type: 'interactive',
+        interactive: {
+          type: 'product',
+          body: {
+            text: `Check out this amazing product from SUSA SHAPEWEAR! 💫`
+          },
+          action: {
+            catalog_id: '923378196624516', // Our synced catalog ID
+            product_retailer_id: product.id.toString() // Use Shopify product ID
+          }
         }
       };
 
@@ -742,7 +740,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           } : msg
         ));
       } else {
-        console.warn('⚠️ Product message failed, falling back to image+caption:', productResult.message);
+        console.warn('⚠️ Interactive product message failed, falling back to image+caption:', productResult.message);
         
         // Fallback 1: Send as image with caption if product has image
         if (productImageUrl) {
@@ -965,7 +963,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       `✅ *Selected Options:* ${optionsText}\n` +
       `💰 *Price:* ${price}${comparePrice}\n` +
       `📦 *Type:* ${product.product_type || 'General'}\n` +
-      `🏢 *Brand:* ${product.vendor || 'SUSA'}\n` +
+      `🏢 *Brand:* ${product.vendor || 'SUSA SHAPEWEAR'}\n` +
       `📋 *Availability:* ${selectedVariant?.inventory_quantity > 0 ? `✅ In Stock (${selectedVariant.inventory_quantity})` : '❌ Out of Stock'}\n\n` +
       `${product.body_html ? product.body_html.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : 'Premium quality product from our collection.'}\n\n` +
       `🔗 Product ID: ${product.handle || product.id}`;
@@ -995,7 +993,64 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     try {
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
-      // First, try to send as image with caption if product has image
+      // Try to send as proper WhatsApp interactive product message first
+      const productPayload = {
+        to: phoneNumber.replace(/[^\d]/g, ''),
+        type: 'interactive',
+        interactive: {
+          type: 'product',
+          body: {
+            text: `Check out this specific variant from SUSA SHAPEWEAR! 💫\n\n*Selected:* ${optionsText}`
+          },
+          action: {
+            catalog_id: '923378196624516', // Our synced catalog ID
+            product_retailer_id: product.id.toString() // Use main Shopify product ID
+          }
+        }
+      };
+
+      const productResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productPayload),
+      });
+
+      const productResult = await productResponse.json();
+      
+      if (productResult.success) {
+        console.log('✅ Product variant card sent successfully as interactive product message:', product.title);
+        
+        // Send additional variant details as a follow-up text message
+        const variantDetailsPayload = {
+          to: phoneNumber.replace(/[^\d]/g, ''),
+          message: `*Specific Variant Details:*\n• ${optionsText}\n• Price: ${price}${comparePrice}\n• Stock: ${selectedVariant?.inventory_quantity > 0 ? `${selectedVariant.inventory_quantity} available` : 'Out of stock'}\n• SKU: ${selectedVariant?.sku || 'N/A'}`,
+          type: 'text'
+        };
+
+        await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(variantDetailsPayload),
+        });
+        
+        // Update message status to sent
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id ? { 
+            ...msg, 
+            status: 'sent',
+            whatsapp_message_id: productResult.data.messageId 
+          } : msg
+        ));
+        return;
+      } else {
+        console.warn('⚠️ Interactive product message failed, falling back to image+caption:', productResult.message);
+      }
+      
+      // Fallback 1: First, try to send as image with caption if product has image
       if (productImageUrl) {
         const imagePayload = {
           to: phoneNumber.replace(/[^\d]/g, ''),
@@ -2698,25 +2753,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       }}
                     >
                       📝 Templates
-                    </button>
-                    <button 
-                      className="action-btn" 
-                      onClick={() => setShowShopifyWhatsAppIntegration(true)}
-                      style={{
-                        backgroundColor: '#128C7E',
-                        color: 'white',
-                        border: 'none',
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginLeft: '8px'
-                      }}
-                    >
-                      🛒📱 Shopify + WhatsApp
                     </button>
                   </div>
                 </div>
@@ -4552,16 +4588,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         />
       )}
 
-      {/* Shopify WhatsApp Integration */}
-      {showShopifyWhatsAppIntegration && (
-        <ShopifyWhatsAppIntegration
-          onClose={() => setShowShopifyWhatsAppIntegration(false)}
-          onSuccess={(result) => {
-            console.log('✅ Shopify WhatsApp integration setup complete:', result);
-            // Optionally refresh product data or show success message
-          }}
-        />
-      )}
     </div>
   );
 };
