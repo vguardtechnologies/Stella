@@ -705,7 +705,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         },
         body: JSON.stringify({
           to: phoneNumber.replace(/[^\d]/g, ''),
-          text: productMessage,
+          message: productMessage,
           type: 'text'
         }),
       });
@@ -872,7 +872,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         },
         body: JSON.stringify({
           to: phoneNumber.replace(/[^\d]/g, ''),
-          text: productMessage,
+          message: productMessage,
           type: 'text'
         }),
       });
