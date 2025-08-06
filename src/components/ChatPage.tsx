@@ -4592,11 +4592,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 </div>
               )}
             </div>
-            
-            {/* Third Section */}
-            <div className="shopify-section" style={{ padding: '10px', border: '1px dashed #ccc', margin: '10px 0', borderRadius: '4px' }}>
-              <p style={{ color: '#666', textAlign: 'center', margin: '20px 0' }}>Section 3 - Ready for content</p>
-            </div>
           </div>
         </div>
       </div>
