@@ -1232,33 +1232,121 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   };
 
   // Cart management functions
+  // Helper function to check if all required options are selected for a product
+  const areAllOptionsSelected = (product: any): { isValid: boolean; missingOptions: string[] } => {
+    // If product has no options, no validation needed
+    if (!product.options || product.options.length === 0) {
+      return { isValid: true, missingOptions: [] };
+    }
+
+    // Get selected options for this product
+    const selectedOptions = selectedVariants[product.id] || {};
+    const requiredOptions = product.options.map((option: any) => option.name);
+    const missingOptions: string[] = [];
+
+    // Check each required option
+    for (const optionName of requiredOptions) {
+      if (!selectedOptions[optionName]) {
+        missingOptions.push(optionName);
+      }
+    }
+
+    return {
+      isValid: missingOptions.length === 0,
+      missingOptions
+    };
+  };
+
   const addToShopifyCart = (product: any, quantity: number = 1) => {
-    const existingItem = cartItems.find(item => item.id === product.id);
+    // Validate that all required options are selected
+    const optionValidation = areAllOptionsSelected(product);
+    
+    if (!optionValidation.isValid) {
+      // Show error message indicating which options need to be selected
+      const missingOptionsText = optionValidation.missingOptions.join(', ');
+      const errorMessage = `Please select all required options: ${missingOptionsText}`;
+      
+      setCartNotification(errorMessage);
+      
+      // Clear notification after 5 seconds (longer for error messages)
+      setTimeout(() => setCartNotification(''), 5000);
+      
+      console.warn(`❌ Cannot add to cart - Missing options: ${missingOptionsText}`);
+      return;
+    }
+
+    // Get the selected variant based on options
+    let selectedVariant = product.variants?.[0]; // Default to first variant
+    const selectedOptions = selectedVariants[product.id] || {};
+    
+    if (Object.keys(selectedOptions).length > 0 && product.variants) {
+      selectedVariant = product.variants.find((variant: any) => {
+        return Object.entries(selectedOptions).every(([, optionValue]) => {
+          return variant.option1?.toLowerCase() === optionValue.toLowerCase() ||
+                 variant.option2?.toLowerCase() === optionValue.toLowerCase() ||
+                 variant.option3?.toLowerCase() === optionValue.toLowerCase();
+        });
+      }) || product.variants[0];
+    }
+
+    // Check if selected variant is in stock
+    if (selectedVariant && selectedVariant.inventory_quantity <= 0) {
+      setCartNotification(`Selected variant is out of stock`);
+      setTimeout(() => setCartNotification(''), 5000);
+      console.warn(`❌ Cannot add to cart - Selected variant out of stock`);
+      return;
+    }
+
+    // Create a unique cart item ID that includes selected options
+    const optionsHash = Object.entries(selectedOptions).sort().map(([k,v]) => `${k}:${v}`).join('|');
+    const uniqueCartItemId = `cart_${product.id}_${optionsHash}_${Date.now()}`;
+    
+    // Check if exact same product with same options already exists in cart
+    const existingItem = cartItems.find(item => {
+      if (item.id !== product.id) return false;
+      
+      // Compare selected options
+      const itemOptions = item.selectedOptions || {};
+      const currentOptions = selectedOptions;
+      
+      const itemOptionsStr = Object.entries(itemOptions).sort().map(([k,v]) => `${k}:${v}`).join('|');
+      const currentOptionsStr = Object.entries(currentOptions).sort().map(([k,v]) => `${k}:${v}`).join('|');
+      
+      return itemOptionsStr === currentOptionsStr;
+    });
     
     if (existingItem) {
-      // Update quantity if item already exists
+      // Update quantity if item with same options already exists
       setCartItems(prev => prev.map(item => 
-        item.id === product.id 
+        item.cartItemId === existingItem.cartItemId 
           ? { ...item, quantity: item.quantity + quantity }
           : item
       ));
-      setCartNotification(`Updated ${product.title} quantity in cart`);
+      const optionsText = Object.entries(selectedOptions).map(([key, value]) => `${key}: ${value}`).join(', ');
+      setCartNotification(`Updated ${product.title} ${optionsText ? `(${optionsText})` : ''} quantity in cart`);
     } else {
-      // Add new item to cart
+      // Add new item to cart with selected options
       const cartItem = {
         ...product,
         quantity,
-        cartItemId: `cart_${product.id}_${Date.now()}`,
-        addedAt: new Date()
+        cartItemId: uniqueCartItemId,
+        addedAt: new Date(),
+        selectedOptions: selectedOptions,
+        selectedVariant: selectedVariant,
+        displayPrice: selectedVariant?.price || product.variants?.[0]?.price || '0.00'
       };
       setCartItems(prev => [...prev, cartItem]);
-      setCartNotification(`Added ${product.title} to cart`);
+      
+      const optionsText = Object.entries(selectedOptions).map(([key, value]) => `${key}: ${value}`).join(', ');
+      const displayText = optionsText ? `${product.title} (${optionsText})` : product.title;
+      setCartNotification(`Added ${displayText} to cart`);
     }
     
     // Clear notification after 3 seconds
     setTimeout(() => setCartNotification(''), 3000);
     
-    console.log(`✅ Added to cart: ${product.title} (${quantity}x)`);
+    const optionsText = Object.entries(selectedOptions).map(([key, value]) => `${key}: ${value}`).join(', ');
+    console.log(`✅ Added to cart: ${product.title} ${optionsText ? `(${optionsText})` : ''} (${quantity}x)`);
   };
 
   const removeFromCart = (cartItemId: string) => {
@@ -3334,21 +3422,49 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                 <div style={{ display: 'flex', gap: '3px', flexDirection: 'column' }}>
                                   <button
                                     onClick={() => addToShopifyCart(product, 1)}
-                                    disabled={!isAvailable}
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px',
-                                      fontSize: '10px',
-                                      backgroundColor: isAvailable ? '#4CAF50' : '#ccc',
-                                      color: 'white',
-                                      border: 'none',
-                                      borderRadius: '3px',
-                                      cursor: isAvailable ? 'pointer' : 'not-allowed',
-                                      transition: 'background-color 0.2s',
-                                      fontWeight: 'bold'
-                                    }}
+                                    disabled={(() => {
+                                      // Check if all required options are selected
+                                      const optionValidation = areAllOptionsSelected(product);
+                                      return !isAvailable || !optionValidation.isValid;
+                                    })()}
+                                    style={(() => {
+                                      // Check if all required options are selected
+                                      const optionValidation = areAllOptionsSelected(product);
+                                      const canAddToCart = isAvailable && optionValidation.isValid;
+                                      
+                                      let buttonColor = '#4CAF50';
+                                      if (!isAvailable) {
+                                        buttonColor = '#ccc';
+                                      } else if (!optionValidation.isValid) {
+                                        buttonColor = '#FF9800'; // Orange for missing options
+                                      }
+                                      
+                                      return {
+                                        width: '100%',
+                                        padding: '6px',
+                                        fontSize: '10px',
+                                        backgroundColor: buttonColor,
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '3px',
+                                        cursor: canAddToCart ? 'pointer' : 'not-allowed',
+                                        transition: 'background-color 0.2s',
+                                        fontWeight: 'bold'
+                                      };
+                                    })()}
+                                    title={(() => {
+                                      const optionValidation = areAllOptionsSelected(product);
+                                      if (!isAvailable) return 'Product unavailable';
+                                      if (!optionValidation.isValid) return `Please select: ${optionValidation.missingOptions.join(', ')}`;
+                                      return 'Add to cart';
+                                    })()}
                                   >
-                                    {isAvailable ? '🛒 Add to Cart' : '❌ Unavailable'}
+                                    {(() => {
+                                      const optionValidation = areAllOptionsSelected(product);
+                                      if (!isAvailable) return '❌ Unavailable';
+                                      if (!optionValidation.isValid) return `⚠️ Select ${optionValidation.missingOptions.join(', ')}`;
+                                      return '🛒 Add to Cart';
+                                    })()}
                                   </button>
                                   
                                   <button
@@ -4596,27 +4712,59 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         <div style={{ display: 'flex', gap: '2px', flexDirection: 'column' }}>
                           <button
                             onClick={() => addToShopifyCart(product, 1)}
-                            disabled={!isAvailable}
-                            style={{
-                              width: '100%',
-                              padding: '4px',
-                              fontSize: '8px',
-                              backgroundColor: isAvailable ? '#4CAF50' : '#ccc',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '3px',
-                              cursor: isAvailable ? 'pointer' : 'not-allowed',
-                              transition: 'background-color 0.2s',
-                              fontWeight: 'bold'
-                            }}
+                            disabled={(() => {
+                              // Check if all required options are selected
+                              const optionValidation = areAllOptionsSelected(product);
+                              return !isAvailable || !optionValidation.isValid;
+                            })()}
+                            style={(() => {
+                              // Check if all required options are selected
+                              const optionValidation = areAllOptionsSelected(product);
+                              const canAddToCart = isAvailable && optionValidation.isValid;
+                              
+                              let buttonColor = '#4CAF50';
+                              if (!isAvailable) {
+                                buttonColor = '#ccc';
+                              } else if (!optionValidation.isValid) {
+                                buttonColor = '#FF9800'; // Orange for missing options
+                              }
+                              
+                              return {
+                                width: '100%',
+                                padding: '4px',
+                                fontSize: '8px',
+                                backgroundColor: buttonColor,
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '3px',
+                                cursor: canAddToCart ? 'pointer' : 'not-allowed',
+                                transition: 'background-color 0.2s',
+                                fontWeight: 'bold'
+                              };
+                            })()}
                             onMouseEnter={(e) => {
-                              if (isAvailable) e.currentTarget.style.backgroundColor = '#45a049';
+                              const optionValidation = areAllOptionsSelected(product);
+                              const canAddToCart = isAvailable && optionValidation.isValid;
+                              if (canAddToCart) e.currentTarget.style.backgroundColor = '#45a049';
                             }}
                             onMouseLeave={(e) => {
-                              if (isAvailable) e.currentTarget.style.backgroundColor = '#4CAF50';
+                              const optionValidation = areAllOptionsSelected(product);
+                              const canAddToCart = isAvailable && optionValidation.isValid;
+                              if (canAddToCart) e.currentTarget.style.backgroundColor = '#4CAF50';
                             }}
+                            title={(() => {
+                              const optionValidation = areAllOptionsSelected(product);
+                              if (!isAvailable) return 'Product unavailable';
+                              if (!optionValidation.isValid) return `Please select: ${optionValidation.missingOptions.join(', ')}`;
+                              return 'Add to cart';
+                            })()}
                           >
-                            {isAvailable ? '🛒 Add to Cart' : '❌ Unavailable'}
+                            {(() => {
+                              const optionValidation = areAllOptionsSelected(product);
+                              if (!isAvailable) return '❌ Unavailable';
+                              if (!optionValidation.isValid) return `⚠️ Select ${optionValidation.missingOptions.join(', ')}`;
+                              return '🛒 Add to Cart';
+                            })()}
                           </button>
                           
                           <button
