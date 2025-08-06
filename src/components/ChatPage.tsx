@@ -4209,21 +4209,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
           {/* E-commerce Integration Panel */}
           <div className="shopify-panel">
-            <div style={{ padding: '4px 8px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
+            <div style={{ padding: '6px 12px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
+              <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: '#333' }}>
                 🛒 {shopNameLoading ? 'Loading store...' : (actualShopName || 'E-commerce Store')}
-                {isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#22c55e', fontWeight: 'normal' }}>● Connected</span>}
-                {!isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 'normal' }}>● Demo Mode</span>}
+                {isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#22c55e', fontWeight: 'normal' }}>● Connected</span>}
+                {!isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#ef4444', fontWeight: 'normal' }}>● Demo Mode</span>}
               </h3>
             </div>
             
             {/* First Section - Products */}
-            <div className="shopify-section" style={{ padding: '10px', border: '1px solid #334155', margin: '10px 0', borderRadius: '8px', backgroundColor: '#1e293b' }}>
+            <div className="shopify-section" style={{ padding: '8px', border: '1px solid #334155', margin: '8px 0', borderRadius: '8px', backgroundColor: '#1e293b' }}>
               {/* Products Header */}
-              <div style={{ marginBottom: '8px' }}>
-                <h4 style={{ margin: 0, color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>
+              <div style={{ marginBottom: '6px' }}>
+                <h4 style={{ margin: 0, color: '#ffffff', fontSize: '12px', fontWeight: 'bold' }}>
                   🛍️ Products ({shopifyProducts.length})
-                  {!isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#fbbf24', fontWeight: 'normal' }}>(Demo Products)</span>}
+                  {!isShopifyConfigured && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#fbbf24', fontWeight: 'normal' }}>(Demo Products)</span>}
                 </h4>
               </div>
 
@@ -4236,14 +4236,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   onChange={(e) => setProductSearchQuery(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '4px 8px',
+                    padding: '3px 8px',
                     border: '1px solid #ddd',
                     borderRadius: '4px',
-                    fontSize: '11px',
+                    fontSize: '10px',
                     outline: 'none',
                     backgroundColor: 'white',
                     boxSizing: 'border-box',
-                    height: '28px'
+                    height: '24px'
                   }}
                 />
                 
@@ -4685,12 +4685,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             </div>
             
             {/* Second Section - Cart */}
-            <div className="shopify-section" style={{ padding: '10px', border: '1px solid #ddd', margin: '10px 0', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h4 style={{ margin: '0', fontSize: '14px', color: '#333' }}>
+            <div className="shopify-section" style={{ padding: '8px', border: '1px solid #ddd', margin: '8px 0', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h4 style={{ margin: '0', fontSize: '12px', color: '#333' }}>
                   🛒 Cart ({cartItems.length} item{cartItems.length !== 1 ? 's' : ''})
                 </h4>
-                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#4CAF50' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#4CAF50' }}>
                   Total: ${cartTotal.toFixed(2)}
                 </div>
               </div>

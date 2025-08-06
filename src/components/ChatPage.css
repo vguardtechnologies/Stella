@@ -72,16 +72,21 @@
   background: rgba(249, 168, 212, 0.2);
   border: 1px solid var(--glass-border);
   color: var(--accent-purple);
-  width: 35px;
-  height: 35px;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
   border-radius: var(--radius-lg);
-  font-size: 1rem;
+  font-size: 0.9rem !important;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.3s ease;
   backdrop-filter: blur(8px);
+  min-width: 28px !important;
+  min-height: 28px !important;
+  max-width: 28px !important;
+  max-height: 28px !important;
 }
 
 .close-btn:hover {
