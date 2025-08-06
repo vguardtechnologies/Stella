@@ -1234,15 +1234,62 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   // Cart management functions
   // Helper function to check if all required options are selected for a product
   const areAllOptionsSelected = (product: any): { isValid: boolean; missingOptions: string[] } => {
+    // Debug logging
+    console.log('🔍 Checking options for product:', {
+      title: product.title,
+      id: product.id,
+      options: product.options,
+      variants: product.variants?.length || 0
+    });
+
     // If product has no options, no validation needed
     if (!product.options || product.options.length === 0) {
+      console.log('✅ Product has no options - validation passed');
+      return { isValid: true, missingOptions: [] };
+    }
+
+    // If product only has one variant, likely no meaningful options to select
+    if (product.variants && product.variants.length <= 1) {
+      console.log('✅ Product has only one variant - no selection needed');
+      return { isValid: true, missingOptions: [] };
+    }
+
+    // Filter out options that don't need user selection
+    const meaningfulOptions = product.options.filter((option: any) => {
+      const optionName = option.name?.toLowerCase() || '';
+      
+      // Skip default "Title" option - this is Shopify's default when no real options exist
+      if (optionName === 'title') {
+        console.log('⏭️ Skipping "Title" option (default Shopify option)');
+        return false;
+      }
+      
+      // Skip options with only one value - no choice to make
+      if (option.values && option.values.length <= 1) {
+        console.log(`⏭️ Skipping "${option.name}" option (only one value: ${option.values[0]})`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    // If no meaningful options after filtering, no validation needed
+    if (meaningfulOptions.length === 0) {
+      console.log('✅ No meaningful options found - validation passed');
       return { isValid: true, missingOptions: [] };
     }
 
     // Get selected options for this product
     const selectedOptions = selectedVariants[product.id] || {};
-    const requiredOptions = product.options.map((option: any) => option.name);
+    const requiredOptions = meaningfulOptions.map((option: any) => option.name);
     const missingOptions: string[] = [];
+
+    console.log('🎯 Option validation details:', {
+      requiredOptions,
+      selectedOptions,
+      productId: product.id,
+      meaningfulOptionsCount: meaningfulOptions.length
+    });
 
     // Check each required option
     for (const optionName of requiredOptions) {
@@ -1250,6 +1297,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         missingOptions.push(optionName);
       }
     }
+
+    console.log('📋 Validation result:', {
+      isValid: missingOptions.length === 0,
+      missingOptions
+    });
 
     return {
       isValid: missingOptions.length === 0,
