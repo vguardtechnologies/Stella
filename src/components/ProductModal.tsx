@@ -44,7 +44,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   shopifyStore 
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  // const [selectedVariant, setSelectedVariant] = useState<any>(null); // Reserved for future variant selection
   const [quantity, setQuantity] = useState(1);
 
   if (!isOpen || !product) return null;
