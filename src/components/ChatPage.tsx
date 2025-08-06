@@ -2903,11 +2903,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   )}
                 </div>
                 <div style={{
-                  fontSize: '11px',
+                  fontSize: '10px',
                   color: '#666',
-                  marginTop: '4px',
+                  marginTop: '3px',
                   padding: '0 8px',
-                  lineHeight: '1.3'
+                  lineHeight: '1.2'
                 }}>
                   ⏰ Note: You can only send messages to customers who have messaged you within the last 24 hours
                 </div>
