@@ -622,11 +622,13 @@ router.post('/send-message', async (req, res) => {
         messageType: type,
         content: type === 'text' ? message : (caption || fileName || 'Media message'),
         mediaUrl: mediaUrl || null,
-        mediaMimeType: null // Will be filled when we download the media
+        mediaMimeType: null, // Will be filled when we download the media
+        productData: (type === 'product' || req.body.productData) ? req.body.productData : null,
+        failureReason: null
       };
       
       await whatsappMessageService.saveOutgoingMessage(saveData);
-      console.log(`✅ Saved outgoing ${type} message ${response.data.messages[0].id} to database`);
+      console.log(`✅ Saved outgoing ${type} message ${response.data.messages[0].id} to database${saveData.productData ? ' with product data' : ''}`);
     } catch (dbError) {
       console.error(`❌ Failed to save outgoing message to database:`, dbError);
       // Don't fail the API call if database save fails

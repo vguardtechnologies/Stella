@@ -715,7 +715,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             catalog_id: '923378196624516', // Our synced catalog ID
             product_retailer_id: product.id.toString() // Use Shopify product ID
           }
-        }
+        },
+        productData: product // Include product data for database storage
       };
 
       const productResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
@@ -748,7 +749,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             to: phoneNumber.replace(/[^\d]/g, ''),
             type: 'image',
             mediaUrl: productImageUrl,
-            caption: productDescription
+            caption: productDescription,
+            productData: product // Include product data for database storage
           };
 
           const imageResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
@@ -779,7 +781,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             const textPayload = {
               to: phoneNumber.replace(/[^\d]/g, ''),
               message: productDescription,
-              type: 'text'
+              type: 'text',
+              productData: product // Include product data for database storage
             };
 
             const textResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
@@ -821,7 +824,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           const textPayload = {
             to: phoneNumber.replace(/[^\d]/g, ''),
             message: productDescription,
-            type: 'text'
+            type: 'text',
+            productData: product // Include product data for database storage
           };
 
           const textResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
@@ -1006,7 +1010,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             catalog_id: '923378196624516', // Our synced catalog ID
             product_retailer_id: product.id.toString() // Use main Shopify product ID
           }
-        }
+        },
+        productData: { ...product, selectedOptions } // Include product data with selected options for database storage
       };
 
       const productResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
@@ -1056,7 +1061,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           to: phoneNumber.replace(/[^\d]/g, ''),
           type: 'image',
           mediaUrl: productImageUrl,
-          caption: productMessage
+          caption: productMessage,
+          productData: { ...product, selectedOptions } // Include product data with selected options
         };
 
         const imageResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
@@ -1354,12 +1360,25 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             // Voice message detected - no debug output needed
           }
           
+          // Parse product data if available
+          let productData = null;
+          try {
+            if (msg.product_data && typeof msg.product_data === 'string') {
+              productData = JSON.parse(msg.product_data);
+            } else if (msg.product_data && typeof msg.product_data === 'object') {
+              productData = msg.product_data;
+            }
+          } catch (error) {
+            console.warn('Failed to parse product data:', error);
+          }
+          
           return {
             id: msg.whatsapp_message_id || msg.id.toString(),
             text: msg.content || '',
             sender: msg.direction === 'incoming' ? 'user' : 'agent',
             timestamp: new Date(parseInt(msg.timestamp) * 1000),
-            type: (msg.message_type === 'audio' || msg.message_type === 'voice') ? 'voice' :
+            type: productData ? 'product' : // If we have product data, it's a product message
+                  (msg.message_type === 'audio' || msg.message_type === 'voice') ? 'voice' :
                   (msg.media_mime_type?.includes('audio') || 
                    msg.media_mime_type?.includes('ogg') || 
                    msg.media_mime_type?.includes('mpeg') || 
@@ -1373,7 +1392,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             media_file_id: msg.media_file_id, // Add media_file_id for thumbnails
             voice_duration: msg.voice_duration,
             direction: msg.direction,
-            failureReason: msg.failure_reason as '24_hour_rule' | 'general_error' | undefined
+            failureReason: msg.failure_reason as '24_hour_rule' | 'general_error' | undefined,
+            productData: productData // Include parsed product data
           };
         });
         console.log('Converted messages:', convertedMessages);

@@ -206,7 +206,9 @@ class WhatsAppMessageService {
         messageType,
         content,
         mediaUrl = null,
-        mediaMimeType = null
+        mediaMimeType = null,
+        productData = null,
+        failureReason = null
       } = messageData;
 
       // Get or create conversation
@@ -215,8 +217,9 @@ class WhatsAppMessageService {
       const savedMessage = await pool.query(
         `INSERT INTO messages (
           whatsapp_message_id, conversation_id, phone_number, direction,
-          message_type, content, media_url, media_mime_type, timestamp, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          message_type, content, media_url, media_mime_type, product_data, 
+          failure_reason, timestamp, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *`,
         [
           whatsappMessageId,
@@ -227,12 +230,14 @@ class WhatsAppMessageService {
           content,
           mediaUrl,
           mediaMimeType,
+          productData ? JSON.stringify(productData) : null,
+          failureReason,
           Math.floor(Date.now() / 1000), // Convert to seconds and round down to integer
           'sent'
         ]
       );
 
-      console.log(`✅ Saved outgoing ${messageType} message to ${phoneNumber}`);
+      console.log(`✅ Saved outgoing ${messageType} message to ${phoneNumber}${productData ? ' with product data' : ''}`);
       return savedMessage.rows[0];
     } catch (error) {
       console.error('Error saving outgoing message:', error);
