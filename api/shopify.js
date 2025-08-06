@@ -272,4 +272,91 @@ router.post('/proxy', async (req, res) => {
   }
 });
 
+// Create draft order for checkout
+router.post('/draft-orders', async (req, res) => {
+  try {
+    if (!shopifyConfig || !shopifyConfig.isConfigured) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shopify is not configured'
+      });
+    }
+
+    const { draft_order } = req.body;
+
+    if (!draft_order) {
+      return res.status(400).json({
+        success: false,
+        message: 'Draft order data is required'
+      });
+    }
+
+    const shopifyUrl = `https://${shopifyConfig.shopDomain}/admin/api/2023-10/draft_orders.json`;
+
+    console.log('Creating draft order:', JSON.stringify(draft_order, null, 2));
+
+    const response = await fetch(shopifyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifyConfig.accessToken
+      },
+      body: JSON.stringify({ draft_order })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      console.log('✅ Draft order created successfully:', data.draft_order.id);
+      
+      // Complete the draft order to convert it to a real order
+      const completeUrl = `https://${shopifyConfig.shopDomain}/admin/api/2023-10/draft_orders/${data.draft_order.id}/complete.json`;
+      
+      const completeResponse = await fetch(completeUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': shopifyConfig.accessToken
+        },
+        body: JSON.stringify({
+          payment_pending: true // Allow order completion without payment
+        })
+      });
+
+      if (completeResponse.ok) {
+        const completedOrder = await completeResponse.json();
+        console.log('✅ Draft order completed as real order:', completedOrder.draft_order.order_id);
+        
+        res.json({
+          success: true,
+          draft_order: data.draft_order,
+          completed_order: completedOrder.draft_order,
+          message: 'Order created and completed successfully'
+        });
+      } else {
+        console.log('⚠️ Draft order created but completion failed');
+        res.json({
+          success: true,
+          draft_order: data.draft_order,
+          message: 'Draft order created successfully (manual completion required)'
+        });
+      }
+    } else {
+      console.error('❌ Failed to create draft order:', data);
+      res.status(400).json({
+        success: false,
+        message: data.errors || 'Failed to create draft order',
+        details: data
+      });
+    }
+  } catch (error) {
+    console.error('❌ Draft order creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during draft order creation',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;

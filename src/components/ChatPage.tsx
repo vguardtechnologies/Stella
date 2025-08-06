@@ -265,6 +265,26 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const updateInterval = 300000; // Fixed at 5 minutes
   const [retryCount, setRetryCount] = useState(0);
   const [cartNotification, setCartNotification] = useState<string>('');
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [checkoutData, setCheckoutData] = useState({
+    customerInfo: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: ''
+    },
+    shippingAddress: {
+      address1: '',
+      address2: '',
+      city: '',
+      province: '',
+      zip: '',
+      country: 'US'
+    },
+    paymentMethod: 'stripe',
+    orderNotes: ''
+  });
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -1328,6 +1348,133 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     } else {
       return `❌ Product "${productTitle}" not found. Please check the spelling.`;
     }
+  };
+
+  // Checkout functionality
+  const processCheckout = async () => {
+    if (cartItems.length === 0) {
+      alert('Cart is empty');
+      return;
+    }
+
+    setIsProcessingCheckout(true);
+
+    try {
+      // Create Shopify draft order
+      const lineItems = cartItems.map(item => ({
+        variant_id: item.variants?.[0]?.id || item.id,
+        quantity: item.quantity,
+        title: item.title,
+        price: parseFloat(item.variants?.[0]?.price || '0')
+      }));
+
+      const draftOrderData = {
+        draft_order: {
+          line_items: lineItems,
+          customer: {
+            first_name: checkoutData.customerInfo.firstName,
+            last_name: checkoutData.customerInfo.lastName,
+            email: checkoutData.customerInfo.email,
+            phone: checkoutData.customerInfo.phone
+          },
+          shipping_address: {
+            first_name: checkoutData.customerInfo.firstName,
+            last_name: checkoutData.customerInfo.lastName,
+            address1: checkoutData.shippingAddress.address1,
+            address2: checkoutData.shippingAddress.address2,
+            city: checkoutData.shippingAddress.city,
+            province: checkoutData.shippingAddress.province,
+            zip: checkoutData.shippingAddress.zip,
+            country: checkoutData.shippingAddress.country,
+            phone: checkoutData.customerInfo.phone
+          },
+          note: checkoutData.orderNotes,
+          email: checkoutData.customerInfo.email
+        }
+      };
+
+      const response = await fetch(`${API_BASE}/api/shopify/draft-orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(draftOrderData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Send order confirmation to WhatsApp
+        if (selectedConversation) {
+          const phoneNumber = selectedConversation.replace('wa_', '');
+          const orderMessage = `🎉 *Order Created Successfully!*\n\n` +
+            `📋 Order #${result.draft_order.id}\n` +
+            `👤 Customer: ${checkoutData.customerInfo.firstName} ${checkoutData.customerInfo.lastName}\n` +
+            `📧 Email: ${checkoutData.customerInfo.email}\n` +
+            `📱 Phone: ${checkoutData.customerInfo.phone}\n\n` +
+            `📦 *Items:*\n` +
+            cartItems.map((item, index) => 
+              `${index + 1}. ${item.title} - $${parseFloat(item.variants?.[0]?.price || '0')} x ${item.quantity}`
+            ).join('\n') +
+            `\n\n💰 *Total: $${cartTotal.toFixed(2)}*\n\n` +
+            `📍 *Shipping Address:*\n` +
+            `${checkoutData.shippingAddress.address1}\n` +
+            `${checkoutData.shippingAddress.city}, ${checkoutData.shippingAddress.province} ${checkoutData.shippingAddress.zip}\n` +
+            `${checkoutData.shippingAddress.country}\n\n` +
+            `✅ We'll process your order and send updates soon!`;
+
+          await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: phoneNumber,
+              message: orderMessage,
+              type: 'text'
+            })
+          });
+        }
+
+        // Clear cart and close modal
+        clearCart();
+        setShowCheckoutModal(false);
+        alert(`Order created successfully! Order ID: ${result.draft_order.id}`);
+        
+      } else {
+        const error = await response.text();
+        console.error('Checkout failed:', error);
+        alert('Checkout failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('Checkout error. Please try again.');
+    } finally {
+      setIsProcessingCheckout(false);
+    }
+  };
+
+  const updateCheckoutData = (section: string, field: string, value: string) => {
+    setCheckoutData(prev => {
+      if (section === 'customerInfo') {
+        return {
+          ...prev,
+          customerInfo: {
+            ...prev.customerInfo,
+            [field]: value
+          }
+        };
+      } else if (section === 'shippingAddress') {
+        return {
+          ...prev,
+          shippingAddress: {
+            ...prev.shippingAddress,
+            [field]: value
+          }
+        };
+      }
+      return prev;
+    });
   };
 
   // Update cart total when cart items change
@@ -4547,6 +4694,24 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   {/* Cart Actions */}
                   <div style={{ display: 'flex', gap: '5px', flexDirection: 'column' }}>
                     <button
+                      onClick={() => setShowCheckoutModal(true)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        fontSize: '12px',
+                        backgroundColor: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        marginBottom: '5px'
+                      }}
+                    >
+                      🛒 Checkout (${cartTotal.toFixed(2)})
+                    </button>
+                    
+                    <button
                       onClick={sendCartInChat}
                       style={{
                         width: '100%',
@@ -4637,6 +4802,301 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           onClose={() => setShowMediaBrowser(false)}
           onSelectMedia={handleMediaFromBrowser}
         />
+      )}
+
+      {/* Checkout Modal */}
+      {showCheckoutModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '30px',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px',
+              borderBottom: '2px solid #f0f0f0',
+              paddingBottom: '15px'
+            }}>
+              <h2 style={{ margin: 0, color: '#333', fontSize: '24px' }}>🛒 Checkout</h2>
+              <button
+                onClick={() => setShowCheckoutModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Order Summary */}
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ color: '#333', marginBottom: '15px' }}>📋 Order Summary</h3>
+              <div style={{
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '15px',
+                backgroundColor: '#f9f9f9'
+              }}>
+                {cartItems.map((item, index) => (
+                  <div key={item.cartItemId} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 0',
+                    borderBottom: index < cartItems.length - 1 ? '1px solid #eee' : 'none'
+                  }}>
+                    <div>
+                      <span style={{ fontWeight: 'bold' }}>{item.title}</span>
+                      <span style={{ color: '#666', marginLeft: '10px' }}>x {item.quantity}</span>
+                    </div>
+                    <span style={{ fontWeight: 'bold' }}>
+                      ${(parseFloat(item.variants?.[0]?.price || '0') * item.quantity).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '15px',
+                  padding: '10px 0',
+                  borderTop: '2px solid #333',
+                  fontSize: '18px',
+                  fontWeight: 'bold'
+                }}>
+                  <span>Total:</span>
+                  <span>${cartTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Customer Information */}
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ color: '#333', marginBottom: '15px' }}>👤 Customer Information</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <input
+                  type="text"
+                  placeholder="First Name *"
+                  value={checkoutData.customerInfo.firstName}
+                  onChange={(e) => updateCheckoutData('customerInfo', 'firstName', e.target.value)}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Last Name *"
+                  value={checkoutData.customerInfo.lastName}
+                  onChange={(e) => updateCheckoutData('customerInfo', 'lastName', e.target.value)}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                <input
+                  type="email"
+                  placeholder="Email Address *"
+                  value={checkoutData.customerInfo.email}
+                  onChange={(e) => updateCheckoutData('customerInfo', 'email', e.target.value)}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    gridColumn: '1 / -1'
+                  }}
+                />
+                <input
+                  type="tel"
+                  placeholder="Phone Number *"
+                  value={checkoutData.customerInfo.phone}
+                  onChange={(e) => updateCheckoutData('customerInfo', 'phone', e.target.value)}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    gridColumn: '1 / -1'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Shipping Address */}
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ color: '#333', marginBottom: '15px' }}>📍 Shipping Address</h3>
+              <div style={{ display: 'grid', gap: '15px' }}>
+                <input
+                  type="text"
+                  placeholder="Address Line 1 *"
+                  value={checkoutData.shippingAddress.address1}
+                  onChange={(e) => updateCheckoutData('shippingAddress', 'address1', e.target.value)}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Address Line 2 (Optional)"
+                  value={checkoutData.shippingAddress.address2}
+                  onChange={(e) => updateCheckoutData('shippingAddress', 'address2', e.target.value)}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
+                  <input
+                    type="text"
+                    placeholder="City *"
+                    value={checkoutData.shippingAddress.city}
+                    onChange={(e) => updateCheckoutData('shippingAddress', 'city', e.target.value)}
+                    style={{
+                      padding: '12px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="State/Province *"
+                    value={checkoutData.shippingAddress.province}
+                    onChange={(e) => updateCheckoutData('shippingAddress', 'province', e.target.value)}
+                    style={{
+                      padding: '12px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="ZIP/Postal Code *"
+                    value={checkoutData.shippingAddress.zip}
+                    onChange={(e) => updateCheckoutData('shippingAddress', 'zip', e.target.value)}
+                    style={{
+                      padding: '12px',
+                      border: '1px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <select
+                  value={checkoutData.shippingAddress.country}
+                  onChange={(e) => updateCheckoutData('shippingAddress', 'country', e.target.value)}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="US">United States</option>
+                  <option value="CA">Canada</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="AU">Australia</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Order Notes */}
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ color: '#333', marginBottom: '15px' }}>📝 Order Notes (Optional)</h3>
+              <textarea
+                placeholder="Any special instructions for your order..."
+                value={checkoutData.orderNotes}
+                onChange={(e) => setCheckoutData(prev => ({ ...prev, orderNotes: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  minHeight: '80px',
+                  resize: 'vertical',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Checkout Actions */}
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <button
+                onClick={() => setShowCheckoutModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '15px',
+                  fontSize: '16px',
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={processCheckout}
+                disabled={isProcessingCheckout || 
+                  !checkoutData.customerInfo.firstName || 
+                  !checkoutData.customerInfo.lastName || 
+                  !checkoutData.customerInfo.email ||
+                  !checkoutData.shippingAddress.address1 ||
+                  !checkoutData.shippingAddress.city}
+                style={{
+                  flex: 2,
+                  padding: '15px',
+                  fontSize: '16px',
+                  backgroundColor: isProcessingCheckout ? '#ccc' : '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: isProcessingCheckout ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                {isProcessingCheckout ? '⏳ Processing...' : `✅ Place Order ($${cartTotal.toFixed(2)})`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
