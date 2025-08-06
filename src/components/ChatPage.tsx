@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import VideoMessage from './VideoMessage';
 import ContactManager from './ContactManager';
 import ImageModal from './ImageModal';
+import ProductModal from './ProductModal';
 import WhatsAppTemplateManager from './WhatsAppTemplateManager';
 import MediaBrowser from './MediaBrowser';
 import { shopifyService } from '../services/shopifyService';
@@ -283,6 +284,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [modalImageUrl, setModalImageUrl] = useState('');
   const [modalImageCaption, setModalImageCaption] = useState('');
 
+  // Product Modal State
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [modalProduct, setModalProduct] = useState<any>(null);
+
   // Attachment Menu State
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -326,6 +331,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setShowImageModal(false);
     setModalImageUrl('');
     setModalImageCaption('');
+  };
+
+  // Function to open product modal
+  const openProductModal = (product: any) => {
+    setModalProduct(product);
+    setShowProductModal(true);
+  };
+
+  // Function to close product modal
+  const closeProductModal = () => {
+    setShowProductModal(false);
+    setModalProduct(null);
   };
 
   // Fetch WhatsApp conversations from the database
@@ -3081,10 +3098,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                     {isAvailable ? '🛒 Add to Cart' : '❌ Unavailable'}
                                   </button>
                                   
-                                  <a
-                                    href={shopifyStore?.domain ? `https://${shopifyStore.domain}/products/${(product as any).handle}` : '#'}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                  <button
+                                    onClick={() => openProductModal(product)}
                                     style={{
                                       width: '100%',
                                       padding: '4px',
@@ -3100,8 +3115,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                       display: 'block'
                                     }}
                                   >
-                                    🔗 View Product
-                                  </a>
+                                    � View Details
+                                  </button>
                                 </div>
                               </div>
                             );
@@ -4591,6 +4606,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         imageUrl={modalImageUrl}
         caption={modalImageCaption}
         onClose={closeImageModal}
+      />
+
+      {/* Product Modal */}
+      <ProductModal
+        isOpen={showProductModal}
+        product={modalProduct}
+        onClose={closeProductModal}
+        onAddToCart={addToShopifyCart}
+        shopifyStore={shopifyStore}
       />
 
       {/* WhatsApp Template Manager */}
