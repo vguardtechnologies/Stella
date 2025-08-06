@@ -285,6 +285,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     orderNotes: ''
   });
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  const [discountCode, setDiscountCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    type: 'percentage' | 'fixed';
+    value: number;
+    description: string;
+  } | null>(null);
+  const [discountError, setDiscountError] = useState('');
+  const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -1368,7 +1377,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         price: parseFloat(item.variants?.[0]?.price || '0')
       }));
 
-      const draftOrderData = {
+      const draftOrderData: any = {
         draft_order: {
           line_items: lineItems,
           customer: {
@@ -1388,10 +1397,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             country: checkoutData.shippingAddress.country,
             phone: checkoutData.customerInfo.phone
           },
-          note: checkoutData.orderNotes,
+          note: checkoutData.orderNotes + (appliedDiscount ? `\nDiscount Applied: ${appliedDiscount.code} (-$${calculateDiscountAmount().toFixed(2)})` : ''),
           email: checkoutData.customerInfo.email
         }
       };
+
+      // Add discount information if applied
+      if (appliedDiscount) {
+        draftOrderData.draft_order.applied_discount = {
+          description: appliedDiscount.description,
+          value: calculateDiscountAmount(),
+          value_type: 'fixed_amount',
+          amount: calculateDiscountAmount()
+        };
+      }
 
       const response = await fetch(`${API_BASE}/api/shopify/draft-orders`, {
         method: 'POST',
@@ -1416,7 +1435,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             cartItems.map((item, index) => 
               `${index + 1}. ${item.title} - $${parseFloat(item.variants?.[0]?.price || '0')} x ${item.quantity}`
             ).join('\n') +
-            `\n\n💰 *Total: $${cartTotal.toFixed(2)}*\n\n` +
+            `\n\n💰 *Subtotal: $${cartTotal.toFixed(2)}*\n` +
+            (appliedDiscount ? `💳 *Discount (${appliedDiscount.code}): -$${calculateDiscountAmount().toFixed(2)}*\n` : '') +
+            `🏷️ *Final Total: $${getFinalTotal().toFixed(2)}*\n\n` +
             `📍 *Shipping Address:*\n` +
             `${checkoutData.shippingAddress.address1}\n` +
             `${checkoutData.shippingAddress.city}, ${checkoutData.shippingAddress.province} ${checkoutData.shippingAddress.zip}\n` +
@@ -1475,6 +1496,79 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       }
       return prev;
     });
+  };
+
+  // Apply discount code
+  const applyDiscountCode = async () => {
+    if (!discountCode.trim()) {
+      setDiscountError('Please enter a discount code');
+      return;
+    }
+
+    setIsApplyingDiscount(true);
+    setDiscountError('');
+
+    try {
+      const response = await fetch(`${API_BASE}/api/shopify/validate-discount`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: discountCode.trim(),
+          cartTotal: cartTotal,
+          lineItems: cartItems.map(item => ({
+            variant_id: item.variants?.[0]?.id || item.id,
+            quantity: item.quantity,
+            price: parseFloat(item.variants?.[0]?.price || '0')
+          }))
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.valid) {
+        setAppliedDiscount({
+          code: discountCode.trim(),
+          type: result.type,
+          value: result.value,
+          description: result.description
+        });
+        setDiscountError('');
+      } else {
+        setDiscountError(result.message || 'Invalid discount code');
+        setAppliedDiscount(null);
+      }
+    } catch (error) {
+      console.error('Error applying discount:', error);
+      setDiscountError('Failed to apply discount code');
+      setAppliedDiscount(null);
+    } finally {
+      setIsApplyingDiscount(false);
+    }
+  };
+
+  // Remove applied discount
+  const removeDiscount = () => {
+    setAppliedDiscount(null);
+    setDiscountCode('');
+    setDiscountError('');
+  };
+
+  // Calculate discount amount
+  const calculateDiscountAmount = () => {
+    if (!appliedDiscount) return 0;
+    
+    if (appliedDiscount.type === 'percentage') {
+      return cartTotal * (appliedDiscount.value / 100);
+    } else {
+      return Math.min(appliedDiscount.value, cartTotal);
+    }
+  };
+
+  // Calculate final total with discount
+  const getFinalTotal = () => {
+    return cartTotal - calculateDiscountAmount();
   };
 
   // Update cart total when cart items change
@@ -4691,6 +4785,119 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     ))}
                   </div>
                   
+                  {/* Discount Code Section */}
+                  <div style={{ 
+                    marginBottom: '15px', 
+                    padding: '10px', 
+                    border: '1px solid #e0e0e0', 
+                    borderRadius: '4px',
+                    backgroundColor: '#fafafa'
+                  }}>
+                    <h5 style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#333' }}>💳 Discount Code</h5>
+                    
+                    {appliedDiscount ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#28a745', fontWeight: 'bold' }}>
+                            ✅ {appliedDiscount.code} Applied
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#666' }}>
+                            {appliedDiscount.description}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#28a745', fontWeight: 'bold' }}>
+                            -${calculateDiscountAmount().toFixed(2)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={removeDiscount}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '10px',
+                            backgroundColor: '#ff4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                          <input
+                            type="text"
+                            placeholder="Enter discount code"
+                            value={discountCode}
+                            onChange={(e) => setDiscountCode(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: '6px',
+                              fontSize: '11px',
+                              border: '1px solid #ddd',
+                              borderRadius: '3px'
+                            }}
+                            onKeyPress={(e) => e.key === 'Enter' && applyDiscountCode()}
+                          />
+                          <button
+                            onClick={applyDiscountCode}
+                            disabled={isApplyingDiscount || !discountCode.trim()}
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '10px',
+                              backgroundColor: isApplyingDiscount ? '#ccc' : '#2196F3',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: isApplyingDiscount ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {isApplyingDiscount ? '...' : 'Apply'}
+                          </button>
+                        </div>
+                        {discountError && (
+                          <div style={{ fontSize: '10px', color: '#ff4444', marginTop: '3px' }}>
+                            {discountError}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Updated Cart Total with Discount */}
+                  <div style={{ 
+                    marginBottom: '10px', 
+                    padding: '8px', 
+                    backgroundColor: '#f0f0f0', 
+                    borderRadius: '4px' 
+                  }}>
+                    <div style={{ fontSize: '11px', color: '#666' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Subtotal:</span>
+                        <span>${cartTotal.toFixed(2)}</span>
+                      </div>
+                      {appliedDiscount && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#28a745' }}>
+                          <span>Discount ({appliedDiscount.code}):</span>
+                          <span>-${calculateDiscountAmount().toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        fontWeight: 'bold', 
+                        fontSize: '12px',
+                        marginTop: '5px',
+                        paddingTop: '5px',
+                        borderTop: '1px solid #ddd'
+                      }}>
+                        <span>Total:</span>
+                        <span>${getFinalTotal().toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Cart Actions */}
                   <div style={{ display: 'flex', gap: '5px', flexDirection: 'column' }}>
                     <button
@@ -4708,7 +4915,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         marginBottom: '5px'
                       }}
                     >
-                      🛒 Checkout (${cartTotal.toFixed(2)})
+                      🛒 Checkout (${getFinalTotal().toFixed(2)})
                     </button>
                     
                     <button
@@ -4878,18 +5085,46 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     </span>
                   </div>
                 ))}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: '15px',
-                  padding: '10px 0',
-                  borderTop: '2px solid #333',
-                  fontSize: '18px',
-                  fontWeight: 'bold'
-                }}>
-                  <span>Total:</span>
-                  <span>${cartTotal.toFixed(2)}</span>
+                
+                {/* Order Totals */}
+                <div style={{ marginTop: '15px' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '5px 0',
+                    fontSize: '14px'
+                  }}>
+                    <span>Subtotal:</span>
+                    <span>${cartTotal.toFixed(2)}</span>
+                  </div>
+                  
+                  {appliedDiscount && (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '5px 0',
+                      fontSize: '14px',
+                      color: '#28a745'
+                    }}>
+                      <span>Discount ({appliedDiscount.code}):</span>
+                      <span>-${calculateDiscountAmount().toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 0',
+                    borderTop: '2px solid #333',
+                    fontSize: '18px',
+                    fontWeight: 'bold'
+                  }}>
+                    <span>Total:</span>
+                    <span>${getFinalTotal().toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -5092,7 +5327,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   fontWeight: 'bold'
                 }}
               >
-                {isProcessingCheckout ? '⏳ Processing...' : `✅ Place Order ($${cartTotal.toFixed(2)})`}
+                {isProcessingCheckout ? '⏳ Processing...' : `✅ Place Order ($${getFinalTotal().toFixed(2)})`}
               </button>
             </div>
           </div>

@@ -272,6 +272,152 @@ router.post('/proxy', async (req, res) => {
   }
 });
 
+// Validate discount code
+router.post('/validate-discount', async (req, res) => {
+  try {
+    if (!shopifyConfig || !shopifyConfig.isConfigured) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shopify is not configured'
+      });
+    }
+
+    const { code, cartTotal, lineItems } = req.body;
+
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        valid: false,
+        message: 'Discount code is required'
+      });
+    }
+
+    // First, try to get discount code details from Shopify
+    const discountUrl = `https://${shopifyConfig.shopDomain}/admin/api/2023-10/discount_codes.json?code=${encodeURIComponent(code)}`;
+
+    const response = await fetch(discountUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': shopifyConfig.accessToken
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      
+      if (data.discount_codes && data.discount_codes.length > 0) {
+        const discountCode = data.discount_codes[0];
+        
+        // Check if discount is still valid
+        const now = new Date();
+        const startDate = discountCode.starts_at ? new Date(discountCode.starts_at) : null;
+        const endDate = discountCode.ends_at ? new Date(discountCode.ends_at) : null;
+        
+        if (startDate && now < startDate) {
+          return res.json({
+            success: false,
+            valid: false,
+            message: 'Discount code is not yet active'
+          });
+        }
+        
+        if (endDate && now > endDate) {
+          return res.json({
+            success: false,
+            valid: false,
+            message: 'Discount code has expired'
+          });
+        }
+        
+        if (discountCode.usage_limit && discountCode.usage_count >= discountCode.usage_limit) {
+          return res.json({
+            success: false,
+            valid: false,
+            message: 'Discount code usage limit reached'
+          });
+        }
+
+        // Get the price rule to determine discount details
+        const priceRuleUrl = `https://${shopifyConfig.shopDomain}/admin/api/2023-10/price_rules/${discountCode.price_rule_id}.json`;
+        
+        const priceRuleResponse = await fetch(priceRuleUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': shopifyConfig.accessToken
+          }
+        });
+
+        if (priceRuleResponse.ok) {
+          const priceRuleData = await priceRuleResponse.json();
+          const priceRule = priceRuleData.price_rule;
+          
+          let discountType, discountValue, description;
+          
+          if (priceRule.target_type === 'line_item') {
+            if (priceRule.value_type === 'percentage') {
+              discountType = 'percentage';
+              discountValue = Math.abs(priceRule.value);
+              description = `${discountValue}% off`;
+            } else if (priceRule.value_type === 'fixed_amount') {
+              discountType = 'fixed';
+              discountValue = Math.abs(priceRule.value);
+              description = `$${discountValue} off`;
+            }
+          }
+          
+          return res.json({
+            success: true,
+            valid: true,
+            type: discountType,
+            value: discountValue,
+            description: description,
+            code: code
+          });
+        }
+      }
+    }
+
+    // If not found in Shopify or API call failed, check against common codes
+    const commonDiscounts = {
+      'WELCOME10': { type: 'percentage', value: 10, description: '10% off your first order' },
+      'SAVE20': { type: 'percentage', value: 20, description: '20% off' },
+      'FREESHIP': { type: 'fixed', value: 5.99, description: 'Free shipping' },
+      'NEWCUSTOMER': { type: 'percentage', value: 15, description: '15% off for new customers' }
+    };
+
+    const upperCode = code.toUpperCase();
+    if (commonDiscounts[upperCode]) {
+      const discount = commonDiscounts[upperCode];
+      return res.json({
+        success: true,
+        valid: true,
+        type: discount.type,
+        value: discount.value,
+        description: discount.description,
+        code: code
+      });
+    }
+
+    // Invalid discount code
+    res.json({
+      success: false,
+      valid: false,
+      message: 'Invalid discount code'
+    });
+
+  } catch (error) {
+    console.error('❌ Discount validation error:', error);
+    res.status(500).json({
+      success: false,
+      valid: false,
+      message: 'Error validating discount code',
+      details: error.message
+    });
+  }
+});
+
 // Create draft order for checkout
 router.post('/draft-orders', async (req, res) => {
   try {
