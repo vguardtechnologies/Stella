@@ -2807,6 +2807,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         }}>
                           {(() => {
                             const product = message.productData;
+                            
+                            // Debug product data
+                            console.log('🛍️ Rendering product card:', {
+                              title: (product as any).title,
+                              images: (product as any).images,
+                              imageCount: (product as any).images?.length || 0,
+                              firstImageSrc: (product as any).images?.[0]?.src
+                            });
+                            
                             const variants = (product as any).variants || [];
                             const availableVariants = variants.filter((v: any) => (v.inventory_quantity || 0) > 0);
                             const isAvailable = availableVariants.length > 0;
@@ -2860,16 +2869,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                     style={{ 
                                       width: '100%', 
                                       height: '160px', 
-                                      objectFit: 'cover', 
+                                      objectFit: 'contain',
                                       borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      transition: 'transform 0.2s ease'
+                                      cursor: 'default',
+                                      transition: 'transform 0.2s ease',
+                                      backgroundColor: '#f8f9fa'
                                     } as React.CSSProperties}
-                                    onClick={() => {
-                                      // Open full size image in new tab
-                                      if (productImages[currentImageIndex]?.src) {
-                                        window.open(productImages[currentImageIndex].src, '_blank');
-                                      }
+                                    onLoad={() => {
+                                      console.log('✅ Product image loaded:', productImages[currentImageIndex]?.src);
+                                    }}
+                                    onError={(e) => {
+                                      console.error('❌ Product image failed to load:', productImages[currentImageIndex]?.src);
+                                      console.log('Product images array:', productImages);
+                                      // Fallback to placeholder
+                                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/280x180/f0f0f0/666?text=Image+Error';
                                     }}
                                     onMouseEnter={(e) => {
                                       e.currentTarget.style.transform = 'scale(1.02)';
@@ -2965,12 +2978,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                       left: '50%',
                                       transform: 'translateX(-50%)',
                                       display: 'flex',
-                                      gap: '4px',
+                                      gap: '1px',
                                       zIndex: 2
                                     }}>
                                       {productImages.map((_: any, index: number) => (
                                         <button
                                           key={index}
+                                          className="tiny-dot-indicator"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             setProductImageIndices(prev => ({
@@ -2979,25 +2993,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                             }));
                                           }}
                                           style={{
-                                            width: '6px',
-                                            height: '6px',
                                             borderRadius: '50%',
                                             border: 'none',
                                             backgroundColor: index === currentImageIndex 
                                               ? 'white' 
-                                              : 'rgba(255,255,255,0.5)',
+                                              : 'rgba(255,255,255,0.6)',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s ease',
-                                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-                                          }}
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                                          } as React.CSSProperties}
                                           onMouseEnter={(e) => {
                                             if (index !== currentImageIndex) {
-                                              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.8)';
+                                              e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.8)';
                                             }
                                           }}
                                           onMouseLeave={(e) => {
                                             if (index !== currentImageIndex) {
-                                              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.5)';
+                                              e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.5)';
                                             }
                                           }}
                                         />

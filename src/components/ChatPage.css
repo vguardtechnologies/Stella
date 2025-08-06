@@ -19,6 +19,18 @@
   animation: fadeIn 0.4s ease;
 }
 
+/* Bigger dot indicators for better visibility */
+.tiny-dot-indicator {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  padding: 0 !important;
+  margin: 0 2px !important;
+}
+
 .chat-container {
   width: 100%;
   max-width: 1600px;
