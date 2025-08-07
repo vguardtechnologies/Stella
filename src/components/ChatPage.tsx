@@ -921,10 +921,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  // Handle variant option selection
+  // Handle variant option selection with toggle support
   const handleVariantOptionSelect = (productId: string, optionName: string, optionValue: string) => {
     setSelectedVariants(prev => {
       const currentSelections = prev[productId] || {};
+      
+      // Check if this option value is already selected - if so, toggle it off
+      if (currentSelections[optionName] === optionValue) {
+        const newSelections = { ...currentSelections };
+        delete newSelections[optionName]; // Remove the selection (toggle off)
+        
+        return {
+          ...prev,
+          [productId]: newSelections
+        };
+      }
+      
+      // Otherwise, select the new option value
       const newSelections = {
         ...currentSelections,
         [optionName]: optionValue
@@ -952,6 +965,33 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             // If the size is not available in the new color, remove the size selection
             if (sizeInColorInventory === 0) {
               delete newSelections['Size'];
+            }
+          }
+        }
+      }
+      
+      // If we're selecting a size, check if it's available in the currently selected color
+      if (optionName.toLowerCase().includes('size')) {
+        const currentColor = currentSelections['Color'] || currentSelections['Colour'];
+        if (currentColor) {
+          // Find the product to check inventory
+          const product = shopifyProducts.find(p => p.id === productId);
+          if (product) {
+            // Check if this size is available in the selected color
+            const variants = product.variants || [];
+            const sizeInColorInventory = variants.filter((variant: any) => {
+              const colorMatch = variant.option1?.toLowerCase() === currentColor.toLowerCase() ||
+                               variant.option2?.toLowerCase() === currentColor.toLowerCase() ||
+                               variant.option3?.toLowerCase() === currentColor.toLowerCase();
+              const sizeMatch = variant.option1?.toLowerCase() === optionValue.toLowerCase() ||
+                              variant.option2?.toLowerCase() === optionValue.toLowerCase() ||
+                              variant.option3?.toLowerCase() === optionValue.toLowerCase();
+              return colorMatch && sizeMatch;
+            }).reduce((total: number, variant: any) => total + (variant.inventory_quantity || 0), 0);
+            
+            // If the size is not available in the selected color, don't select it
+            if (sizeInColorInventory === 0) {
+              return prev; // Don't update selections if combination is not available
             }
           }
         }
