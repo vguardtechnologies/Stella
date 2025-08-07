@@ -4491,9 +4491,24 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       }
                     });
 
-                    // Helper function to get specific inventory for color/size combination
-                    const getVariantInventory = (color?: string, size?: string) => {
-                      if (!color && !size) return 0;
+                    // Helper function to get specific inventory for any option combination
+                    const getVariantInventory = (color?: string, size?: string, optionName?: string, optionValue?: string) => {
+                      // If specific option is provided, use that; otherwise fall back to color/size logic
+                      if (optionName && optionValue && !color && !size) {
+                        const matchingVariants = variants.filter((variant: any) => {
+                          // Check if this variant matches the specific option value
+                          return variant[optionName]?.toLowerCase() === optionValue.toLowerCase() ||
+                                 variant.option1?.toLowerCase() === optionValue.toLowerCase() ||
+                                 variant.option2?.toLowerCase() === optionValue.toLowerCase() ||
+                                 variant.option3?.toLowerCase() === optionValue.toLowerCase();
+                        });
+                        
+                        return matchingVariants.reduce((total: number, variant: any) => 
+                          total + (variant.inventory_quantity || 0), 0);
+                      }
+                      
+                      // Original color/size logic
+                      if (!color && !size && !optionName) return 0;
                       
                       const matchingVariants = variants.filter((variant: any) => {
                         let colorMatch = !color; // If no color specified, match all
@@ -4625,154 +4640,149 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           {priceRange}
                         </div>
 
-                        {/* Product Details */}
+                        {/* Product Options - Dynamic Renderer */}
                         <div style={{ marginBottom: '3px', fontSize: '9px', lineHeight: '1.2' }}>
-                          {/* Clickable Colors */}
-                          {colors.size > 0 && (
-                            <div style={{ marginBottom: '2px' }}>
-                              <div style={{ color: '#e2e8f0', fontWeight: 'bold', marginBottom: '1px', fontSize: '8px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>🎨 Colors:</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
-                                {Array.from(colors).map((color) => {
-                                  const isSelected = selectedVariants[product.id]?.['Color'] === color || selectedVariants[product.id]?.['Colour'] === color;
-                                  const isColorAvailable = isOptionValueAvailable('color', color);
-                                  const colorInventory = getVariantInventory(color);
-                                  
-                                  return (
-                                    <button
-                                      key={color}
-                                      onClick={() => {
-                                        if (!isColorAvailable) return; // Don't allow selection if this color is not available
-                                        const colorOptionName = product.options?.find((opt: any) => 
-                                          opt.name?.toLowerCase().includes('color') || opt.name?.toLowerCase().includes('colour')
-                                        )?.name || 'Color';
-                                        handleVariantOptionSelect(product.id, colorOptionName, color);
-                                      }}
-                                      disabled={!isColorAvailable}
-                                      title={`${color}: ${colorInventory} in stock`}
-                                      style={{
-                                        padding: '1px 3px',
-                                        fontSize: '7px',
-                                        border: `1px solid ${isSelected && isColorAvailable ? '#2196F3' : '#ddd'}`,
-                                        borderRadius: '6px',
-                                        backgroundColor: isSelected && isColorAvailable ? '#2196F3' : !isColorAvailable ? '#f5f5f5' : 'white',
-                                        color: isSelected && isColorAvailable ? 'white' : !isColorAvailable ? '#999' : '#555',
-                                        cursor: isColorAvailable ? 'pointer' : 'not-allowed',
-                                        transition: 'all 0.2s',
-                                        opacity: isColorAvailable ? 1 : 0.5,
-                                        position: 'relative'
-                                      }}
-                                    >
-                                      {color}
-                                      {isColorAvailable && (
-                                        <span style={{ 
-                                          fontSize: '6px', 
-                                          marginLeft: '2px', 
-                                          opacity: 0.8,
-                                          fontWeight: 'bold'
-                                        }}>
-                                          ({colorInventory})
-                                        </span>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
+                          {/* Render ALL product options dynamically */}
+                          {product.options && product.options
+                            .filter((option: any) => {
+                              // Filter out meaningless options like "Title" with only one "Default Title" value
+                              const optionValues = option.values || [];
+                              return optionValues.length > 1 || !(optionValues[0] && String(optionValues[0]).toLowerCase().includes('default'));
+                            })
+                            .map((option: any) => {
+                              // Get all values for this option directly from option.values
+                              const optionValues = option.values || [];
 
-                          {/* Clickable Sizes */}
-                          {sizes.size > 0 && (
-                            <div style={{ marginBottom: '2px' }}>
-                              <div style={{ color: '#e2e8f0', fontWeight: 'bold', marginBottom: '1px', fontSize: '8px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>📏 Sizes:</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
-                                {Array.from(sizes).map((size) => {
-                                  const isSelected = selectedVariants[product.id]?.['Size'] === size;
-                                  
-                                  // Check if this size is available in the selected color (or any color if none selected)
-                                  const sizeInventory = selectedColor 
-                                    ? getVariantInventory(selectedColor, size) 
-                                    : getVariantInventory(undefined, size);
-                                    
-                                  const isSizeAvailable = selectedColor 
-                                    ? sizeInventory > 0  // If color is selected, check specific combination
-                                    : isOptionValueAvailable('size', size); // If no color selected, check general availability
-                                  
-                                  return (
-                                    <button
-                                      key={size}
-                                      onClick={() => {
-                                        if (!isSizeAvailable) return; // Don't allow selection if this size is not available
-                                        const sizeOptionName = product.options?.find((opt: any) => 
-                                          opt.name?.toLowerCase().includes('size')
-                                        )?.name || 'Size';
-                                        handleVariantOptionSelect(product.id, sizeOptionName, size);
-                                      }}
-                                      disabled={!isSizeAvailable}
-                                      title={selectedColor 
-                                        ? `${size} in ${selectedColor}: ${sizeInventory} in stock`
-                                        : `${size}: ${sizeInventory} in stock`}
-                                      style={{
-                                        padding: '1px 3px',
-                                        fontSize: '7px',
-                                        border: `1px solid ${isSelected && isSizeAvailable ? '#4CAF50' : '#ddd'}`,
-                                        borderRadius: '6px',
-                                        backgroundColor: isSelected && isSizeAvailable ? '#4CAF50' : !isSizeAvailable ? '#f5f5f5' : 'white',
-                                        color: isSelected && isSizeAvailable ? 'white' : !isSizeAvailable ? '#999' : '#555',
-                                        cursor: isSizeAvailable ? 'pointer' : 'not-allowed',
-                                        transition: 'all 0.2s',
-                                        opacity: isSizeAvailable ? 1 : 0.5
-                                      }}
-                                    >
-                                      {size}
-                                      {isSizeAvailable && (
-                                        <span style={{ 
-                                          fontSize: '6px', 
-                                          marginLeft: '2px', 
-                                          opacity: 0.8,
-                                          fontWeight: 'bold'
-                                        }}>
-                                          ({sizeInventory})
-                                        </span>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
+                              if (optionValues.length === 0) return null;
 
-                          {/* Current Selection Inventory */}
-                          {(selectedColor || selectedSize) && (
-                            <div style={{ marginBottom: '2px', padding: '2px 4px', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                              <div style={{ color: '#3b82f6', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                                📦 Selected: {selectedColor && selectedSize ? `${selectedColor} - ${selectedSize}` : selectedColor || selectedSize} 
-                                <span style={{ color: selectedInventory > 0 ? '#22c55e' : '#ef4444', marginLeft: '4px' }}>
-                                  ({selectedInventory} in stock)
-                                </span>
-                              </div>
-                            </div>
-                          )}
+                              // Get option icon based on name
+                              const getOptionIcon = (optionName: string) => {
+                                const name = optionName.toLowerCase();
+                                if (name.includes('color') || name.includes('colour')) return '🎨';
+                                if (name.includes('size')) return '📏';
+                                if (name.includes('style')) return '✨';
+                                if (name.includes('material')) return '🧵';
+                                if (name.includes('pattern')) return '🔷';
+                                if (name.includes('type')) return '📋';
+                                if (name.includes('variant')) return '🔄';
+                                if (name.includes('model')) return '🏷️';
+                                if (name.includes('finish')) return '🎯';
+                                return '⚙️'; // Default icon
+                              };
 
-                          {/* Variants Count */}
-                          <div style={{ marginBottom: '1px', display: 'flex', alignItems: 'center', gap: '1px' }}>
-                            <span style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>🔄 Variants:</span>
-                            <span style={{ color: '#cbd5e1', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                              {variants.length} option{variants.length !== 1 ? 's' : ''} available
-                            </span>
+                              // Get option color based on name for variety
+                              const getOptionColor = (optionName: string) => {
+                                const name = optionName.toLowerCase();
+                                if (name.includes('color') || name.includes('colour')) return '#2196F3';
+                                if (name.includes('size')) return '#4CAF50';
+                                if (name.includes('style')) return '#9C27B0';
+                                if (name.includes('material')) return '#FF9800';
+                                if (name.includes('pattern')) return '#E91E63';
+                                if (name.includes('type')) return '#00BCD4';
+                                if (name.includes('variant')) return '#795548';
+                                if (name.includes('model')) return '#607D8B';
+                                if (name.includes('finish')) return '#3F51B5';
+                                return '#757575'; // Default color
+                              };
+
+                              const optionColor = getOptionColor(option.name);
+                              const optionIcon = getOptionIcon(option.name);
+
+                              return (
+                                <div key={option.name} style={{ marginBottom: '2px' }}>
+                                  <div style={{ 
+                                    color: '#e2e8f0', 
+                                    fontWeight: 'bold', 
+                                    marginBottom: '1px', 
+                                    fontSize: '8px', 
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.5)' 
+                                  }}>
+                                    {optionIcon} {option.name}:
+                                  </div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
+                                    {optionValues.map((value: any) => {
+                                      const isSelected = selectedVariants[product.id]?.[option.name] === value;
+                                      const isValueAvailable = isOptionValueAvailable(option.name.toLowerCase(), value);
+                                      const valueInventory = getVariantInventory(
+                                        option.name.toLowerCase().includes('color') ? value : undefined,
+                                        option.name.toLowerCase().includes('size') ? value : undefined,
+                                        option.name,
+                                        value
+                                      );
+                                      
+                                      return (
+                                        <button
+                                          key={value}
+                                          onClick={() => {
+                                            if (!isValueAvailable) return;
+                                            handleVariantOptionSelect(product.id, option.name, value);
+                                          }}
+                                          disabled={!isValueAvailable}
+                                          title={`${value}: ${valueInventory} in stock`}
+                                          style={{
+                                            padding: '1px 3px',
+                                            fontSize: '7px',
+                                            border: `1px solid ${isSelected && isValueAvailable ? optionColor : '#ddd'}`,
+                                            borderRadius: '6px',
+                                            backgroundColor: isSelected && isValueAvailable ? optionColor : !isValueAvailable ? '#f5f5f5' : 'white',
+                                            color: isSelected && isValueAvailable ? 'white' : !isValueAvailable ? '#999' : '#555',
+                                            cursor: isValueAvailable ? 'pointer' : 'not-allowed',
+                                            transition: 'all 0.2s',
+                                            opacity: isValueAvailable ? 1 : 0.5,
+                                            position: 'relative'
+                                          }}
+                                        >
+                                          {value}
+                                          {isValueAvailable && (
+                                            <span style={{ 
+                                              fontSize: '6px', 
+                                              marginLeft: '2px', 
+                                              opacity: 0.8,
+                                              fontWeight: 'bold'
+                                            }}>
+                                              ({valueInventory})
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+
+                        {/* Current Selection Summary */}
+                        {Object.keys(selectedVariants[product.id] || {}).length > 0 && (
+                          <div style={{ marginBottom: '2px', padding: '2px 4px', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                            <div style={{ color: '#3b82f6', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                              📦 Selected: {Object.entries(selectedVariants[product.id] || {}).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                              <span style={{ color: selectedInventory > 0 ? '#22c55e' : '#ef4444', marginLeft: '4px' }}>
+                                ({selectedInventory} in stock)
+                              </span>
+                            </div>
                           </div>
+                        )}
 
-                          {/* Stock Status */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
-                            <span style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>📦 Stock:</span>
-                            <span style={{ 
-                              color: isAvailable ? '#4ade80' : '#f87171',
-                              fontWeight: 'bold',
-                              fontSize: '7px',
-                              textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                            }}>
-                              {isAvailable ? `${totalStock} units` : 'Out of stock'}
-                            </span>
-                          </div>
+                        {/* Variants Count */}
+                        <div style={{ marginBottom: '1px', display: 'flex', alignItems: 'center', gap: '1px' }}>
+                          <span style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>🔄 Variants:</span>
+                          <span style={{ color: '#cbd5e1', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                            {variants.length} option{variants.length !== 1 ? 's' : ''} available
+                          </span>
+                        </div>
+
+                        {/* Stock Status */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                          <span style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '7px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>📦 Stock:</span>
+                          <span style={{ 
+                            color: isAvailable ? '#4ade80' : '#f87171',
+                            fontWeight: 'bold',
+                            fontSize: '7px',
+                            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                          }}>
+                            {isAvailable ? `${totalStock} units` : 'Out of stock'}
+                          </span>
                         </div>
 
                         {/* Action Buttons */}
