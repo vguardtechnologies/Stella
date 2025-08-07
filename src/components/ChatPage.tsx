@@ -4910,12 +4910,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             </div>
             
             {/* Second Section - Cart */}
-            <div className="shopify-section" style={{ padding: '4px', border: '1px solid #334155', margin: '4px 0', borderRadius: '6px', backgroundColor: '#1e293b' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <h4 style={{ margin: '0', fontSize: '10px', color: '#ffffff', fontWeight: 'bold' }}>
+            <div className="shopify-section" style={{ padding: '8px', border: '1px solid #ddd', margin: '8px 0', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h4 style={{ margin: '0', fontSize: '12px', color: '#333' }}>
                   🛒 Cart ({cartItems.length} item{cartItems.length !== 1 ? 's' : ''})
                 </h4>
-                <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#60a5fa', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#4CAF50' }}>
                   Total: ${cartTotal.toFixed(2)}
                 </div>
               </div>
@@ -4923,56 +4923,50 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               {cartItems.length > 0 ? (
                 <div>
                   {/* Cart Items */}
-                  <div style={{ maxHeight: '160px', overflowY: 'auto', marginBottom: '6px' }}>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '10px' }}>
                     {cartItems.map((item, index) => (
                       <div key={index} style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between', 
                         alignItems: 'center',
-                        padding: '4px',
-                        backgroundColor: 'rgba(255,255,255,0.1)',
-                        backdropFilter: 'blur(10px)',
+                        padding: '8px',
+                        backgroundColor: 'white',
                         borderRadius: '4px',
-                        marginBottom: '2px',
-                        border: '1px solid rgba(255,255,255,0.2)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                        marginBottom: '5px',
+                        border: '1px solid #eee'
                       }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '10px', fontWeight: 'bold', marginBottom: '1px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '2px' }}>
                             {item.title}
                           </div>
-                          <div style={{ fontSize: '8px', color: '#e2e8f0', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          <div style={{ fontSize: '10px', color: '#666' }}>
                             ${item.variants?.[0]?.price || item.price || 'N/A'} each
                           </div>
                         </div>
                         
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                           <button
                             onClick={() => updateCartQuantity(item.cartItemId || item.id, item.quantity - 1)}
                             style={{
-                              width: '16px',
-                              height: '16px',
+                              width: '20px',
+                              height: '20px',
                               padding: '0',
-                              fontSize: '10px',
-                              backgroundColor: '#ef4444',
+                              fontSize: '12px',
+                              backgroundColor: '#ff4444',
                               color: 'white',
                               border: 'none',
-                              borderRadius: '3px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                              borderRadius: '2px',
+                              cursor: 'pointer'
                             }}
                           >
                             -
                           </button>
                           
                           <span style={{ 
-                            minWidth: '18px', 
+                            minWidth: '25px', 
                             textAlign: 'center', 
-                            fontSize: '9px',
-                            fontWeight: 'bold',
-                            color: '#ffffff',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                            fontSize: '11px',
+                            fontWeight: 'bold'
                           }}>
                             {item.quantity}
                           </span>
@@ -4980,17 +4974,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           <button
                             onClick={() => updateCartQuantity(item.cartItemId || item.id, item.quantity + 1)}
                             style={{
-                              width: '16px',
-                              height: '16px',
+                              width: '20px',
+                              height: '20px',
                               padding: '0',
-                              fontSize: '10px',
-                              backgroundColor: '#22c55e',
+                              fontSize: '12px',
+                              backgroundColor: '#4CAF50',
                               color: 'white',
                               border: 'none',
-                              borderRadius: '3px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                              borderRadius: '2px',
+                              cursor: 'pointer'
                             }}
                           >
                             +
@@ -4999,18 +4991,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           <button
                             onClick={() => removeFromCart(item.cartItemId || item.id)}
                             style={{
-                              width: '16px',
-                              height: '16px',
+                              width: '20px',
+                              height: '20px',
                               padding: '0',
-                              fontSize: '8px',
-                              backgroundColor: '#64748b',
+                              fontSize: '10px',
+                              backgroundColor: '#666',
                               color: 'white',
                               border: 'none',
-                              borderRadius: '3px',
+                              borderRadius: '2px',
                               cursor: 'pointer',
-                              marginLeft: '2px',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                              marginLeft: '5px'
                             }}
                           >
                             ×
@@ -5022,41 +5012,37 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   
                   {/* Discount Code Section */}
                   <div style={{ 
-                    marginBottom: '6px', 
-                    padding: '4px', 
-                    border: '1px solid rgba(255,255,255,0.2)', 
+                    marginBottom: '10px', 
+                    padding: '8px', 
+                    border: '1px solid #ddd', 
                     borderRadius: '4px',
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                    backgroundColor: '#f5f5f5'
                   }}>
-                    <h5 style={{ margin: '0 0 4px 0', fontSize: '9px', color: '#ffffff', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>💳 Discount Code</h5>
+                    <h5 style={{ margin: '0 0 5px 0', fontSize: '11px', color: '#333' }}>💳 Discount Code</h5>
                     
                     {appliedDiscount ? (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          <div style={{ fontSize: '12px', color: '#4CAF50', fontWeight: 'bold' }}>
                             ✅ {appliedDiscount.code} Applied
                           </div>
-                          <div style={{ fontSize: '10px', color: '#cbd5e1', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          <div style={{ fontSize: '10px', color: '#666' }}>
                             {appliedDiscount.description}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          <div style={{ fontSize: '12px', color: '#4CAF50', fontWeight: 'bold' }}>
                             -${calculateDiscountAmount().toFixed(2)}
                           </div>
                         </div>
                         <button
                           onClick={removeDiscount}
                           style={{
-                            padding: '4px 8px',
-                            fontSize: '10px',
-                            backgroundColor: '#ef4444',
+                            padding: '5px 10px',
+                            fontSize: '11px',
+                            backgroundColor: '#ff4444',
                             color: 'white',
                             border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                            borderRadius: '4px',
+                            cursor: 'pointer'
                           }}
                         >
                           Remove
@@ -5064,21 +5050,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       </div>
                     ) : (
                       <div>
-                        <div style={{ display: 'flex', gap: '2px', marginBottom: '2px' }}>
+                        <div style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
                           <input
                             type="text"
-                            placeholder="Code"
+                            placeholder="Enter discount code"
                             value={discountCode}
                             onChange={(e) => setDiscountCode(e.target.value)}
                             style={{
                               flex: 1,
-                              padding: '3px',
-                              fontSize: '9px',
-                              border: '1px solid rgba(255,255,255,0.3)',
-                              borderRadius: '3px',
-                              backgroundColor: 'rgba(255,255,255,0.1)',
-                              color: '#ffffff',
-                              backdropFilter: 'blur(10px)',
+                              padding: '5px',
+                              fontSize: '11px',
+                              border: '1px solid #ddd',
+                              borderRadius: '2px',
                               outline: 'none'
                             }}
                             onKeyPress={(e) => e.key === 'Enter' && applyDiscountCode()}
@@ -5087,22 +5070,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             onClick={applyDiscountCode}
                             disabled={isApplyingDiscount || !discountCode.trim()}
                             style={{
-                              padding: '3px 6px',
-                              fontSize: '8px',
-                              backgroundColor: isApplyingDiscount ? '#64748b' : '#3b82f6',
+                              padding: '5px 10px',
+                              fontSize: '10px',
+                              backgroundColor: isApplyingDiscount ? '#ccc' : '#2196F3',
                               color: 'white',
                               border: 'none',
-                              borderRadius: '3px',
-                              cursor: isApplyingDiscount ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                              borderRadius: '2px',
+                              cursor: isApplyingDiscount ? 'not-allowed' : 'pointer'
                             }}
                           >
-                            {isApplyingDiscount ? '...' : 'Apply'}
+                            {isApplyingDiscount ? 'Applying...' : 'Apply'}
                           </button>
                         </div>
                         {discountError && (
-                          <div style={{ fontSize: '10px', color: '#fca5a5', marginTop: '3px', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          <div style={{ fontSize: '10px', color: '#ff4444', marginTop: '5px' }}>
                             {discountError}
                           </div>
                         )}
@@ -5112,21 +5093,19 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
                   {/* Updated Cart Total with Discount */}
                   <div style={{ 
-                    marginBottom: '6px', 
-                    padding: '4px', 
-                    backgroundColor: 'rgba(255,255,255,0.1)', 
-                    backdropFilter: 'blur(10px)',
+                    marginBottom: '10px', 
+                    padding: '8px', 
+                    backgroundColor: '#f0f8ff', 
                     borderRadius: '4px',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                    border: '1px solid #ddd'
                   }}>
-                    <div style={{ fontSize: '9px', color: '#e2e8f0', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                    <div style={{ fontSize: '11px', color: '#333' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Subtotal:</span>
                         <span>${cartTotal.toFixed(2)}</span>
                       </div>
                       {appliedDiscount && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#22c55e' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4CAF50' }}>
                           <span>Discount ({appliedDiscount.code}):</span>
                           <span>-${calculateDiscountAmount().toFixed(2)}</span>
                         </div>
@@ -5135,11 +5114,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         display: 'flex', 
                         justifyContent: 'space-between', 
                         fontWeight: 'bold', 
-                        fontSize: '10px',
-                        marginTop: '2px',
-                        paddingTop: '2px',
-                        borderTop: '1px solid rgba(255,255,255,0.2)',
-                        color: '#60a5fa'
+                        fontSize: '13px',
+                        marginTop: '5px',
+                        paddingTop: '5px',
+                        borderTop: '1px solid #ddd',
+                        color: '#333'
                       }}>
                         <span>Total:</span>
                         <span>${getFinalTotal().toFixed(2)}</span>
@@ -5148,26 +5127,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   </div>
 
                   {/* Cart Actions */}
-                  <div style={{ display: 'flex', gap: '2px', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', gap: '5px', flexDirection: 'column' }}>
                     <button
                       onClick={() => setShowCheckoutModal(true)}
                       style={{
                         width: '100%',
-                        padding: '6px',
-                        fontSize: '9px',
-                        backgroundColor: '#22c55e',
+                        padding: '10px',
+                        fontSize: '12px',
+                        backgroundColor: '#28a745',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
                         cursor: 'pointer',
                         fontWeight: 'bold',
-                        marginBottom: '2px',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                        marginBottom: '5px'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#16a34a'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#22c55e'}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#218838'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#28a745'}
                     >
                       🛒 Checkout (${getFinalTotal().toFixed(2)})
                     </button>
@@ -5176,20 +5152,17 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       onClick={sendCartInChat}
                       style={{
                         width: '100%',
-                        padding: '4px',
-                        fontSize: '8px',
-                        backgroundColor: '#3b82f6',
+                        padding: '8px',
+                        fontSize: '11px',
+                        backgroundColor: '#2196F3',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
                         cursor: 'pointer',
-                        fontWeight: 'bold',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                        fontWeight: 'bold'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1976D2'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2196F3'}
                     >
                       💬 Send Cart in Chat
                     </button>
@@ -5198,19 +5171,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       onClick={clearCart}
                       style={{
                         width: '100%',
-                        padding: '3px',
-                        fontSize: '8px',
-                        backgroundColor: '#ef4444',
+                        padding: '6px',
+                        fontSize: '10px',
+                        backgroundColor: '#ff4444',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                        cursor: 'pointer'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#cc3333'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ff4444'}
                     >
                       🗑️ Clear Cart
                     </button>
@@ -5219,13 +5189,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               ) : (
                 <div style={{ 
                   textAlign: 'center', 
-                  color: '#e2e8f0', 
+                  color: '#666', 
                   padding: '20px',
-                  fontSize: '12px',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                  fontSize: '12px'
                 }}>
                   🛒 Your cart is empty<br />
-                  <small style={{ color: '#cbd5e1', fontSize: '10px' }}>Add products from Section 1 above</small>
+                  <small style={{ color: '#999', fontSize: '10px' }}>Add products from Section 1 above</small>
                 </div>
               )}
             </div>
