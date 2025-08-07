@@ -294,6 +294,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   } | null>(null);
   const [discountError, setDiscountError] = useState('');
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
+  
+  // Smart Auto Cart UX Enhancement States
+  const [cartFocusMode, setCartFocusMode] = useState(false);
+  const [isHoveringCart, setIsHoveringCart] = useState(false);
+  const [lastCartInteraction, setLastCartInteraction] = useState<number>(0);
+  const [autoRecoveryTimer, setAutoRecoveryTimer] = useState<NodeJS.Timeout | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -1726,6 +1733,72 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     return cartTotal - calculateDiscountAmount();
   };
 
+  // Smart Auto Cart UX Enhancement Functions
+  const handleCartInteraction = () => {
+    setLastCartInteraction(Date.now());
+    if (!cartFocusMode) {
+      setCartFocusMode(true);
+    }
+    
+    // Clear any existing recovery timer
+    if (autoRecoveryTimer) {
+      clearTimeout(autoRecoveryTimer);
+    }
+    
+    // Set a new recovery timer for 8 seconds of inactivity
+    const newTimer = setTimeout(() => {
+      if (!isHoveringCart) {
+        setCartFocusMode(false);
+      }
+    }, 8000);
+    
+    setAutoRecoveryTimer(newTimer);
+  };
+
+  const handleCartMouseEnter = () => {
+    setIsHoveringCart(true);
+    handleCartInteraction();
+  };
+
+  const handleCartMouseLeave = () => {
+    setIsHoveringCart(false);
+    
+    // Start recovery timer when mouse leaves cart
+    if (autoRecoveryTimer) {
+      clearTimeout(autoRecoveryTimer);
+    }
+    
+    const newTimer = setTimeout(() => {
+      setCartFocusMode(false);
+    }, 3000); // 3 seconds after mouse leaves
+    
+    setAutoRecoveryTimer(newTimer);
+  };
+
+  const handleProductsMouseEnter = () => {
+    // If user hovers over products while cart is in focus mode, give them 5 seconds before auto-recovery
+    if (cartFocusMode && autoRecoveryTimer) {
+      clearTimeout(autoRecoveryTimer);
+      
+      const newTimer = setTimeout(() => {
+        if (!isHoveringCart) {
+          setCartFocusMode(false);
+        }
+      }, 5000);
+      
+      setAutoRecoveryTimer(newTimer);
+    }
+  };
+
+  // Cleanup timer on component unmount
+  React.useEffect(() => {
+    return () => {
+      if (autoRecoveryTimer) {
+        clearTimeout(autoRecoveryTimer);
+      }
+    };
+  }, [autoRecoveryTimer]);
+
   // Update cart total when cart items change
   React.useEffect(() => {
     const total = cartItems.reduce((sum, item) => {
@@ -2980,6 +3053,35 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   };
 
   return (
+    <>
+      {/* Smart Auto Cart UX Enhancement CSS */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes pulse {
+            0% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.8;
+              transform: scale(1.05);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+          
+          .no-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .no-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+        `
+      }} />
+    
     <div className="chat-page">
       {/* Cart Notification */}
       {cartNotification && (
@@ -4401,7 +4503,57 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             </div>
             
             {/* First Section - Products */}
-            <div className="shopify-section" style={{ padding: '8px', border: '1px solid #334155', margin: '8px 0', borderRadius: '8px', backgroundColor: '#1e293b' }}>
+            <div 
+              className="shopify-section" 
+              style={{ 
+                padding: '8px', 
+                border: '1px solid #334155', 
+                margin: '8px 0', 
+                borderRadius: '8px', 
+                backgroundColor: '#1e293b',
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: cartFocusMode ? 'scale(0.85)' : 'scale(1)',
+                opacity: cartFocusMode ? 0.6 : 1,
+                maxHeight: cartFocusMode ? '200px' : 'none',
+                overflow: cartFocusMode ? 'hidden' : 'visible',
+                position: 'relative'
+              }}
+              onMouseEnter={handleProductsMouseEnter}
+            >
+              {/* Smart Auto Cart Overlay */}
+              {cartFocusMode && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(30, 41, 59, 0.8)',
+                  backdropFilter: 'blur(2px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10,
+                  borderRadius: '8px',
+                  transition: 'all 0.3s ease'
+                }}>
+                  <div style={{
+                    color: '#cbd5e1',
+                    fontSize: '12px',
+                    textAlign: 'center',
+                    padding: '20px'
+                  }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>🛒</div>
+                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Cart Focus Mode</div>
+                    <div style={{ fontSize: '10px', opacity: 0.8 }}>
+                      Products minimized for better cart experience
+                    </div>
+                    <div style={{ fontSize: '9px', opacity: 0.6, marginTop: '8px' }}>
+                      Hover here or wait to restore
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Products Header */}
               <div style={{ marginBottom: '6px' }}>
                 <h4 style={{ margin: 0, color: '#ffffff', fontSize: '12px', fontWeight: 'bold' }}>
@@ -4910,7 +5062,41 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             </div>
             
             {/* Second Section - Cart */}
-            <div className="shopify-section" style={{ padding: '8px', border: '1px solid #ddd', margin: '8px 0', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+            <div 
+              className="shopify-section" 
+              style={{ 
+                padding: '8px', 
+                border: cartFocusMode ? '2px solid #4CAF50' : '1px solid #ddd', 
+                margin: '8px 0', 
+                borderRadius: '4px', 
+                backgroundColor: cartFocusMode ? '#f0f8ff' : '#f9f9f9',
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: cartFocusMode ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: cartFocusMode ? '0 8px 32px rgba(76, 175, 80, 0.2)' : 'none',
+                position: 'relative'
+              }}
+              onMouseEnter={handleCartMouseEnter}
+              onMouseLeave={handleCartMouseLeave}
+              onClick={handleCartInteraction}
+            >
+              {/* Smart Auto Cart Enhancement Indicator */}
+              {cartFocusMode && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '12px',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  zIndex: 10,
+                  animation: 'pulse 2s infinite'
+                }}>
+                  ✨ Cart Focus Mode
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h4 style={{ margin: '0', fontSize: '12px', color: '#333' }}>
                   🛒 Cart ({cartItems.length} item{cartItems.length !== 1 ? 's' : ''})
@@ -4946,7 +5132,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                           <button
-                            onClick={() => updateCartQuantity(item.cartItemId || item.id, item.quantity - 1)}
+                            onClick={() => {
+                              handleCartInteraction();
+                              updateCartQuantity(item.cartItemId || item.id, item.quantity - 1);
+                            }}
                             style={{
                               width: '20px',
                               height: '20px',
@@ -4972,7 +5161,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           </span>
                           
                           <button
-                            onClick={() => updateCartQuantity(item.cartItemId || item.id, item.quantity + 1)}
+                            onClick={() => {
+                              handleCartInteraction();
+                              updateCartQuantity(item.cartItemId || item.id, item.quantity + 1);
+                            }}
                             style={{
                               width: '20px',
                               height: '20px',
@@ -4989,7 +5181,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           </button>
                           
                           <button
-                            onClick={() => removeFromCart(item.cartItemId || item.id)}
+                            onClick={() => {
+                              handleCartInteraction();
+                              removeFromCart(item.cartItemId || item.id);
+                            }}
                             style={{
                               width: '20px',
                               height: '20px',
@@ -5064,10 +5259,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                               borderRadius: '2px',
                               outline: 'none'
                             }}
-                            onKeyPress={(e) => e.key === 'Enter' && applyDiscountCode()}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                handleCartInteraction();
+                                applyDiscountCode();
+                              }
+                            }}
                           />
                           <button
-                            onClick={applyDiscountCode}
+                            onClick={() => {
+                              handleCartInteraction();
+                              applyDiscountCode();
+                            }}
                             disabled={isApplyingDiscount || !discountCode.trim()}
                             style={{
                               padding: '5px 10px',
@@ -5129,7 +5332,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   {/* Cart Actions */}
                   <div style={{ display: 'flex', gap: '5px', flexDirection: 'column' }}>
                     <button
-                      onClick={() => setShowCheckoutModal(true)}
+                      onClick={() => {
+                        handleCartInteraction();
+                        setShowCheckoutModal(true);
+                      }}
                       style={{
                         width: '100%',
                         padding: '10px',
@@ -5149,7 +5355,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     </button>
                     
                     <button
-                      onClick={sendCartInChat}
+                      onClick={() => {
+                        handleCartInteraction();
+                        sendCartInChat();
+                      }}
                       style={{
                         width: '100%',
                         padding: '8px',
@@ -5168,7 +5377,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     </button>
                     
                     <button
-                      onClick={clearCart}
+                      onClick={() => {
+                        handleCartInteraction();
+                        clearCart();
+                      }}
                       style={{
                         width: '100%',
                         padding: '6px',
@@ -5569,6 +5781,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       )}
 
     </div>
+    </>
   );
 };
 
