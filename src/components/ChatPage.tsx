@@ -177,9 +177,16 @@ interface Message {
   text: string;
   sender: 'user' | 'agent';
   timestamp: Date;
-  type: 'text' | 'product' | 'order' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location';
+  type: 'text' | 'product' | 'order' | 'cart' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location';
   productData?: Product;
   orderData?: Order;
+  cartData?: {
+    items: any[];
+    total: number;
+    finalTotal: number;
+    discount?: any;
+    itemCount: number;
+  };
   status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   // WhatsApp specific fields
   whatsapp_message_id?: string;
@@ -1097,7 +1104,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         interactive: {
           type: 'product',
           body: {
-            text: `Check out this specific variant from SUSA SHAPEWEAR! 💫\n\n*Selected:* ${optionsText}`
+            text: `Check out this specific variant from SUSA SHAPEWEAR! 💫\n\n*Selected:* ${optionsText}\n*Price:* ${price}${comparePrice}\n*Stock:* ${selectedVariant?.inventory_quantity > 0 ? `${selectedVariant.inventory_quantity} available` : 'Out of stock'}`
           },
           action: {
             catalog_id: '923378196624516', // Our synced catalog ID
@@ -1119,21 +1126,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       if (productResult.success) {
         console.log('✅ Product variant card sent successfully as interactive product message:', product.title);
-        
-        // Send additional variant details as a follow-up text message
-        const variantDetailsPayload = {
-          to: phoneNumber.replace(/[^\d]/g, ''),
-          message: `*Specific Variant Details:*\n• ${optionsText}\n• Price: ${price}${comparePrice}\n• Stock: ${selectedVariant?.inventory_quantity > 0 ? `${selectedVariant.inventory_quantity} available` : 'Out of stock'}\n• SKU: ${selectedVariant?.sku || 'N/A'}`,
-          type: 'text'
-        };
-
-        await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(variantDetailsPayload),
-        });
         
         // Update message status to sent
         setMessages(prev => prev.map(msg => 
@@ -1457,52 +1449,154 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       return;
     }
 
-    let cartMessage = '🛒 *Shopping Cart Summary*\n\n';
+    // Extract phone number from conversation
+    const conversation = whatsappConversations.find(c => c.id === selectedConversation);
+    let phoneNumber: string;
+    if (!conversation) {
+      if (selectedConversation.startsWith('wa_')) {
+        phoneNumber = '+' + selectedConversation.replace('wa_', '');
+      } else {
+        console.error('No conversation found for ID:', selectedConversation);
+        return;
+      }
+    } else {
+      phoneNumber = conversation.customerPhone;
+    }
+
+    // Create a beautifully formatted cart summary message
+    let cartMessage = '🛒 *SHOPPING CART SUMMARY*\n';
+    cartMessage += '═══════════════════════════\n\n';
     
+    // Add each cart item with enhanced formatting
     cartItems.forEach((item, index) => {
-      const price = parseFloat(item.variants?.[0]?.price || '0');
+      const price = parseFloat(item.selectedVariant?.price || item.variants?.[0]?.price || '0');
       const itemTotal = price * item.quantity;
-      cartMessage += `${index + 1}. *${item.title}*\n`;
-      cartMessage += `   💰 $${price} x ${item.quantity} = $${itemTotal.toFixed(2)}\n\n`;
+      
+      cartMessage += `📦 *${index + 1}. ${item.title}*\n`;
+      
+      // Add selected options if any
+      if (item.selectedOptions && Object.keys(item.selectedOptions).length > 0) {
+        const optionsText = Object.entries(item.selectedOptions)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ');
+        cartMessage += `   ✨ *Options:* ${optionsText}\n`;
+      }
+      
+      cartMessage += `   💰 *Price:* $${price.toFixed(2)} TTD\n`;
+      cartMessage += `   📊 *Quantity:* ${item.quantity}\n`;
+      cartMessage += `   💵 *Subtotal:* $${itemTotal.toFixed(2)} TTD\n`;
+      
+      if (index < cartItems.length - 1) {
+        cartMessage += '\n─────────────────────────\n\n';
+      }
     });
     
-    cartMessage += `📊 *Total: $${cartTotal.toFixed(2)}*\n\n`;
-    cartMessage += `Ready to checkout? Let me know! 😊`;
+    cartMessage += '\n═══════════════════════════\n';
+    
+    // Add discount information if applied
+    if (appliedDiscount) {
+      cartMessage += `🎉 *Discount Applied:* ${appliedDiscount.code}\n`;
+      cartMessage += `� *Discount Amount:* -$${calculateDiscountAmount().toFixed(2)} TTD\n`;
+      cartMessage += `💰 *Subtotal:* $${cartTotal.toFixed(2)} TTD\n`;
+      cartMessage += `🏷️ *Final Total:* $${getFinalTotal().toFixed(2)} TTD\n\n`;
+    } else {
+      cartMessage += `💰 *TOTAL: $${cartTotal.toFixed(2)} TTD*\n\n`;
+    }
+    
+    cartMessage += '🚀 Ready to checkout? Just let me know!\n';
+    cartMessage += '✅ I can help process your order right away!\n\n';
+    cartMessage += `📱 Cart contains ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''}\n`;
+    cartMessage += `�️ From: SUSA SHAPEWEAR Collection`;
+
+    // Create visual cart message for chat display (optimistic update)
+    const newMessage: Message = {
+      id: `cart_${Date.now()}`,
+      text: cartMessage,
+      sender: 'agent',
+      timestamp: new Date(),
+      status: 'sending',
+      type: 'cart', // Special type for cart messages
+      direction: 'outgoing',
+      cartData: {
+        items: cartItems,
+        total: cartTotal,
+        finalTotal: getFinalTotal(),
+        discount: appliedDiscount,
+        itemCount: cartItems.length
+      }
+    };
+    
+    console.log('🛒 Creating cart message:', newMessage);
+    setMessages(prev => [...prev, newMessage]);
 
     try {
-      const phoneNumber = selectedConversation.replace('wa_', '');
+      const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
+      // Send the formatted cart message
       const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: phoneNumber,  // Fix: API expects 'to', not 'phoneNumber'
+          to: phoneNumber.replace(/[^\d]/g, ''),
           message: cartMessage,
-          type: 'text'
+          type: 'text',
+          cartData: {
+            items: cartItems,
+            total: cartTotal,
+            finalTotal: getFinalTotal(),
+            discount: appliedDiscount
+          }
         })
       });
 
-      if (response.ok) {
-        const newMessage: Message = {
-          id: `cart_${Date.now()}`,
-          text: cartMessage,
-          sender: 'agent',
-          timestamp: new Date(),
-          status: 'sent',
-          type: 'text',
-          direction: 'outgoing'
-        };
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Cart summary sent successfully to chat');
         
-        setMessages(prev => [...prev, newMessage]);
-        console.log(`✅ Cart sent to chat`);
+        // Update message status to sent - ensure cartData is preserved
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id ? { 
+            ...msg, 
+            status: 'sent',
+            whatsapp_message_id: result.data.messageId,
+            // Explicitly preserve cartData and type
+            type: 'cart',
+            cartData: msg.cartData
+          } : msg
+        ));
       } else {
-        console.error('Failed to send cart message');
+        console.error('❌ Failed to send cart message:', result.message);
+        
+        // Update message status to failed - ensure cartData is preserved
+        setMessages(prev => prev.map(msg => 
+          msg.id === newMessage.id ? { 
+            ...msg, 
+            status: 'failed',
+            // Explicitly preserve cartData and type
+            type: 'cart',
+            cartData: msg.cartData
+          } : msg
+        ));
+        
         alert('Failed to send cart. Please try again.');
       }
     } catch (error) {
-      console.error('Error sending cart message:', error);
+      console.error('❌ Error sending cart message:', error);
+      
+      // Update message status to failed - ensure cartData is preserved
+      setMessages(prev => prev.map(msg => 
+        msg.id === newMessage.id ? { 
+          ...msg, 
+          status: 'failed',
+          // Explicitly preserve cartData and type
+          type: 'cart',
+          cartData: msg.cartData
+        } : msg
+      ));
+      
       alert('Error sending cart. Please try again.');
     }
   };
@@ -1838,6 +1932,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       console.log('Parsed messages data:', data);
       
       if (data.success) {
+        // Debug: Show what we got from server
+        console.log(`📨 Server returned ${data.data.length} messages for auto-refresh`);
+        data.data.forEach((msg: any, idx: number) => {
+          console.log(`   ${idx}: id=${msg.whatsapp_message_id} type=${msg.message_type} content=${msg.message_content?.substring(0, 30)}...`);
+        });
+
         const convertedMessages = data.data.map((msg: any) => {
           // Voice message detection
           if (msg.message_type === 'voice' || msg.message_type === 'audio' || msg.media_mime_type?.includes('audio') || msg.voice_duration || 
@@ -1916,9 +2016,69 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               msg.videoUrl = existingVideoUrls.get(msg.id);
             }
           });
+
+          // Preserve local messages (cart, product messages) that have rich formatting
+          console.log(`🔍 Auto-refresh detected - checking ${messages.length} existing messages for preservation`);
+          
+          const localMessages = messages.filter(msg => 
+            (msg.type === 'cart' && msg.cartData) || 
+            (msg.type === 'product' && msg.id.startsWith('product_')) ||
+            (msg.id.startsWith('cart_') || msg.id.startsWith('product_variant_'))
+          );
+          
+          console.log(`🔍 Found ${localMessages.length} potential local messages:`, localMessages.map(m => ({ id: m.id, type: m.type, hasCartData: !!m.cartData })));
+          
+          // For cart messages, always preserve the local version with cartData over server's plain text version
+          const serverMessageIds = new Set(convertedMessages.map((m: any) => m.whatsapp_message_id || m.id));
+          console.log(`📋 Server message IDs:`, Array.from(serverMessageIds));
+          
+          const localMessagesToKeep = localMessages.filter(msg => {
+            // Always preserve cart messages with cartData, regardless of server version
+            if (msg.type === 'cart' && msg.cartData) {
+              console.log(`🛒 Preserving cart message ${msg.id} with cartData over server version`);
+              return true;
+            }
+            
+            // For other messages, check if server doesn't have them
+            const shouldKeep = !serverMessageIds.has(msg.whatsapp_message_id || msg.id);
+            console.log(`🔍 Message ${msg.id} (whatsapp_id: ${msg.whatsapp_message_id}) - Should keep: ${shouldKeep}`);
+            return shouldKeep;
+          });
+          
+          // Remove server versions of cart messages that we want to keep local versions of
+          const cartMessagesToKeep = localMessagesToKeep.filter(msg => msg.type === 'cart' && msg.cartData);
+          if (cartMessagesToKeep.length > 0) {
+            const cartMessageIds = new Set(cartMessagesToKeep.map(msg => msg.whatsapp_message_id).filter(id => id));
+            // Filter out server versions of cart messages to preserve local formatting
+            const filteredServerMessages = convertedMessages.filter((serverMsg: any) => {
+              const shouldRemove = cartMessageIds.has(serverMsg.whatsapp_message_id || serverMsg.id);
+              if (shouldRemove) {
+                console.log(`🗑️ Removing server version of cart message ${serverMsg.whatsapp_message_id || serverMsg.id} to keep local cart formatting`);
+              }
+              return !shouldRemove;
+            });
+            // Replace convertedMessages with the filtered array
+            convertedMessages.splice(0, convertedMessages.length, ...filteredServerMessages);
+          }
+          
+          if (localMessagesToKeep.length > 0) {
+            console.log('🔄 Preserving', localMessagesToKeep.length, 'local messages during refresh');
+            localMessagesToKeep.forEach(msg => {
+              console.log(`   - ${msg.id}: type=${msg.type}, cartData=${!!msg.cartData}, productData=${!!msg.productData}`);
+            });
+            convertedMessages.push(...localMessagesToKeep);
+          }
         }
         
         setMessages(convertedMessages.reverse());
+        
+        // Debug: Show final message array composition
+        if (convertedMessages.length > 0) {
+          console.log('📋 Final message array composition:');
+          convertedMessages.forEach((msg, idx) => {
+            console.log(`   ${idx}: ${msg.id} (type: ${msg.type}, cartData: ${!!msg.cartData}) - ${msg.text?.substring(0, 30)}...`);
+          });
+        }
       } else {
         console.warn('Messages fetch was not successful:', data);
       }
@@ -3669,6 +3829,205 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             <p>Status: {message.orderData.status}</p>
                           </div>
                         </div>
+                      ) : message.type === 'cart' && message.cartData ? (
+                        (() => {
+                          console.log('🛒 Rendering cart message:', message.id, 'Type:', message.type, 'Has cartData:', !!message.cartData);
+                          return (
+                        <div className="cart-message" style={{ 
+                          maxWidth: '350px',
+                          margin: message.sender === 'agent' ? '0 0 0 auto' : '0 auto 0 0'
+                        }}>
+                          <div style={{
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            borderRadius: '16px',
+                            padding: '20px',
+                            color: 'white',
+                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                          }}>
+                            {/* Cart Header */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              marginBottom: '16px',
+                              paddingBottom: '12px',
+                              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+                            }}>
+                              <div style={{
+                                background: 'rgba(255, 255, 255, 0.2)',
+                                borderRadius: '12px',
+                                width: '48px',
+                                height: '48px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: '12px',
+                                fontSize: '24px'
+                              }}>
+                                🛒
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>
+                                  Shopping Cart
+                                </div>
+                                <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                                  {message.cartData.itemCount} item{message.cartData.itemCount !== 1 ? 's' : ''} • SUSA SHAPEWEAR
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Cart Items */}
+                            <div style={{ marginBottom: '16px' }}>
+                              {message.cartData.items.slice(0, 3).map((item: any, index: number) => (
+                                <div key={index} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  marginBottom: '12px',
+                                  padding: '8px',
+                                  background: 'rgba(255, 255, 255, 0.1)',
+                                  borderRadius: '8px',
+                                  backdropFilter: 'blur(10px)'
+                                }}>
+                                  <img 
+                                    src={item.images?.[0]?.src || 'https://via.placeholder.com/40x40/667eea/white?text=P'} 
+                                    alt={item.title}
+                                    style={{ 
+                                      width: '40px', 
+                                      height: '40px', 
+                                      borderRadius: '6px',
+                                      objectFit: 'cover',
+                                      marginRight: '12px',
+                                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                                    }}
+                                  />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ 
+                                      fontSize: '14px', 
+                                      fontWeight: 'bold',
+                                      marginBottom: '4px',
+                                      lineHeight: '1.2'
+                                    }}>
+                                      {item.title.length > 30 ? item.title.substring(0, 30) + '...' : item.title}
+                                    </div>
+                                    <div style={{ 
+                                      fontSize: '11px', 
+                                      opacity: 0.8,
+                                      marginBottom: '2px'
+                                    }}>
+                                      {item.selectedOptions && Object.keys(item.selectedOptions).length > 0 && (
+                                        <>
+                                          {Object.entries(item.selectedOptions)
+                                            .map(([key, value]) => `${key}: ${value}`)
+                                            .join(', ')}
+                                          <br />
+                                        </>
+                                      )}
+                                      Qty: {item.quantity} × ${parseFloat(item.selectedVariant?.price || item.variants?.[0]?.price || '0').toFixed(2)}
+                                    </div>
+                                  </div>
+                                  <div style={{ 
+                                    fontSize: '14px', 
+                                    fontWeight: 'bold',
+                                    textAlign: 'right'
+                                  }}>
+                                    ${(parseFloat(item.selectedVariant?.price || item.variants?.[0]?.price || '0') * item.quantity).toFixed(2)}
+                                  </div>
+                                </div>
+                              ))}
+                              
+                              {message.cartData.items.length > 3 && (
+                                <div style={{
+                                  textAlign: 'center',
+                                  fontSize: '12px',
+                                  opacity: 0.8,
+                                  padding: '8px',
+                                  background: 'rgba(255, 255, 255, 0.1)',
+                                  borderRadius: '8px',
+                                  marginBottom: '12px'
+                                }}>
+                                  +{message.cartData.items.length - 3} more item{message.cartData.items.length - 3 !== 1 ? 's' : ''}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Cart Total */}
+                            <div style={{
+                              paddingTop: '12px',
+                              borderTop: '1px solid rgba(255, 255, 255, 0.2)'
+                            }}>
+                              {message.cartData.discount && (
+                                <div style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  fontSize: '12px',
+                                  marginBottom: '8px',
+                                  opacity: 0.9
+                                }}>
+                                  <span>Subtotal:</span>
+                                  <span>${message.cartData.total.toFixed(2)}</span>
+                                </div>
+                              )}
+                              {message.cartData.discount && (
+                                <div style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  fontSize: '12px',
+                                  marginBottom: '8px',
+                                  color: '#4ade80'
+                                }}>
+                                  <span>Discount ({message.cartData.discount.code}):</span>
+                                  <span>-${(message.cartData.total - message.cartData.finalTotal).toFixed(2)}</span>
+                                </div>
+                              )}
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: '18px',
+                                fontWeight: 'bold',
+                                marginTop: '8px'
+                              }}>
+                                <span>Total:</span>
+                                <span>${message.cartData.finalTotal.toFixed(2)} TTD</span>
+                              </div>
+                            </div>
+
+                            {/* Action Hint */}
+                            <div style={{
+                              marginTop: '16px',
+                              padding: '12px',
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              borderRadius: '8px',
+                              textAlign: 'center',
+                              fontSize: '12px',
+                              opacity: 0.9
+                            }}>
+                              🚀 Ready to checkout? Just let me know!
+                            </div>
+
+                            {/* Message Status */}
+                            <div style={{ 
+                              fontSize: '10px', 
+                              opacity: 0.7, 
+                              textAlign: 'right', 
+                              marginTop: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'flex-end',
+                              gap: '4px'
+                            }}>
+                              {message.timestamp.toLocaleTimeString('en-US', { 
+                                hour: '2-digit', 
+                                minute: '2-digit', 
+                                hour12: false 
+                              })}
+                              {message.status === 'sent' && <span style={{ color: '#4ade80' }}>✓✓</span>}
+                              {message.status === 'sending' && <span style={{ color: '#fbbf24' }}>⏳</span>}
+                              {message.status === 'failed' && <span style={{ color: '#f87171' }}>✗</span>}
+                            </div>
+                          </div>
+                        </div>
+                        );
+                        })()
                       ) : message.type === 'voice' ? (
                         <div className="whatsapp-message voice-message" style={{ padding: '0', background: 'transparent' }}>
                           {message.media_file_id ? (
@@ -3868,6 +4227,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           {message.text && <div className="location-data">{message.text}</div>}
                         </div>
                       ) : (
+                        (() => {
+                          console.log('📝 Rendering regular message:', message.id, 'Type:', message.type, 'Text preview:', message.text?.substring(0, 50));
+                          return (
                         <div className="message-content">
                           <div className="message-text">{message.text}</div>
                           <div className="message-meta">
@@ -3942,6 +4304,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             </div>
                           )}
                         </div>
+                        );
+                        })()
                       )}
                     </div>
                   ))}
@@ -5334,6 +5698,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     <button
                       onClick={() => {
                         handleCartInteraction();
+                        // Close other modals to prevent conflicts
+                        setShowContactManager(false);
+                        setShowImageModal(false);
+                        setShowProductModal(false);
+                        setShowTemplateManager(false);
+                        setShowMediaBrowser(false);
+                        // Open checkout modal
                         setShowCheckoutModal(true);
                       }}
                       style={{
@@ -5469,18 +5840,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 10000,
+          zIndex: 9999,
           padding: '20px'
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
             borderRadius: '12px',
             padding: '30px',
             width: '100%',
             maxWidth: '600px',
             maxHeight: '90vh',
             overflow: 'auto',
-            position: 'relative'
+            position: 'relative',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
           }}>
             <div style={{
               display: 'flex',
