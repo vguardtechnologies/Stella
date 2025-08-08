@@ -10,9 +10,8 @@ const { createTables } = require('./database/migrations');
 
 // Middleware
 app.use(cors());
-// Increase payload limit to handle base64 images (10MB limit)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from dist directory
 app.use(express.static(path.join(__dirname, 'dist')));
