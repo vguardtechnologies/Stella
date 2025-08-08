@@ -2035,7 +2035,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           const localMessagesToKeep = localMessages.filter(msg => {
             // Always preserve cart messages with cartData, regardless of server version
             if (msg.type === 'cart' && msg.cartData) {
-              console.log(`🛒 Preserving cart message ${msg.id} with cartData over server version`);
+              console.log(`🛒 FORCE-PRESERVING cart message ${msg.id} with cartData (whatsapp_id: ${msg.whatsapp_message_id})`);
+              return true;
+            }
+            
+            // Always preserve product messages with productData
+            if (msg.type === 'product' && msg.productData) {
+              console.log(`📦 FORCE-PRESERVING product message ${msg.id} with productData (whatsapp_id: ${msg.whatsapp_message_id})`);
               return true;
             }
             
@@ -2047,16 +2053,35 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           
           // Remove server versions of cart messages that we want to keep local versions of
           const cartMessagesToKeep = localMessagesToKeep.filter(msg => msg.type === 'cart' && msg.cartData);
+          console.log(`🛒 Found ${cartMessagesToKeep.length} local cart messages to preserve during auto-refresh`);
+          
           if (cartMessagesToKeep.length > 0) {
-            const cartMessageIds = new Set(cartMessagesToKeep.map(msg => msg.whatsapp_message_id).filter(id => id));
-            // Filter out server versions of cart messages to preserve local formatting
-            const filteredServerMessages = convertedMessages.filter((serverMsg: any) => {
-              const shouldRemove = cartMessageIds.has(serverMsg.whatsapp_message_id || serverMsg.id);
-              if (shouldRemove) {
-                console.log(`🗑️ Removing server version of cart message ${serverMsg.whatsapp_message_id || serverMsg.id} to keep local cart formatting`);
-              }
-              return !shouldRemove;
+            cartMessagesToKeep.forEach(cartMsg => {
+              console.log(`🛒 Preserving cart message: ${cartMsg.id}, whatsapp_id: ${cartMsg.whatsapp_message_id}, has cartData: ${!!cartMsg.cartData}`);
             });
+            
+            const cartMessageIds = new Set(cartMessagesToKeep.map(msg => msg.whatsapp_message_id).filter(id => id));
+            console.log(`🛒 Cart message WhatsApp IDs to filter from server:`, Array.from(cartMessageIds));
+            
+            // Filter out server versions of cart messages to preserve local formatting
+            const originalServerCount = convertedMessages.length;
+            const filteredServerMessages = convertedMessages.filter((serverMsg: any) => {
+              const messageContent = serverMsg.message_content || serverMsg.text || '';
+              const isCartMessage = cartMessageIds.has(serverMsg.whatsapp_message_id || serverMsg.id) || 
+                                   messageContent.includes('🛒 *SHOPPING CART SUMMARY*') ||
+                                   messageContent.includes('SHOPPING CART SUMMARY') ||
+                                   messageContent.includes('═══════════════════════════') ||
+                                   (messageContent.includes('🛒') && messageContent.includes('TOTAL:'));
+              
+              if (isCartMessage) {
+                console.log(`🗑️ Removing server version of cart message ${serverMsg.whatsapp_message_id || serverMsg.id} to keep local cart formatting`);
+                console.log(`   Server message content preview: ${messageContent.substring(0, 100)}...`);
+              }
+              
+              return !isCartMessage;
+            });
+            
+            console.log(`🛒 Filtered server messages from ${originalServerCount} to ${filteredServerMessages.length}`);
             // Replace convertedMessages with the filtered array
             convertedMessages.splice(0, convertedMessages.length, ...filteredServerMessages);
           }
@@ -2068,6 +2093,36 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             });
             convertedMessages.push(...localMessagesToKeep);
           }
+          
+          // Final validation: Ensure all cart messages have proper type and cartData
+          convertedMessages.forEach((msg: any, index: number) => {
+            if (msg.type === 'cart' && !msg.cartData) {
+              console.warn(`⚠️ Cart message at index ${index} missing cartData:`, msg.id);
+            }
+            if (msg.text && msg.text.includes('🛒 *SHOPPING CART SUMMARY*') && msg.type !== 'cart') {
+              console.warn(`⚠️ Message with cart content but wrong type:`, { id: msg.id, type: msg.type, hasCartData: !!msg.cartData });
+              // Force correct the type
+              msg.type = 'cart';
+              if (!msg.cartData) {
+                console.log(`🔧 Attempting to reconstruct cartData from text for message ${msg.id}`);
+                // Basic cartData reconstruction (better than nothing)
+                msg.cartData = {
+                  items: [],
+                  total: 0,
+                  finalTotal: 0,
+                  itemCount: 0
+                };
+              }
+            }
+          });
+          
+          console.log('📋 Final message array:', convertedMessages.map((m: any) => ({ 
+            id: m.id, 
+            type: m.type, 
+            hasCartData: !!m.cartData,
+            isCart: m.type === 'cart',
+            preview: (m.text || m.message_content || '').substring(0, 50)
+          })));
         }
         
         setMessages(convertedMessages.reverse());
