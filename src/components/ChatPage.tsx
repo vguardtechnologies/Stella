@@ -1437,7 +1437,158 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setCartTotal(0);
   };
 
-  // Send cart summary in chat
+  // Generate cart image using canvas (optimized for smaller size)
+  const generateCartImage = async (): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      
+      // Optimized canvas size for smaller file size but still mobile-friendly
+      canvas.width = 600; // Reduced from 800
+      canvas.height = Math.min(800, Math.max(400, 150 + (cartItems.length * 80))); // Smaller and capped height
+      
+      // Create gradient background (matching your beautiful frontend design)
+      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      gradient.addColorStop(0, '#667eea');
+      gradient.addColorStop(1, '#764ba2');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Add glass morphism effect overlay
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.fillRect(15, 15, canvas.width - 30, canvas.height - 30);
+      
+      // Add rounded corners effect (visual approximation)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+      
+      let yPos = 50;
+      
+      // Header (smaller font)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('🛒 SHOPPING CART', canvas.width / 2, yPos);
+      
+      // Subtitle (smaller font)
+      ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      yPos += 25;
+      ctx.fillText('SUSA SHAPEWEAR Collection', canvas.width / 2, yPos);
+      
+      // Divider line
+      yPos += 20;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(40, yPos);
+      ctx.lineTo(canvas.width - 40, yPos);
+      ctx.stroke();
+      
+      yPos += 25;
+      
+      // Cart items (more compact)
+      ctx.textAlign = 'left';
+      cartItems.slice(0, 8).forEach((item, index) => { // Limit to first 8 items to keep size reasonable
+        const price = parseFloat(item.selectedVariant?.price || item.variants?.[0]?.price || '0');
+        const itemTotal = price * item.quantity;
+        
+        // Item background (smaller)
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fillRect(30, yPos - 10, canvas.width - 60, 70);
+        
+        // Item title (truncated if too long)
+        const truncatedTitle = item.title.length > 35 ? item.title.substring(0, 35) + '...' : item.title;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+        ctx.fillText(`${index + 1}. ${truncatedTitle}`, 40, yPos + 8);
+        
+        // Selected options (if any, compact)
+        if (item.selectedOptions && Object.keys(item.selectedOptions).length > 0) {
+          const optionsText = Object.entries(item.selectedOptions)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+          const truncatedOptions = optionsText.length > 40 ? optionsText.substring(0, 40) + '...' : optionsText;
+          ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+          ctx.fillText(`✨ ${truncatedOptions}`, 40, yPos + 25);
+        }
+        
+        // Price and quantity (compact)
+        ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillText(`$${price.toFixed(2)} × ${item.quantity}`, 40, yPos + 42);
+        
+        // Item total (right aligned)
+        ctx.textAlign = 'right';
+        ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(`$${itemTotal.toFixed(2)}`, canvas.width - 40, yPos + 42);
+        
+        ctx.textAlign = 'left';
+        yPos += 80;
+      });
+      
+      // Show "and X more items" if cart has more than 8 items
+      if (cartItems.length > 8) {
+        ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.textAlign = 'center';
+        ctx.fillText(`... and ${cartItems.length - 8} more items`, canvas.width / 2, yPos);
+        yPos += 25;
+      }
+      
+      // Total section
+      yPos += 15;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(40, yPos);
+      ctx.lineTo(canvas.width - 40, yPos);
+      ctx.stroke();
+      
+      yPos += 30;
+      
+      // Discount info if applied (compact)
+      if (appliedDiscount) {
+        ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+        ctx.fillStyle = '#FFD700'; // Gold color for discount
+        ctx.textAlign = 'left';
+        ctx.fillText(`🎉 Discount: ${appliedDiscount.code}`, 40, yPos);
+        ctx.textAlign = 'right';
+        ctx.fillText(`-$${calculateDiscountAmount().toFixed(2)}`, canvas.width - 40, yPos);
+        yPos += 25;
+        
+        ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Subtotal: $${cartTotal.toFixed(2)}`, 40, yPos);
+        yPos += 30;
+      }
+      
+      // Final total (compact)
+      ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'left';
+      ctx.fillText('TOTAL:', 40, yPos);
+      ctx.textAlign = 'right';
+      ctx.fillText(`$${getFinalTotal().toFixed(2)} TTD`, canvas.width - 40, yPos);
+      
+      // Footer (compact)
+      yPos += 35;
+      ctx.textAlign = 'center';
+      ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.fillText(`${cartItems.length} item${cartItems.length !== 1 ? 's' : ''} • Ready for checkout`, canvas.width / 2, yPos);
+      
+      // Convert canvas to base64 image with JPEG compression for much smaller size
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.7); // JPEG with 70% quality = much smaller file
+      resolve(imageDataUrl);
+    });
+  };
+
+  // Send cart summary with Visual-First Approach (Option 1)
   const sendCartInChat = async () => {
     if (!selectedConversation) {
       alert('Please select a conversation first');
@@ -1463,60 +1614,80 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       phoneNumber = conversation.customerPhone;
     }
 
-    // Create a beautifully formatted cart summary message
-    let cartMessage = '🛒 *SHOPPING CART SUMMARY*\n';
-    cartMessage += '═══════════════════════════\n\n';
+    // Generate beautiful cart image
+    console.log('🎨 Generating optimized cart image...');
+    let cartImageDataUrl: string = '';
+    let imageGenerationFailed = false;
     
-    // Add each cart item with enhanced formatting
-    cartItems.forEach((item, index) => {
-      const price = parseFloat(item.selectedVariant?.price || item.variants?.[0]?.price || '0');
-      const itemTotal = price * item.quantity;
+    try {
+      cartImageDataUrl = await generateCartImage();
+      console.log('✅ Cart image generated successfully');
       
-      cartMessage += `📦 *${index + 1}. ${item.title}*\n`;
+      // Check if the base64 string is too large (> 500KB when decoded)
+      const imageSizeKB = (cartImageDataUrl.length * 0.75) / 1024; // Rough base64 size calculation
+      console.log(`📏 Generated image size: ~${imageSizeKB.toFixed(1)} KB`);
       
-      // Add selected options if any
-      if (item.selectedOptions && Object.keys(item.selectedOptions).length > 0) {
-        const optionsText = Object.entries(item.selectedOptions)
-          .map(([key, value]) => `${key}: ${value}`)
-          .join(', ');
-        cartMessage += `   ✨ *Options:* ${optionsText}\n`;
+      if (imageSizeKB > 500) {
+        console.warn('⚠️ Generated image too large, will fallback to text-only');
+        cartImageDataUrl = '';
+        imageGenerationFailed = true;
       }
-      
-      cartMessage += `   💰 *Price:* $${price.toFixed(2)} TTD\n`;
-      cartMessage += `   📊 *Quantity:* ${item.quantity}\n`;
-      cartMessage += `   💵 *Subtotal:* $${itemTotal.toFixed(2)} TTD\n`;
-      
-      if (index < cartItems.length - 1) {
-        cartMessage += '\n─────────────────────────\n\n';
-      }
-    });
-    
-    cartMessage += '\n═══════════════════════════\n';
-    
-    // Add discount information if applied
-    if (appliedDiscount) {
-      cartMessage += `🎉 *Discount Applied:* ${appliedDiscount.code}\n`;
-      cartMessage += `� *Discount Amount:* -$${calculateDiscountAmount().toFixed(2)} TTD\n`;
-      cartMessage += `💰 *Subtotal:* $${cartTotal.toFixed(2)} TTD\n`;
-      cartMessage += `🏷️ *Final Total:* $${getFinalTotal().toFixed(2)} TTD\n\n`;
-    } else {
-      cartMessage += `💰 *TOTAL: $${cartTotal.toFixed(2)} TTD*\n\n`;
+    } catch (error) {
+      console.error('❌ Failed to generate cart image:', error);
+      imageGenerationFailed = true;
     }
-    
-    cartMessage += '🚀 Ready to checkout? Just let me know!\n';
-    cartMessage += '✅ I can help process your order right away!\n\n';
-    cartMessage += `📱 Cart contains ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''}\n`;
-    cartMessage += `�️ From: SUSA SHAPEWEAR Collection`;
+
+    // Create concise caption for the image or detailed text fallback
+    const cartCaption = cartImageDataUrl ? 
+      // Short caption for image
+      `🛒 *SHOPPING CART SUMMARY*\n\n` +
+      `📱 ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''} in cart\n` +
+      `💰 Total: $${getFinalTotal().toFixed(2)} TTD\n` +
+      (appliedDiscount ? `🎉 Discount: ${appliedDiscount.code} (-$${calculateDiscountAmount().toFixed(2)})\n` : '') +
+      `\n🚀 Ready to checkout? Use the buttons below!`
+      :
+      // Detailed text fallback when no image
+      `🛒 *SHOPPING CART SUMMARY*\n` +
+      `═══════════════════════════\n\n` +
+      cartItems.slice(0, 6).map((item, index) => {
+        const price = parseFloat(item.selectedVariant?.price || item.variants?.[0]?.price || '0');
+        const itemTotal = price * item.quantity;
+        let itemText = `📦 *${index + 1}. ${item.title}*\n`;
+        
+        if (item.selectedOptions && Object.keys(item.selectedOptions).length > 0) {
+          const optionsText = Object.entries(item.selectedOptions)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+          itemText += `   ✨ *Options:* ${optionsText}\n`;
+        }
+        
+        itemText += `   💰 *Price:* $${price.toFixed(2)} TTD × ${item.quantity}\n`;
+        itemText += `   💵 *Subtotal:* $${itemTotal.toFixed(2)} TTD`;
+        return itemText;
+      }).join('\n\n─────────────────────────\n\n') +
+      (cartItems.length > 6 ? `\n\n... and ${cartItems.length - 6} more items` : '') +
+      `\n\n═══════════════════════════\n` +
+      (appliedDiscount ? 
+        `🎉 *Discount Applied:* ${appliedDiscount.code}\n` +
+        `💳 *Discount Amount:* -$${calculateDiscountAmount().toFixed(2)} TTD\n` +
+        `💰 *Subtotal:* $${cartTotal.toFixed(2)} TTD\n` +
+        `🏷️ *Final Total:* $${getFinalTotal().toFixed(2)} TTD\n\n` : 
+        `💰 *TOTAL: $${getFinalTotal().toFixed(2)} TTD*\n\n`
+      ) +
+      `🚀 Ready to checkout? Use the buttons below!\n` +
+      `📱 Cart contains ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''}\n` +
+      `🏷️ From: SUSA SHAPEWEAR Collection`;
 
     // Create visual cart message for chat display (optimistic update)
     const newMessage: Message = {
       id: `cart_${Date.now()}`,
-      text: cartMessage,
+      text: cartCaption,
       sender: 'agent',
       timestamp: new Date(),
       status: 'sending',
       type: 'cart', // Special type for cart messages
       direction: 'outgoing',
+      media_url: cartImageDataUrl, // Include the generated image if available
       cartData: {
         items: cartItems,
         total: cartTotal,
@@ -1526,74 +1697,175 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       }
     };
     
-    console.log('🛒 Creating cart message:', newMessage);
+    console.log(cartImageDataUrl ? '🛒 Creating hybrid cart message with image + buttons' : '🛒 Creating text cart message with buttons (image fallback)');
     setMessages(prev => [...prev, newMessage]);
 
     try {
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
-      // Send the formatted cart message
-      const response = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+      // Step 1: Send cart (image with caption OR text-only)
+      let primaryResult: any = null;
+      
+      if (cartImageDataUrl) {
+        console.log('📸 Sending cart as optimized image with caption...');
+        
+        try {
+          const imageResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: phoneNumber.replace(/[^\d]/g, ''),
+              type: 'image',
+              mediaUrl: cartImageDataUrl,
+              caption: cartCaption,
+              cartData: {
+                items: cartItems.slice(0, 10), // Limit cart data size too
+                total: cartTotal,
+                finalTotal: getFinalTotal(),
+                discount: appliedDiscount
+              }
+            })
+          });
+          
+          primaryResult = await imageResponse.json();
+          console.log('Image send result:', primaryResult);
+          
+          // If image send fails due to payload size, fallback to text
+          if (!primaryResult.success && primaryResult.message?.includes('too large')) {
+            console.warn('⚠️ Image still too large, falling back to text...');
+            throw new Error('Image payload too large');
+          }
+        } catch (imageError) {
+          console.warn('⚠️ Image send failed, falling back to text:', imageError.message);
+          cartImageDataUrl = ''; // Clear image for fallback
+        }
+      }
+      
+      // Fallback to text-only if image failed or wasn't generated
+      if (!cartImageDataUrl || !primaryResult?.success) {
+        console.log('📝 Sending cart as text message...');
+        const textResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: phoneNumber.replace(/[^\d]/g, ''),
+            message: cartCaption,
+            type: 'text',
+            cartData: {
+              items: cartItems.slice(0, 10), // Limit cart data size
+              total: cartTotal,
+              finalTotal: getFinalTotal(),
+              discount: appliedDiscount
+            }
+          })
+        });
+        
+        primaryResult = await textResponse.json();
+        console.log('Text send result:', primaryResult);
+      }
+      
+      // Step 2: Send interactive buttons for actions
+      console.log('🔘 Sending interactive checkout buttons...');
+      const buttonsResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           to: phoneNumber.replace(/[^\d]/g, ''),
-          message: cartMessage,
-          type: 'text',
-          cartData: {
-            items: cartItems,
-            total: cartTotal,
-            finalTotal: getFinalTotal(),
-            discount: appliedDiscount
+          type: 'interactive',
+          interactive: {
+            type: 'button',
+            header: {
+              type: 'text',
+              text: '🛒 Cart Actions'
+            },
+            body: {
+              text: 'Choose what you\'d like to do with your cart:'
+            },
+            action: {
+              buttons: [
+                {
+                  type: 'reply',
+                  reply: {
+                    id: 'checkout_cart',
+                    title: '🚀 Checkout Now'
+                  }
+                },
+                {
+                  type: 'reply',
+                  reply: {
+                    id: 'modify_cart',
+                    title: '✏️ Modify Cart'
+                  }
+                },
+                {
+                  type: 'reply',
+                  reply: {
+                    id: 'continue_shopping',
+                    title: '🛍️ Keep Shopping'
+                  }
+                }
+              ]
+            }
           }
         })
       });
-
-      const result = await response.json();
       
-      if (result.success) {
-        console.log('✅ Cart summary sent successfully to chat');
+      const buttonsResult = await buttonsResponse.json();
+      console.log('Buttons send result:', buttonsResult);
+      
+      // Determine overall success
+      const overallSuccess = primaryResult?.success && buttonsResult.success;
+      
+      if (overallSuccess) {
+        console.log('✅ Hybrid cart (content + buttons) sent successfully!');
         
-        // Update message status to sent - ensure cartData is preserved
+        // Update message status to sent - preserve cartData and image
         setMessages(prev => prev.map(msg => 
           msg.id === newMessage.id ? { 
             ...msg, 
             status: 'sent',
-            whatsapp_message_id: result.data.messageId,
-            // Explicitly preserve cartData and type
+            whatsapp_message_id: primaryResult?.data?.messageId || buttonsResult?.data?.messageId,
             type: 'cart',
-            cartData: msg.cartData
+            cartData: msg.cartData,
+            media_url: msg.media_url // Preserve the image if it was sent
           } : msg
         ));
       } else {
-        console.error('❌ Failed to send cart message:', result.message);
+        console.error('❌ Failed to send hybrid cart:', {
+          primaryResult: primaryResult?.message || 'failed',
+          buttonsResult: buttonsResult?.message || 'failed'
+        });
         
-        // Update message status to failed - ensure cartData is preserved
+        // Update message status to failed - preserve cartData and image
         setMessages(prev => prev.map(msg => 
           msg.id === newMessage.id ? { 
             ...msg, 
             status: 'failed',
-            // Explicitly preserve cartData and type
             type: 'cart',
-            cartData: msg.cartData
+            cartData: msg.cartData,
+            media_url: msg.media_url // Preserve the image
           } : msg
         ));
         
         alert('Failed to send cart. Please try again.');
       }
     } catch (error) {
-      console.error('❌ Error sending cart message:', error);
+      console.error('❌ Error sending hybrid cart:', error);
       
-      // Update message status to failed - ensure cartData is preserved
+      // Update message status to failed - preserve cartData and image
       setMessages(prev => prev.map(msg => 
         msg.id === newMessage.id ? { 
           ...msg, 
           status: 'failed',
-          // Explicitly preserve cartData and type
           type: 'cart',
-          cartData: msg.cartData
+          cartData: msg.cartData,
+          media_url: msg.media_url // Preserve the image
         } : msg
       ));
       
