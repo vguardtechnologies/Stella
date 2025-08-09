@@ -1500,6 +1500,39 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     try {
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
+      // First, send a product image card with the first product in cart
+      if (cartItems.length > 0) {
+        const firstProduct = cartItems[0];
+        
+        // Optimize the image URL if it's a Shopify image
+        const optimizeImageUrl = (url: string) => {
+          if (url && url.includes('shopify.com')) {
+            const separator = url.includes('?') ? '&' : '?';
+            return `${url}${separator}width=800&height=800&quality=90&format=webp`;
+          }
+          return url;
+        };
+
+        const productImageResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: phoneNumber.replace(/[^\d]/g, ''),
+            type: 'image',
+            mediaUrl: optimizeImageUrl(firstProduct.image || firstProduct.imageSrc),
+            caption: `🛒 ${firstProduct.title}\n💰 $${firstProduct.displayPrice || firstProduct.price} TTD\n📦 Quantity: ${firstProduct.quantity}\n\nYour cart details below:`
+          })
+        });
+
+        const imageResult = await productImageResponse.json();
+        console.log('Product image result:', imageResult);
+
+        // Wait a moment before sending the cart list
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
       // Send cart as WhatsApp interactive list with checkout option
       const cartResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
         method: 'POST',
