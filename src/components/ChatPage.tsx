@@ -1570,8 +1570,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   rows: [
                     {
                       id: 'proceed_checkout',
-                      title: '🚀 Proceed Check-out',
-                      description: 'Completing your purchase'
+                      title: 'Check-out',
+                      description: 'Processing your purchase'
                     }
                   ]
                 }
