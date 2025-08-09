@@ -62,6 +62,12 @@ router.post('/', (req, res) => {
                 text: message.text?.body || message.caption || 'Media message'
               });
 
+              // Handle interactive button responses
+              if (message.type === 'interactive') {
+                console.log('📱 Interactive message received:', message.interactive);
+                await handleInteractiveMessage(message, webhookEvent);
+              }
+
               // Extract all available contact name information
               const contactNames = whatsappContactService.extractContactNames(message, webhookEvent);
               const bestDisplayName = whatsappContactService.getBestDisplayName(contactNames);
@@ -163,6 +169,120 @@ router.post('/', (req, res) => {
     res.status(500).send('Webhook processing failed');
   }
 });
+
+// Function to handle interactive messages (button responses)
+async function handleInteractiveMessage(message, webhookEvent) {
+  const { from, interactive } = message;
+  
+  console.log(`🔘 Processing interactive message from ${from}:`, interactive);
+
+  try {
+    // Handle button replies
+    if (interactive.type === 'button_reply') {
+      const buttonId = interactive.button_reply?.id;
+      const buttonTitle = interactive.button_reply?.title;
+      
+      console.log(`Button pressed - ID: ${buttonId}, Title: ${buttonTitle}`);
+
+      // Handle "Proceed" button from cart
+      if (buttonId === 'proceed_checkout') {
+        console.log('🚀 User wants to proceed with checkout');
+        await sendCheckoutMessage(from);
+      }
+      
+      // Add more button handlers as needed
+      else {
+        console.log(`Unhandled button ID: ${buttonId}`);
+      }
+    }
+    
+    // Handle list replies (for product selections and checkout)
+    else if (interactive.type === 'list_reply') {
+      const listId = interactive.list_reply?.id;
+      const listTitle = interactive.list_reply?.title;
+      
+      console.log(`List item selected - ID: ${listId}, Title: ${listTitle}`);
+      
+      // Handle checkout selection from cart list
+      if (listId === 'proceed_checkout') {
+        console.log('🚀 User wants to proceed with checkout from list');
+        await sendCheckoutMessage(from);
+      }
+      
+      // Handle individual cart item selections
+      else if (listId?.startsWith('view_item_')) {
+        const productId = listId.replace('view_item_', '');
+        console.log(`📱 User wants to view product: ${productId}`);
+        
+        // Send product details message
+        const productMessage = {
+          messaging_product: "whatsapp",
+          to: from,
+          type: "text", 
+          text: {
+            body: `📦 Product Details: ${listTitle}\n\nFor more information about this item, please contact our support team.`
+          }
+        };
+
+        const response = await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(productMessage)
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          console.log('✅ Product info message sent successfully');
+        } else {
+          console.error('❌ Failed to send product info message:', result);
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error handling interactive message:', error);
+  }
+}
+
+// Function to send checkout message
+async function sendCheckoutMessage(phoneNumber) {
+  try {
+    console.log('🚀 Sending checkout message to:', phoneNumber);
+    
+    const checkoutMessage = {
+      messaging_product: "whatsapp",
+      to: phoneNumber,
+      type: "text",
+      text: {
+        body: "🛒 Ready to checkout! Please provide your delivery details and preferred payment method. Our team will contact you shortly to complete your order."
+      }
+    };
+
+    const response = await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(checkoutMessage)
+    });
+
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log('✅ Checkout message sent successfully');
+    } else {
+      console.error('❌ Failed to send checkout message:', result);
+    }
+
+  } catch (error) {
+    console.error('Error sending checkout message:', error);
+  }
+}
 
 // Function to handle incoming messages
 function handleIncomingMessage(message, webhookEvent) {

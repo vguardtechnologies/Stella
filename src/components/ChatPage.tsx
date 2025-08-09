@@ -315,7 +315,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // WhatsApp Integration State
   const [whatsappConversations, setWhatsappConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [currentConversation, setCurrentConversation] = useState<any>(null);
   const [whatsappConfigured] = useState(true); // Assume configured since we have permanent token
+  
+  // Status and Modal State
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [statusType, setStatusType] = useState<'success' | 'error' | 'info'>('info');
+  const [showModal, setShowModal] = useState(false);
 
   // Contact Management State
   const [showContactManager, setShowContactManager] = useState(false);
@@ -348,6 +355,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   
   // Media Browser State
   const [showMediaBrowser, setShowMediaBrowser] = useState(false);
+
+  // WhatsApp Gallery State
+  const [showWhatsAppGallery, setShowWhatsAppGallery] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -432,7 +442,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           last_message_type: conv.last_message_type,
           isWhatsApp: true
         }));
-        setWhatsappConversations(convertedConversations);
+        
+        // Remove duplicates based on phone number (primary key)
+        const uniqueConversations = convertedConversations.filter((conv: any, index: number, array: any[]) =>
+          index === array.findIndex((c: any) => c.customerPhone === conv.customerPhone)
+        );        console.log(`Original conversations: ${convertedConversations.length}, Unique conversations: ${uniqueConversations.length}`);
+        setWhatsappConversations(uniqueConversations);
       }
     } catch (error) {
       console.error('Error fetching WhatsApp conversations:', error);
@@ -1391,7 +1406,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       const optionsText = Object.entries(selectedOptions).map(([key, value]) => `${key}: ${value}`).join(', ');
       setCartNotification(`Updated ${product.title} ${optionsText ? `(${optionsText})` : ''} quantity in cart`);
     } else {
-      // Add new item to cart with selected options
+      // Add new item to cart with selected options and optimized images
+      const optimizedImages = product.images?.map((img: any) => ({
+        ...img,
+        src: optimizeImageUrl(img.src)
+      })) || [];
+      
       const cartItem = {
         ...product,
         quantity,
@@ -1399,7 +1419,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         addedAt: new Date(),
         selectedOptions: selectedOptions,
         selectedVariant: selectedVariant,
-        displayPrice: selectedVariant?.price || product.variants?.[0]?.price || '0.00'
+        displayPrice: selectedVariant?.price || product.variants?.[0]?.price || '0.00',
+        images: optimizedImages, // Use optimized images for better WhatsApp quality
+        // Also optimize single image property if it exists
+        image: product.image ? { ...product.image, src: optimizeImageUrl(product.image.src) } : undefined
       };
       setCartItems(prev => [...prev, cartItem]);
       
@@ -1437,7 +1460,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setCartTotal(0);
   };
 
-  // Send cart using ONLY WhatsApp native catalog (no image generation)
+  // Function to optimize Shopify image URLs for better WhatsApp quality
+  const optimizeImageUrl = (imageUrl: string): string => {
+    if (!imageUrl) return '';
+    
+    // Remove existing parameters and add high-quality parameters
+    const baseUrl = imageUrl.split('?')[0];
+    // Request high quality: 800x800 max, 90% quality, WebP format for better compression
+    return `${baseUrl}?width=800&height=800&quality=90&format=webp`;
+  };
+
   const sendCartInChat = async () => {
     if (!selectedConversation) {
       alert('Please select a conversation first');
@@ -1463,131 +1495,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       phoneNumber = conversation.customerPhone;
     }
 
-    console.log('🛒 Sending enhanced cart with Shopify images + WhatsApp catalog');
-
-    // Create cart summary caption (like Bodysuit Shaper format)
-    const cartCaption = 
-      `🛒 *Shopping Cart Summary*\n\n` +
-      `💰 *Total:* $${getFinalTotal().toFixed(2)} TTD\n` +
-      `📦 *Items:* ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''}\n` +
-      `🏢 *Store:* SUSA SHAPEWEAR\n` +
-      `📋 *Status:* ✅ Ready for Checkout\n\n` +
-      (appliedDiscount ? 
-        `🎉 *Discount Applied:* ${appliedDiscount.code} (-$${calculateDiscountAmount().toFixed(2)} TTD)\n` +
-        `💳 *Subtotal:* $${cartTotal.toFixed(2)} TTD\n\n` : 
-        ``
-      ) +
-      `Your selected items from our premium shapewear collection. ` +
-      `Each piece is designed to provide comfort, support, and confidence. ` +
-      `See individual products below and choose your next action.\n\n` +
-      `🛍️ Cart ID: cart_${Date.now()}`;
-
-    // Create visual cart message for chat display
-    const newMessage: Message = {
-      id: `cart_${Date.now()}`,
-      text: cartCaption,
-      sender: 'agent',
-      timestamp: new Date(),
-      status: 'sending',
-      type: 'cart',
-      direction: 'outgoing',
-      cartData: {
-        items: cartItems,
-        total: cartTotal,
-        finalTotal: getFinalTotal(),
-        discount: appliedDiscount,
-        itemCount: cartItems.length
-      }
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
+    console.log('🛒 Sending cart as WhatsApp product list');
 
     try {
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
       
-      // Step 1: Send individual product images from Shopify with details
-      console.log('📸 Sending cart items with Shopify images...');
-      
-      for (let i = 0; i < Math.min(cartItems.length, 5); i++) {
-        const item = cartItems[i];
-        const price = parseFloat(item.selectedVariant?.price || item.variants?.[0]?.price || '0');
-        const itemTotal = price * item.quantity;
-        
-        // Get the first/featured image from Shopify
-        const shopifyImageUrl = item.images?.[0]?.src || item.image?.src || item.featured_image;
-        
-        if (shopifyImageUrl) {
-          const itemCaption = 
-            `🛍️ *${item.title}*\n\n` +
-            `💰 *Price:* $${price.toFixed(2)} TTD\n` +
-            `📦 *Quantity:* ${item.quantity}\n` +
-            `💵 *Subtotal:* $${itemTotal.toFixed(2)} TTD\n\n` +
-            `${item.body_html ? item.body_html.replace(/<[^>]*>/g, '').substring(0, 100) + '...' : 'Premium shapewear designed for comfort and confidence.'}\n\n` +
-            `📋 Item ${i + 1} of ${cartItems.length} in cart`;
-
-          try {
-            const itemImageResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                to: phoneNumber.replace(/[^\d]/g, ''),
-                type: 'image',
-                mediaUrl: shopifyImageUrl,
-                caption: itemCaption
-              })
-            });
-
-            const itemResult = await itemImageResponse.json();
-            console.log(`Item ${i + 1} image result:`, itemResult);
-            
-            // Small delay between messages to avoid rate limits
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          } catch (itemError) {
-            console.warn(`Failed to send item ${i + 1} image:`, itemError);
-          }
-        }
-      }
-
-      // Show remaining items count if more than 5
-      if (cartItems.length > 5) {
-        const remainingItemsResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: phoneNumber.replace(/[^\d]/g, ''),
-            message: `📦 *Plus ${cartItems.length - 5} more items in your cart*\n\nView all items in the product catalog below.`,
-            type: 'text'
-          })
-        });
-        
-        await remainingItemsResponse.json();
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      // Step 2: Send cart summary as text message
-      console.log('� Sending cart summary text...');
-      const textResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: phoneNumber.replace(/[^\d]/g, ''),
-          message: cartCaption,
-          type: 'text'
-        })
-      });
-
-      const textResult = await textResponse.json();
-      console.log('Text summary result:', textResult);
-
-      // Step 3: Send WhatsApp Product List with cart items (uses catalog images)
-      console.log('📱 Sending product catalog list...');
-      const productListResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
+      // Send cart as WhatsApp interactive list with checkout option
+      const cartResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1596,71 +1510,37 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           to: phoneNumber.replace(/[^\d]/g, ''),
           type: 'interactive',
           interactive: {
-            type: 'product_list',
+            type: 'list',
             header: {
               type: 'text',
-              text: '🛍️ Your Cart Items'
+              text: '🛒 Your Shopping Cart'
             },
             body: {
-              text: `Review your ${cartItems.length} selected item${cartItems.length !== 1 ? 's' : ''} from our catalog:`
+              text: `You have ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''} in your cart.\n\nTotal: $${getFinalTotal().toFixed(2)} TTD\n${appliedDiscount ? `Discount: -$${calculateDiscountAmount().toFixed(2)} TTD\n` : ''}Ready for checkout!`
+            },
+            footer: {
+              text: 'Select an option below'
             },
             action: {
-              catalog_id: '923378196624516',
-              sections: [{
-                title: 'Cart Contents',
-                product_items: cartItems.map(item => ({
-                  product_retailer_id: item.id.toString()
-                }))
-              }]
-            }
-          }
-        })
-      });
-
-      const productListResult = await productListResponse.json();
-      console.log('Product list result:', productListResult);
-
-      // Step 4: Send interactive checkout buttons
-      console.log('🔘 Sending checkout action buttons...');
-      const buttonsResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: phoneNumber.replace(/[^\d]/g, ''),
-          type: 'interactive',
-          interactive: {
-            type: 'button',
-            header: {
-              type: 'text',
-              text: '🛒 What\'s Next?'
-            },
-            body: {
-              text: 'Choose your preferred action:'
-            },
-            action: {
-              buttons: [
+              button: 'View Options',
+              sections: [
                 {
-                  type: 'reply',
-                  reply: {
-                    id: 'checkout_now',
-                    title: '🚀 Checkout'
-                  }
+                  title: 'Cart Items',
+                  rows: cartItems.slice(0, 9).map((item, index) => ({ // WhatsApp limits to 10 rows total
+                    id: `view_item_${item.id}`,
+                    title: item.title.substring(0, 24), // WhatsApp title limit
+                    description: `$${item.displayPrice || item.price} × ${item.quantity}`.substring(0, 72) // WhatsApp description limit
+                  }))
                 },
                 {
-                  type: 'reply',
-                  reply: {
-                    id: 'modify_cart',
-                    title: '✏️ Edit Cart'
-                  }
-                },
-                {
-                  type: 'reply',
-                  reply: {
-                    id: 'continue_shopping',
-                    title: '🛍️ Keep Shopping'
-                  }
+                  title: 'Actions',
+                  rows: [
+                    {
+                      id: 'proceed_checkout',
+                      title: '🚀 Proceed Check-out',
+                      description: 'Complete your purchase'
+                    }
+                  ]
                 }
               ]
             }
@@ -1668,58 +1548,37 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         })
       });
 
-      const buttonsResult = await buttonsResponse.json();
-      console.log('Buttons result:', buttonsResult);
+      const cartResult = await cartResponse.json();
+      console.log('Interactive list cart result:', cartResult);
 
-      // Determine overall success
-      const overallSuccess = textResult.success && productListResult.success && buttonsResult.success;
-
-      if (overallSuccess) {
-        console.log('✅ Enhanced cart sent successfully (Shopify images + catalog + actions)!');
+      if (cartResult.success) {
+        alert('Cart sent successfully to WhatsApp!');
         
-        // Update message status to sent
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id ? { 
-            ...msg, 
-            status: 'sent',
-            whatsapp_message_id: textResult.data?.messageId || textResult.messageId,
-            type: 'cart',
-            cartData: msg.cartData
-          } : msg
-        ));
+        // Update the conversation in the sidebar
+        if (currentConversation) {
+          const now = new Date().toISOString();
+          const cartMessage = {
+            id: Date.now().toString() + Math.random(),
+            content: `🛒 Cart with ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''} sent - $${getFinalTotal().toFixed(2)} TTD`,
+            timestamp: now,
+            sender: 'user'
+          };
+          
+          const updatedConversation = {
+            ...currentConversation,
+            lastMessage: cartMessage.content,
+            lastMessageTime: now,
+            messages: [...(currentConversation.messages || []), cartMessage]
+          };
+          
+          setCurrentConversation(updatedConversation);
+        }
       } else {
-        console.error('❌ Failed to send enhanced cart:', {
-          textResult: textResult.success ? 'success' : textResult.message,
-          productListResult: productListResult.success ? 'success' : productListResult.message,
-          buttonsResult: buttonsResult.success ? 'success' : buttonsResult.message
-        });
-        
-        // Update message status to failed
-        setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id ? { 
-            ...msg, 
-            status: 'failed',
-            type: 'cart',
-            cartData: msg.cartData
-          } : msg
-        ));
-        
-        alert('Failed to send cart. Please try again.');
+        alert(`Failed to send cart: ${cartResult.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('❌ Error sending enhanced cart:', error);
-      
-      // Update message status to failed
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id ? { 
-          ...msg, 
-          status: 'failed',
-          type: 'cart',
-          cartData: msg.cartData
-        } : msg
-      ));
-      
-      alert('Error sending cart. Please try again.');
+      console.error('❌ Error sending cart:', error);
+      alert('Failed to send cart due to error');
     }
   };
 
@@ -2252,7 +2111,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         // Debug: Show final message array composition
         if (convertedMessages.length > 0) {
           console.log('📋 Final message array composition:');
-          convertedMessages.forEach((msg, idx) => {
+          convertedMessages.forEach((msg: any, idx: number) => {
             console.log(`   ${idx}: ${msg.id} (type: ${msg.type}, cartData: ${!!msg.cartData}) - ${msg.text?.substring(0, 30)}...`);
           });
         }
@@ -3443,7 +3302,35 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       <div className="chat-container">
         <div className="chat-header">
           <h1>WhatsApp E-commerce Platform</h1>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              onClick={() => setShowWhatsAppGallery(true)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#25D366',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#128C7E';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#25D366';
+              }}
+              title="View WhatsApp Message Templates"
+            >
+              📱 WhatsApp Gallery
+            </button>
+            <button className="close-btn" onClick={onClose}>×</button>
+          </div>
         </div>
 
         <div className="chat-content">
@@ -3987,10 +3874,42 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                       transition: 'background-color 0.2s',
                                       textDecoration: 'none',
                                       textAlign: 'center',
-                                      display: 'block'
+                                      display: 'block',
+                                      marginBottom: '3px'
                                     }}
                                   >
-                                    � View Details
+                                    👁️ View Details
+                                  </button>
+                                  
+                                  <button
+                                    onClick={() => {
+                                      // Send this product as a WhatsApp message with "View Item" functionality
+                                      console.log('📱 View Item clicked for:', (product as any).title);
+                                      sendProductInChat(product);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '4px',
+                                      fontSize: '9px',
+                                      backgroundColor: '#25D366',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '3px',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s',
+                                      textDecoration: 'none',
+                                      textAlign: 'center',
+                                      display: 'block'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = '#128C7E';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = '#25D366';
+                                    }}
+                                    title="Send this item to WhatsApp chat"
+                                  >
+                                    📱 View Item
                                   </button>
                                 </div>
                               </div>
@@ -6326,6 +6245,553 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               >
                 {isProcessingCheckout ? '⏳ Processing...' : `✅ Place Order ($${getFinalTotal().toFixed(2)})`}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Message Gallery Modal */}
+      {showWhatsAppGallery && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          backdropFilter: 'blur(5px)'
+        }}>
+          <div style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: '16px',
+            width: '90%',
+            maxWidth: '1200px',
+            height: '85%',
+            maxHeight: '900px',
+            position: 'relative',
+            overflow: 'hidden',
+            border: '1px solid #333'
+          }}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #25D366, #128C7E)',
+              padding: '20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{ 
+                  margin: 0, 
+                  color: 'white', 
+                  fontSize: '24px',
+                  fontWeight: 'bold'
+                }}>
+                  📱 WhatsApp Message Templates
+                </h2>
+                <p style={{ 
+                  margin: '4px 0 0 0', 
+                  color: 'rgba(255,255,255,0.9)', 
+                  fontSize: '14px' 
+                }}>
+                  All supported WhatsApp Business API message formats
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowWhatsAppGallery(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  color: 'white',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{
+              padding: '20px',
+              height: 'calc(100% - 90px)',
+              overflowY: 'auto',
+              background: '#1a1a1a'
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+                gap: '20px'
+              }}>
+
+                {/* 1. Text Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    📝 Text Message
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    Hello! Welcome to SUSA SHAPEWEAR. How can I help you today?
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    Basic text message - supports formatting (*bold*, _italic_)
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+                {/* 2. Image Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    🖼️ Image Message
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{
+                      width: '100%',
+                      height: '120px',
+                      backgroundColor: '#555',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '8px',
+                      fontSize: '24px'
+                    }}>
+                      🛍️
+                    </div>
+                    <div>Check out our latest product collection!</div>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    Image with caption - JPEG, PNG supported, max 5MB
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+                {/* 3. Button Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    🔘 Button Message
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      What would you like to do next?
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ 
+                        backgroundColor: 'rgba(255,255,255,0.1)', 
+                        padding: '8px', 
+                        borderRadius: '4px',
+                        textAlign: 'center',
+                        fontSize: '12px'
+                      }}>
+                        🛒 View Products
+                      </div>
+                      <div style={{ 
+                        backgroundColor: 'rgba(255,255,255,0.1)', 
+                        padding: '8px', 
+                        borderRadius: '4px',
+                        textAlign: 'center',
+                        fontSize: '12px'
+                      }}>
+                        📞 Contact Support
+                      </div>
+                      <div style={{ 
+                        backgroundColor: 'rgba(255,255,255,0.1)', 
+                        padding: '8px', 
+                        borderRadius: '4px',
+                        textAlign: 'center',
+                        fontSize: '12px'
+                      }}>
+                        ℹ️ About Us
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    Interactive buttons - up to 3 buttons per message
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+                {/* 4. List Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    📋 List Message
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+                      Choose a category:
+                    </div>
+                    <div style={{ 
+                      backgroundColor: 'rgba(255,255,255,0.1)', 
+                      padding: '8px', 
+                      borderRadius: '4px',
+                      textAlign: 'center',
+                      fontSize: '12px'
+                    }}>
+                      📱 See all options
+                    </div>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    List with sections - up to 10 options total
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+                {/* 5. Product Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    🛍️ Product Message
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      gap: '12px',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{
+                        width: '60px',
+                        height: '60px',
+                        backgroundColor: '#555',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        👗
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                          Bodysuit Shaper
+                        </div>
+                        <div style={{ color: '#ccc', fontSize: '12px' }}>
+                          $408.00 TTD
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    Single product from catalog - requires catalog setup
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+                {/* 6. Product List Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    🛒 Product List
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>
+                      🛍️ Your Cart Items
+                    </div>
+                    <div style={{ marginBottom: '8px', fontSize: '12px' }}>
+                      Review your 3 selected items:
+                    </div>
+                    <div style={{ 
+                      backgroundColor: 'rgba(255,255,255,0.1)', 
+                      padding: '8px', 
+                      borderRadius: '4px',
+                      textAlign: 'center',
+                      fontSize: '12px'
+                    }}>
+                      📱 View Products
+                    </div>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    Multiple products from catalog - perfect for cart
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+                {/* 7. Location Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    📍 Location Message
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{
+                      width: '100%',
+                      height: '80px',
+                      backgroundColor: '#555',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '8px'
+                    }}>
+                      🗺️
+                    </div>
+                    <div style={{ fontSize: '12px' }}>
+                      Our Store Location
+                    </div>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    Share location with coordinates
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+                {/* 8. Template Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    📄 Template Message
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{ marginBottom: '8px' }}>
+                      Hi John! Your order #12345 has been shipped and will arrive tomorrow.
+                    </div>
+                    <div style={{ 
+                      backgroundColor: 'rgba(255,255,255,0.1)', 
+                      padding: '8px', 
+                      borderRadius: '4px',
+                      textAlign: 'center',
+                      fontSize: '12px'
+                    }}>
+                      📦 Track Package
+                    </div>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    Pre-approved templates with variables - required for marketing
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+                {/* 9. Document Message */}
+                <div style={{
+                  backgroundColor: '#2a2a2a',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid #333'
+                }}>
+                  <h3 style={{ color: '#25D366', margin: '0 0 12px 0' }}>
+                    📄 Document Message
+                  </h3>
+                  <div style={{
+                    backgroundColor: '#075E54',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    color: 'white',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      padding: '8px',
+                      borderRadius: '4px'
+                    }}>
+                      <div style={{ fontSize: '20px' }}>📋</div>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 'bold' }}>
+                          Product_Catalog.pdf
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#ccc' }}>
+                          2.3 MB
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
+                    PDF, DOC, XLS files - max 100MB
+                  </div>
+                  <button style={{
+                    backgroundColor: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    Use Template
+                  </button>
+                </div>
+
+              </div>
             </div>
           </div>
         </div>

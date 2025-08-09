@@ -308,6 +308,16 @@ class ShopifyWhatsappSyncService {
     const variant = shopifyProduct.variants?.[0] || {};
     const image = shopifyProduct.images?.[0];
 
+    // Optimize image URL for better quality in WhatsApp
+    // Use Shopify's image transformation to get higher quality images
+    let optimizedImageUrl = '';
+    if (image?.src) {
+      // Remove any existing size parameters and add high-quality parameters
+      const baseUrl = image.src.split('?')[0];
+      // Request high quality image: 800x800 max size, high quality
+      optimizedImageUrl = `${baseUrl}?width=800&height=800&quality=90&format=webp`;
+    }
+
     return {
       retailer_id: shopifyProduct.id.toString(),
       name: shopifyProduct.title,
@@ -315,13 +325,16 @@ class ShopifyWhatsappSyncService {
       price: Math.floor(parseFloat(variant.price || '0') * 100), // Price in cents without currency
       currency: 'TTD', // Separate currency parameter as required by Facebook API
       url: `https://86e53e-a6.myshopify.com/products/${shopifyProduct.handle}`,
-      image_url: image?.src || '',
+      image_url: optimizedImageUrl,
       brand: shopifyProduct.vendor || 'SUSA SHAPEWEAR',
       category: shopifyProduct.product_type || 'General',
       availability: variant.inventory_quantity > 0 ? 'in stock' : 'out of stock',
       condition: 'new',
       inventory: variant.inventory_quantity || 0,
-      additional_image_urls: shopifyProduct.images?.slice(1, 4).map(img => img.src) || []
+      additional_image_urls: shopifyProduct.images?.slice(1, 4).map(img => {
+        const baseUrl = img.src.split('?')[0];
+        return `${baseUrl}?width=800&height=800&quality=90&format=webp`;
+      }) || []
     };
   }
 
