@@ -326,7 +326,7 @@ class SocialMediaService {
       const authorComments = comments.filter((c: SocialComment) => c.author_id === authorId);
       
       return authorComments.map((comment: SocialComment) => this.convertCommentToMessage(comment))
-        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        .sort((a: any, b: any) => a.timestamp.getTime() - b.timestamp.getTime());
         
     } catch (error) {
       console.error('Error getting social messages:', error);
@@ -344,7 +344,7 @@ class SocialMediaService {
         return [];
       }
       
-      return data.platforms.filter(p => p.connected);
+      return data.platforms.filter((p: any) => p.connected);
     } catch (error) {
       console.error('Error getting connected platforms:', error);
       return [];
@@ -364,7 +364,7 @@ class SocialMediaService {
   }
 
   // Get suggested replies for auto-complete
-  async getSuggestedReplies(commentText: string, platform: string, context: any = {}) {
+  async getSuggestedReplies(commentText: string, _platform: string, context: any = {}) {
     try {
       // Generate AI suggestions
       const aiResponse = await this.generateAIResponse(

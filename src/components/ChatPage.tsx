@@ -322,7 +322,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   // Smart Auto Cart UX Enhancement States
   const [cartFocusMode, setCartFocusMode] = useState(false);
   const [isHoveringCart, setIsHoveringCart] = useState(false);
-  const [lastCartInteraction, setLastCartInteraction] = useState<number>(0);
   const [autoRecoveryTimer, setAutoRecoveryTimer] = useState<NodeJS.Timeout | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1630,7 +1629,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             sections: [
               {
                 title: 'Cart Items',
-                rows: cartItems.slice(0, 9).map((item, index) => ({ // WhatsApp limits to 10 rows total
+                rows: cartItems.slice(0, 9).map((item) => ({ // WhatsApp limits to 10 rows total
                   id: `view_item_${item.id}`,
                   title: item.title.substring(0, 24), // WhatsApp title limit
                   description: `$${item.displayPrice || item.price} × ${item.quantity}`.substring(0, 72) // WhatsApp description limit
@@ -1925,7 +1924,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // Smart Auto Cart UX Enhancement Functions
   const handleCartInteraction = () => {
-    setLastCartInteraction(Date.now());
     if (!cartFocusMode) {
       setCartFocusMode(true);
     }

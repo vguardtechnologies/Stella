@@ -72,6 +72,7 @@ async function handleTestConnection(req, res) {
     const pagesData = await pagesResponse.json();
 
     if (pagesData.error) {
+      console.warn('Pages fetch error:', pagesData.error.message);
       // Still return success but with empty pages
     }
 
@@ -86,6 +87,7 @@ async function handleTestConnection(req, res) {
         }
       } catch (e) {
         // App info is optional, don't fail on this
+        console.warn('Could not fetch app info:', e);
       }
     }
 
