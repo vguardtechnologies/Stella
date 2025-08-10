@@ -61,13 +61,21 @@ try {
   app.use('/api/shopify', shopifyHandler);
   console.log('✅ Shopify routes loaded');
 
-  const facebookHandler = require('./api/facebook.js');
-  app.use('/api/facebook', facebookHandler);
-  console.log('✅ Facebook routes loaded');
+  // const facebookHandler = require('./api/facebook.js');
+  // app.use('/api/facebook', facebookHandler);
+  // console.log('✅ Facebook routes loaded');
+
+  const simpleFacebookHandler = require('./api/FacebookAPI.js');
+  app.use('/api/simple-facebook', simpleFacebookHandler);
+  console.log('✅ Simple Facebook routes loaded');
 
   const shopifyWhatsappHandler = require('./api/shopify-whatsapp/index.js');
   app.use('/api/shopify-whatsapp', shopifyWhatsappHandler);
   console.log('✅ Shopify-WhatsApp integration routes loaded');
+
+  const socialCommenterHandler = require('./api/social-commenter.js');
+  app.use('/api/social-commenter', socialCommenterHandler);
+  console.log('✅ Social Media Commenter routes loaded');
   
 } catch (error) {
   console.log('⚠️ API routes error:', error.message);

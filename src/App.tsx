@@ -6,9 +6,10 @@ import OrderConfirmationPage from './components/OrderConfirmationPage'
 import ChatPage from './components/ChatPage'
 import HomePage from './components/HomePage'
 import ContactsPage from './pages/ContactsPage'
-import MetaIntegrationPage from './components/MetaIntegrationPage'
+import SimpleFacebookIntegration from './components/SimpleFacebookIntegration'
 import GmailIntegration from './components/GmailIntegration'
 import ShopifyIntegration from './components/ShopifyIntegration'
+import SocialMediaCommenter from './components/SocialMediaCommenter'
 import './App.css'
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
   const [showFacebook, setShowFacebook] = useState(false)
   const [showGmail, setShowGmail] = useState(false)
   const [showShopify, setShowShopify] = useState(false)
+  const [showSocialCommenter, setShowSocialCommenter] = useState(false)
   const [shopifyStore, setShopifyStore] = useState<{ 
     name: string; 
     shop: string; 
@@ -57,6 +59,7 @@ function App() {
     setShowFacebook(false)
     setShowGmail(false)
     setShowShopify(false)
+    setShowSocialCommenter(false)
   }
 
   const handleLoginClick = () => {
@@ -104,6 +107,11 @@ function App() {
     setShowGmail(true)
   }
 
+  const handleSocialCommenterClick = () => {
+    console.log('Social Commenter button clicked!')
+    setShowSocialCommenter(true)
+  }
+
   const handleCloseWhatsApp = () => {
     setShowWhatsApp(false)
   }
@@ -136,6 +144,10 @@ function App() {
     setShowShopify(false)
   }
 
+  const handleCloseSocialCommenter = () => {
+    setShowSocialCommenter(false)
+  }
+
   const handleShopifyStoreUpdate = (store: { 
     name: string; 
     shop: string; 
@@ -161,6 +173,7 @@ function App() {
         onShopifyClick={handleShopifyClick}
         onFacebookClick={handleFacebookClick}
         onGmailClick={handleGmailClick}
+        onSocialCommenterClick={handleSocialCommenterClick}
       />
       <div className="simple-main">
         <h1 className="stella-main-title">Stella</h1>
@@ -191,7 +204,7 @@ function App() {
       )}
 
       {showFacebook && (
-        <MetaIntegrationPage onClose={handleCloseFacebook} />
+        <SimpleFacebookIntegration onClose={handleCloseFacebook} />
       )}
 
       {showGmail && (
@@ -203,6 +216,10 @@ function App() {
           onClose={handleCloseShopify} 
           onStoreUpdate={handleShopifyStoreUpdate}
         />
+      )}
+
+      {showSocialCommenter && (
+        <SocialMediaCommenter onClose={handleCloseSocialCommenter} />
       )}
     </>
   )

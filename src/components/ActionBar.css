@@ -263,3 +263,16 @@
 .gmail-button:hover svg {
   stroke: #ffffff;
 }
+
+/* Social Commenter Button Styling */
+.social-commenter-button {
+  background: rgba(102, 102, 255, 0.1);
+  border-color: rgba(102, 102, 255, 0.3);
+  color: #6666ff;
+}
+
+.social-commenter-button:hover {
+  background: rgba(102, 102, 255, 0.2);
+  border-color: rgba(102, 102, 255, 0.4);
+  color: #ffffff;
+}

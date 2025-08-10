@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { runSocialCommenterMigration } = require('./social-commenter-migration');
 
 // Database schema for WhatsApp messages
 const createTables = async () => {
@@ -111,6 +112,10 @@ const createTables = async () => {
     `);
 
     console.log('✅ Database tables created successfully');
+    
+    // Run social commenter migration
+    await runSocialCommenterMigration();
+    
     return true;
   } catch (error) {
     console.error('❌ Error creating database tables:', error);

@@ -12,6 +12,7 @@ interface ActionBarProps {
   onShopifyClick?: () => void;
   onFacebookClick?: () => void;
   onGmailClick?: () => void;
+  onSocialCommenterClick?: () => void;
 }
 
 const ActionBar: React.FC<ActionBarProps> = ({ 
@@ -24,7 +25,8 @@ const ActionBar: React.FC<ActionBarProps> = ({
   onLoginClick,
   onShopifyClick,
   onFacebookClick,
-  onGmailClick
+  onGmailClick,
+  onSocialCommenterClick
 }) => {
   return (
     <div className="action-bar">
@@ -147,6 +149,14 @@ const ActionBar: React.FC<ActionBarProps> = ({
         onClick={onGmailClick || (() => console.log('Gmail Integration functionality'))}
       >
         📧
+      </button>
+      
+      <button 
+        className="action-button social-commenter-button" 
+        title="Social Media Comment Manager"
+        onClick={onSocialCommenterClick || (() => console.log('Social Commenter functionality'))}
+      >
+        💬
       </button>
       
       <button className="action-button" title="Menu">

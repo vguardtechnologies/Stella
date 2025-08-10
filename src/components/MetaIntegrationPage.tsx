@@ -44,15 +44,14 @@ const MetaIntegrationPage: React.FC<MetaIntegrationPageProps> = ({ onClose }) =>
 
   const loadExistingConnections = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/meta/status`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.connected) {
-          setFacebookAccount(data.facebook_account);
-          setFacebookPages(data.facebook_pages || []);
-          setInstagramAccounts(data.instagram_accounts || []);
-          setConnectionStatus('connected');
-        }
+      // Check if user has saved Facebook connection in localStorage
+      const savedConnection = localStorage.getItem('facebookConnection');
+      if (savedConnection) {
+        const connectionData = JSON.parse(savedConnection);
+        setFacebookAccount(connectionData.user || null);
+        setFacebookPages(connectionData.pages || []);
+        setInstagramAccounts(connectionData.instagram || []);
+        setConnectionStatus('connected');
       }
     } catch (error) {
       console.error('Error loading Meta connections:', error);
@@ -64,60 +63,129 @@ const MetaIntegrationPage: React.FC<MetaIntegrationPageProps> = ({ onClose }) =>
     setConnectionStatus('connecting');
 
     try {
-      // Simulate Facebook login for now
-      console.log('Facebook login initiated');
+      // Get Facebook OAuth URL from backend
+      const response = await fetch(`${API_BASE}/api/facebook?action=auth-url`);
+      const data = await response.json();
       
-      // Update state with mock connected account info
+      if (data.error || data.setup_required) {
+        alert(data.error || 'Facebook App configuration required. Please check your environment variables.');
+        setIsConnecting(false);
+        setConnectionStatus('disconnected');
+        return;
+      }
+      
+      if (data.authUrl) {
+        // Open Facebook OAuth in a popup window
+        const popup = window.open(
+          data.authUrl,
+          'FacebookAuth',
+          'width=500,height=600,scrollbars=yes,resizable=yes'
+        );
+        
+        // Listen for the OAuth callback
+        const checkClosed = setInterval(() => {
+          if (popup?.closed) {
+            clearInterval(checkClosed);
+            setIsConnecting(false);
+            // Check if connection was successful
+            loadExistingConnections();
+          }
+        }, 1000);
+        
+        // Listen for OAuth callback message from popup
+        const messageListener = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          
+          if (event.data.type === 'FACEBOOK_AUTH_SUCCESS') {
+            popup?.close();
+            handleAuthSuccess(event.data.code);
+            window.removeEventListener('message', messageListener);
+          }
+        };
+        
+        window.addEventListener('message', messageListener);
+      }
+    } catch (error) {
+      console.error('Facebook login error:', error);
+      alert('Failed to initiate Facebook login. Please try again.');
+      setIsConnecting(false);
+      setConnectionStatus('disconnected');
+    }
+  };
+
+  const handleAuthSuccess = async (code: string) => {
+    try {
+      // Exchange code for access token
+      const response = await fetch(`${API_BASE}/api/facebook?action=exchange-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code })
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      // Get user info
+      const userResponse = await fetch(`${API_BASE}/api/facebook?action=user-info&access_token=${data.access_token}`);
+      const userData = await userResponse.json();
+      
+      // Get pages
+      const pagesResponse = await fetch(`${API_BASE}/api/facebook?action=pages&access_token=${data.access_token}`);
+      const pagesData = await pagesResponse.json();
+      
+      // Get Instagram accounts
+      const instagramResponse = await fetch(`${API_BASE}/api/facebook?action=instagram&access_token=${data.access_token}`);
+      const instagramData = await instagramResponse.json();
+      
+      // Update state
       setFacebookAccount({
-        id: 'mock_id',
-        name: 'Mock User',
-        picture: 'https://via.placeholder.com/100',
+        id: userData.id,
+        name: userData.name,
+        picture: userData.picture?.data?.url || 'https://via.placeholder.com/100',
+        access_token: data.access_token,
         connected: true
       });
-
-      // Convert Facebook API pages to local format
-      setFacebookPages([{
-        id: 'mock_page_id',
-        name: 'Mock Page',
-        picture: 'https://via.placeholder.com/100',
-        access_token: 'mock_token',
-        connected: false
-      }]);
       
-      // Convert Instagram accounts to local format
-      setInstagramAccounts([{
-        id: 'mock_ig_id',
-        username: 'mock_instagram',
-        profile_picture_url: 'https://via.placeholder.com/100',
+      setFacebookPages(pagesData.data?.map((page: any) => ({
+        id: page.id,
+        name: page.name,
+        picture: page.picture?.data?.url || 'https://via.placeholder.com/100',
+        access_token: page.access_token,
         connected: false
-      }]);
+      })) || []);
+      
+      setInstagramAccounts(instagramData.data?.map((account: any) => ({
+        id: account.id,
+        username: account.username,
+        profile_picture_url: account.profile_picture_url || 'https://via.placeholder.com/100',
+        connected: false
+      })) || []);
       
       setConnectionStatus('connected');
       
       // Save to localStorage
       const connectionData = {
-        user: { id: 'mock_id', name: 'Mock User' },
-        pages: [],
-        instagram: [],
-        accessToken: 'mock_token'
+        user: {
+          id: userData.id,
+          name: userData.name,
+          picture: userData.picture?.data?.url,
+          access_token: data.access_token
+        },
+        pages: pagesData.data || [],
+        instagram: instagramData.data || [],
+        timestamp: Date.now()
       };
+      
       localStorage.setItem('facebookConnection', JSON.stringify(connectionData));
-
+      
     } catch (error) {
-      console.error('Facebook login error:', error);
-      
-      if (error instanceof Error && error.message.includes('SETUP_REQUIRED')) {
-        alert('⚙️ Facebook App Setup Required\n\n' +
-              'To use Facebook integration, you need to:\n' +
-              '1. Create a Facebook Developer App\n' +
-              '2. Get your App ID from Facebook Developer Console\n' +
-              '3. Add VITE_FACEBOOK_APP_ID=your_real_app_id to your .env file\n' +
-              '4. Restart the development server\n\n' +
-              'Visit: https://developers.facebook.com/apps/');
-      } else {
-        alert('Failed to connect to Facebook. Please try again.');
-      }
-      
+      console.error('Auth success handler error:', error);
+      alert('Failed to complete Facebook authentication. Please try again.');
       setConnectionStatus('disconnected');
     } finally {
       setIsConnecting(false);
@@ -126,25 +194,41 @@ const MetaIntegrationPage: React.FC<MetaIntegrationPageProps> = ({ onClose }) =>
 
   const handleDisconnect = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/meta/disconnect`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        setFacebookAccount(null);
-        setFacebookPages([]);
-        setInstagramAccounts([]);
-        setConnectionStatus('disconnected');
-      }
+      // Remove from localStorage
+      localStorage.removeItem('facebookConnection');
+      
+      // Clear state
+      setFacebookAccount(null);
+      setFacebookPages([]);
+      setInstagramAccounts([]);
+      setConnectionStatus('disconnected');
+      
+      alert('Disconnected from Facebook successfully!');
     } catch (error) {
       console.error('Error disconnecting Meta accounts:', error);
+      alert('Failed to disconnect. Please try again.');
     }
   };
 
   const togglePageConnection = async (pageId: string, connect: boolean) => {
     try {
-      const response = await fetch(`${API_BASE}/api/meta/page/${pageId}/${connect ? 'connect' : 'disconnect'}`, {
+      const savedConnection = localStorage.getItem('facebookConnection');
+      if (!savedConnection) {
+        alert('No Facebook connection found. Please reconnect.');
+        return;
+      }
+      
+      const connectionData = JSON.parse(savedConnection);
+      const response = await fetch(`${API_BASE}/api/facebook?action=toggle-page`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pageId,
+          connect,
+          access_token: connectionData.user.access_token
+        })
       });
 
       if (response.ok) {
@@ -153,16 +237,40 @@ const MetaIntegrationPage: React.FC<MetaIntegrationPageProps> = ({ onClose }) =>
             page.id === pageId ? { ...page, connected: connect } : page
           )
         );
+        
+        // Update localStorage
+        connectionData.pages = connectionData.pages.map((page: any) => 
+          page.id === pageId ? { ...page, connected: connect } : page
+        );
+        localStorage.setItem('facebookConnection', JSON.stringify(connectionData));
+      } else {
+        throw new Error('Failed to toggle page connection');
       }
     } catch (error) {
       console.error('Error toggling page connection:', error);
+      alert('Failed to update page connection. Please try again.');
     }
   };
 
   const toggleInstagramConnection = async (accountId: string, connect: boolean) => {
     try {
-      const response = await fetch(`${API_BASE}/api/meta/instagram/${accountId}/${connect ? 'connect' : 'disconnect'}`, {
+      const savedConnection = localStorage.getItem('facebookConnection');
+      if (!savedConnection) {
+        alert('No Facebook connection found. Please reconnect.');
+        return;
+      }
+      
+      const connectionData = JSON.parse(savedConnection);
+      const response = await fetch(`${API_BASE}/api/facebook?action=toggle-instagram`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accountId,
+          connect,
+          access_token: connectionData.user.access_token
+        })
       });
 
       if (response.ok) {
@@ -171,9 +279,18 @@ const MetaIntegrationPage: React.FC<MetaIntegrationPageProps> = ({ onClose }) =>
             account.id === accountId ? { ...account, connected: connect } : account
           )
         );
+        
+        // Update localStorage
+        connectionData.instagram = connectionData.instagram.map((account: any) => 
+          account.id === accountId ? { ...account, connected: connect } : account
+        );
+        localStorage.setItem('facebookConnection', JSON.stringify(connectionData));
+      } else {
+        throw new Error('Failed to toggle Instagram connection');
       }
     } catch (error) {
       console.error('Error toggling Instagram connection:', error);
+      alert('Failed to update Instagram connection. Please try again.');
     }
   };
 

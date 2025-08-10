@@ -6,6 +6,7 @@ import ProductModal from './ProductModal';
 import WhatsAppTemplateManager from './WhatsAppTemplateManager';
 import MediaBrowser from './MediaBrowser';
 import { shopifyService } from '../services/shopifyService';
+import SocialMediaService from '../services/socialMediaService';
 import './ChatPage.css';
 
 // Template interface for WhatsApp templates
@@ -175,9 +176,9 @@ interface ChatPageProps {
 interface Message {
   id: string;
   text: string;
-  sender: 'user' | 'agent';
+  sender: 'user' | 'agent' | 'system';
   timestamp: Date;
-  type: 'text' | 'product' | 'order' | 'cart' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location';
+  type: 'text' | 'product' | 'order' | 'cart' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location' | 'social_post';
   productData?: Product;
   orderData?: Order;
   cartData?: {
@@ -202,6 +203,14 @@ interface Message {
   templateName?: string;
   // Failure reason for display
   failureReason?: '24_hour_rule' | 'general_error';
+  // Social Media specific fields
+  platform?: string;
+  post?: {
+    title: string;
+    url: string;
+    image?: string;
+  };
+  author?: string;
 }
 
 interface Conversation {
@@ -218,6 +227,14 @@ interface Conversation {
   profile_name?: string;
   last_message_type?: string;
   isWhatsApp?: boolean;
+  // Social Media specific fields
+  isSocialMedia?: boolean;
+  platform?: string;
+  post_title?: string;
+  post_url?: string;
+  post_image?: string;
+  comment_id?: string;
+  post_id?: string;
 }
 
 interface Product {
@@ -315,15 +332,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // WhatsApp Integration State
   const [whatsappConversations, setWhatsappConversations] = useState<Conversation[]>([]);
-  const [conversations, setConversations] = useState<any[]>([]);
   const [currentConversation, setCurrentConversation] = useState<any>(null);
   const [whatsappConfigured] = useState(true); // Assume configured since we have permanent token
   
-  // Status and Modal State
-  const [statusMessage, setStatusMessage] = useState<string>('');
-  const [statusType, setStatusType] = useState<'success' | 'error' | 'info'>('info');
-  const [showModal, setShowModal] = useState(false);
-
+  // Social Media Integration State
+  const [socialMediaConversations, setSocialMediaConversations] = useState<Conversation[]>([]);
+  
   // Contact Management State
   const [showContactManager, setShowContactManager] = useState(false);
   const [currentContact, setCurrentContact] = useState<any>(null);
@@ -451,6 +465,42 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       }
     } catch (error) {
       console.error('Error fetching WhatsApp conversations:', error);
+    }
+  };
+
+  // Fetch Social Media conversations from the database
+  const fetchSocialMediaConversations = async () => {
+    try {
+      console.log('Fetching Social Media conversations...');
+      const socialMediaService = new SocialMediaService(API_BASE);
+      const pendingComments = await socialMediaService.getPendingComments();
+      
+      console.log('Pending comments:', pendingComments);
+      
+      const convertedConversations = pendingComments.map((comment: any) => ({
+        id: `sm_${comment.id}`,
+        customerName: comment.author_name || comment.author_username || 'Social Media User',
+        customerPhone: `social_${comment.platform}_${comment.author_id}`,
+        lastMessage: comment.content || 'Social media comment',
+        timestamp: new Date(comment.created_at),
+        unreadCount: comment.reply_count || 0,
+        status: 'active',
+        display_name: comment.author_name || comment.author_username,
+        profile_name: comment.author_name,
+        last_message_type: 'social_comment',
+        isSocialMedia: true,
+        platform: comment.platform,
+        post_title: comment.post_title,
+        post_url: comment.post_url,
+        post_image: comment.post_image,
+        comment_id: comment.id,
+        post_id: comment.post_id
+      }));
+      
+      console.log(`Social Media conversations: ${convertedConversations.length}`);
+      setSocialMediaConversations(convertedConversations);
+    } catch (error) {
+      console.error('Error fetching Social Media conversations:', error);
     }
   };
 
@@ -1496,89 +1546,118 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
 
     console.log('🛒 Sending cart as WhatsApp product list');
+    console.log('Cart items:', cartItems);
+    console.log('Phone number:', phoneNumber);
 
     try {
       const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      console.log('API_BASE:', API_BASE);
       
       // First, send a product image card with the first product in cart
       if (cartItems.length > 0) {
+        console.log('🎯 ENTERING IMAGE SECTION - Cart has items');
         const firstProduct = cartItems[0];
+        console.log('First product in cart:', firstProduct);
         
         // Optimize the image URL if it's a Shopify image
-        const optimizeImageUrl = (url: string) => {
-          if (url && url.includes('shopify.com')) {
+        const optimizeImageUrl = (url: string | undefined | null) => {
+          if (!url || typeof url !== 'string') {
+            // Use a simple, reliable placeholder image
+            return 'https://via.placeholder.com/400x400/25D366/ffffff?text=Product';
+          }
+          if (url.includes('shopify.com')) {
             const separator = url.includes('?') ? '&' : '?';
             return `${url}${separator}width=800&height=800&quality=90&format=webp`;
           }
           return url;
         };
 
-        const productImageResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        const imageUrl = optimizeImageUrl(firstProduct.image || firstProduct.imageSrc);
+        console.log('Image URL to send:', imageUrl);
+        console.log('Original image URLs:', { image: firstProduct.image, imageSrc: firstProduct.imageSrc });
+
+        // Always send image message (with placeholder if needed)
+        if (imageUrl) {
+          const productImagePayload = {
             to: phoneNumber.replace(/[^\d]/g, ''),
             type: 'image',
-            mediaUrl: optimizeImageUrl(firstProduct.image || firstProduct.imageSrc),
+            mediaUrl: imageUrl,
             caption: `🛒 ${firstProduct.title}\n💰 $${firstProduct.displayPrice || firstProduct.price} TTD\n📦 Quantity: ${firstProduct.quantity}\n\nYour cart details below:`
-          })
-        });
+          };
+          console.log('Sending product image with payload:', productImagePayload);
 
-        const imageResult = await productImageResponse.json();
-        console.log('Product image result:', imageResult);
+          const productImageResponse = await fetch(`${API_BASE}/api/whatsapp`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(productImagePayload)
+          });
 
-        // Wait a moment before sending the cart list
-        await new Promise(resolve => setTimeout(resolve, 500));
+          const imageResult = await productImageResponse.json();
+          console.log('Product image result:', imageResult);
+
+          if (!imageResult.success) {
+            console.error('❌ Product image failed:', imageResult);
+            // Don't throw error, just log and continue with cart list
+            console.warn('⚠️ Continuing with cart list despite image failure');
+          } else {
+            console.log('✅ Product image sent successfully');
+            // Wait longer before sending the cart list
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
       }
       
       // Send cart as WhatsApp interactive list with checkout option
+      const cartListPayload = {
+        to: phoneNumber.replace(/[^\d]/g, ''),
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          header: {
+            type: 'text',
+            text: '🛒 Your Shopping Cart'
+          },
+          body: {
+            text: `You have ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''} in your cart.\n\nTotal: $${getFinalTotal().toFixed(2)} TTD\n${appliedDiscount ? `Discount: -$${calculateDiscountAmount().toFixed(2)} TTD\n` : ''}Ready for checkout!`
+          },
+          footer: {
+            text: 'Select an option below'
+          },
+          action: {
+            button: 'View Options',
+            sections: [
+              {
+                title: 'Cart Items',
+                rows: cartItems.slice(0, 9).map((item, index) => ({ // WhatsApp limits to 10 rows total
+                  id: `view_item_${item.id}`,
+                  title: item.title.substring(0, 24), // WhatsApp title limit
+                  description: `$${item.displayPrice || item.price} × ${item.quantity}`.substring(0, 72) // WhatsApp description limit
+                }))
+              },
+              {
+                title: 'Actions',
+                rows: [
+                  {
+                    id: 'proceed_checkout',
+                    title: 'Check-out',
+                    description: 'Processing your purchase'
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      };
+      console.log('Cart list payload:', JSON.stringify(cartListPayload, null, 2));
+
       const cartResponse = await fetch(`${API_BASE}/api/whatsapp/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          to: phoneNumber.replace(/[^\d]/g, ''),
-          type: 'interactive',
-          interactive: {
-            type: 'list',
-            header: {
-              type: 'text',
-              text: '🛒 Your Shopping Cart'
-            },
-            body: {
-              text: `You have ${cartItems.length} item${cartItems.length !== 1 ? 's' : ''} in your cart.\n\nTotal: $${getFinalTotal().toFixed(2)} TTD\n${appliedDiscount ? `Discount: -$${calculateDiscountAmount().toFixed(2)} TTD\n` : ''}Ready for checkout!`
-            },
-            footer: {
-              text: 'Select an option below'
-            },
-            action: {
-              button: 'View Options',
-              sections: [
-                {
-                  title: 'Cart Items',
-                  rows: cartItems.slice(0, 9).map((item, index) => ({ // WhatsApp limits to 10 rows total
-                    id: `view_item_${item.id}`,
-                    title: item.title.substring(0, 24), // WhatsApp title limit
-                    description: `$${item.displayPrice || item.price} × ${item.quantity}`.substring(0, 72) // WhatsApp description limit
-                  }))
-                },
-                {
-                  title: 'Actions',
-                  rows: [
-                    {
-                      id: 'proceed_checkout',
-                      title: 'Check-out',
-                      description: 'Processing your purchase'
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        })
+        body: JSON.stringify(cartListPayload)
       });
 
       const cartResult = await cartResponse.json();
@@ -1607,11 +1686,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           setCurrentConversation(updatedConversation);
         }
       } else {
+        console.error('❌ Cart list failed:', cartResult);
         alert(`Failed to send cart: ${cartResult.message || 'Unknown error'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error sending cart:', error);
-      alert('Failed to send cart due to error');
+      console.error('Error stack:', error.stack);
+      console.error('Error message:', error.message);
+      alert(`Failed to send cart due to error: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -2175,8 +2257,60 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       console.log('Fetching messages for conversation ID:', conversationId, 'Phone:', phoneNumber);
       await fetchWhatsAppMessages(phoneNumber.replace(/[^\d]/g, ''), isAutoRefresh);
+    } else if (conversationId.startsWith('sm_')) {
+      // Social Media conversation - fetch comment thread
+      console.log('Fetching social media conversation:', conversationId);
+      await fetchSocialMediaMessages(conversationId);
     }
     // Can add other conversation types here in the future
+  };
+
+  // Fetch Social Media messages (comments and replies)
+  const fetchSocialMediaMessages = async (conversationId: string) => {
+    try {
+      // Find the social media conversation
+      const conversation = socialMediaConversations.find(c => c.id === conversationId);
+      
+      if (!conversation) {
+        console.warn('Social media conversation not found:', conversationId);
+        return;
+      }
+
+      // Create mock messages for the social media post and comment
+      const mockMessages = [
+        // Original post display
+        {
+          id: `post_${conversation.post_id}`,
+          sender: 'system' as const,
+          text: '',
+          timestamp: new Date(conversation.timestamp),
+          type: 'social_post' as const,
+          platform: conversation.platform,
+          status: 'sent' as const,
+          post: {
+            title: conversation.post_title!,
+            url: conversation.post_url!,
+            image: conversation.post_image
+          }
+        },
+        // The comment to respond to
+        {
+          id: conversation.comment_id!,
+          sender: 'user' as const,
+          text: conversation.lastMessage,
+          timestamp: new Date(conversation.timestamp),
+          type: 'text' as const,
+          status: 'sent' as const,
+          author: conversation.customerName,
+          platform: conversation.platform
+        }
+      ];
+      
+      console.log('Setting social media messages:', mockMessages);
+      setMessages(mockMessages);
+    } catch (error) {
+      console.error('Error fetching social media messages:', error);
+    }
   };
 
   // Function to get actual media URL from WhatsApp media ID
@@ -2432,14 +2566,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setFilePreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Load WhatsApp data on component mount
+  // Load WhatsApp and Social Media data on component mount
   useEffect(() => {
     fetchWhatsAppConversations();
+    fetchSocialMediaConversations();
     
     // Simple auto-refresh - fetch conversations every 30 seconds
     const interval = setInterval(() => {
       console.log('Auto-refreshing conversations');
       fetchWhatsAppConversations();
+      fetchSocialMediaConversations();
     }, 30000);
     
     return () => clearInterval(interval);
@@ -2668,8 +2804,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     };
   }, [selectedConversation]);
 
-  // Use only real WhatsApp conversations - no mock data
-  const allConversations = whatsappConversations
+  // Use real WhatsApp conversations and Social Media conversations
+  const allConversations = [...whatsappConversations, ...socialMediaConversations]
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   // Smart scroll behavior - only scroll to bottom when appropriate
@@ -2706,17 +2842,74 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     scrollToBottom();
   };
 
+  // Handle sending social media replies
+  const handleSendSocialMediaReply = async () => {
+    if (!newMessage.trim() || !selectedConversation) return;
+
+    const conversation = socialMediaConversations.find(c => c.id === selectedConversation);
+    if (!conversation) {
+      console.error('Social media conversation not found:', selectedConversation);
+      return;
+    }
+
+    // Store the message before clearing
+    const messageToSend = newMessage;
+    setNewMessage('');
+
+    try {
+      // Add optimistic message to UI
+      const newReplyMessage = {
+        id: `temp_${Date.now()}`,
+        sender: 'agent' as const,
+        text: messageToSend,
+        timestamp: new Date(),
+        type: 'text' as const,
+        status: 'sending' as const,
+        platform: conversation.platform
+      };
+
+      setMessages(prev => [...prev, newReplyMessage]);
+
+      // Send to API
+      const socialMediaService = new SocialMediaService(API_BASE);
+      await socialMediaService.sendReply(
+        parseInt(conversation.comment_id!),
+        messageToSend,
+        conversation.platform!
+      );
+
+      console.log('✅ Social media reply sent successfully');
+      
+    } catch (error) {
+      console.error('❌ Error sending social media reply:', error);
+      
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => !msg.id.startsWith('temp_')));
+      setNewMessage(messageToSend); // Restore message
+      
+      // Show error in console (or could show in UI if needed)
+      console.error('Failed to send social media reply. Please try again.');
+    }
+  };
+
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && selectedFiles.length === 0) || !selectedConversation) return;
 
-    // Check for cart commands before sending
+    // Handle social media conversation replies
+    if (selectedConversation.startsWith('sm_')) {
+      console.log('📤 Sending social media reply...');
+      await handleSendSocialMediaReply();
+      return;
+    }
+
+    // Check for cart commands before sending (WhatsApp only)
     if (newMessage.trim().toLowerCase().startsWith('add to cart ')) {
       handleChatCartCommand(newMessage.trim());
       setNewMessage('');
       return;
     }
 
-    // Extract phone number from conversation ID
+    // WhatsApp conversation handling
     const conversation = whatsappConversations.find(c => c.id === selectedConversation);
     
     // If conversation not found in the list, try to extract phone from the conversation ID
@@ -2734,7 +2927,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       phoneNumber = conversation.customerPhone;
     }
 
-    console.log('📤 Sending message to:', phoneNumber);
+    console.log('📤 Sending WhatsApp message to:', phoneNumber);
 
     // Store values before clearing
     const messageToSend = newMessage;
@@ -3439,6 +3632,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   <div
                     key={conversation.id}
                     className={`conversation-item ${selectedConversation === conversation.id ? 'selected' : ''}`}
+                    data-platform={conversation.platform || 'whatsapp'}
                     onClick={() => setSelectedConversation(conversation.id)}
                   >
                     <div className="conversation-avatar">
@@ -3499,53 +3693,123 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               <>
                 <div className="chat-header-info">
                   <div className="customer-details">
-                    <h3>{getDisplayNameForPhone(
-                      allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '',
-                      allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerName
-                    )}</h3>
-                    {savedContacts.has(allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '') && (
-                      <div className="contact-saved-badge">
-                        Contact Saved
-                      </div>
-                    )}
-                    <span>{allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone}</span>
+                    {(() => {
+                      const currentConversation = allConversations.find((c: Conversation) => c.id === selectedConversation);
+                      const isSocialMedia = currentConversation?.id?.startsWith('sm_');
+                      
+                      if (isSocialMedia) {
+                        return (
+                          <>
+                            <h3>{currentConversation?.customerName || 'Social Media User'}</h3>
+                            <div className="social-media-info">
+                              <span className="platform-badge">{currentConversation?.platform?.toUpperCase()}</span>
+                              {currentConversation?.post_title && (
+                                <span className="post-title">Post: {currentConversation.post_title}</span>
+                              )}
+                            </div>
+                            {currentConversation?.post_url && (
+                              <a 
+                                href={currentConversation.post_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="post-link"
+                              >
+                                View Original Post
+                              </a>
+                            )}
+                          </>
+                        );
+                      } else {
+                        return (
+                          <>
+                            <h3>{getDisplayNameForPhone(
+                              currentConversation?.customerPhone || '',
+                              currentConversation?.customerName
+                            )}</h3>
+                            {savedContacts.has(currentConversation?.customerPhone || '') && (
+                              <div className="contact-saved-badge">
+                                Contact Saved
+                              </div>
+                            )}
+                            <span>{currentConversation?.customerPhone}</span>
+                          </>
+                        );
+                      }
+                    })()}
                   </div>
                   <div className="chat-actions">
-                    {!savedContacts.has(allConversations.find((c: Conversation) => c.id === selectedConversation)?.customerPhone || '') && (
-                      <button className="action-btn" onClick={handleSaveContact} style={{
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        📇 Save Contact
-                      </button>
-                    )}
-                    <button 
-                      className="action-btn" 
-                      onClick={() => setShowTemplateManager(true)}
-                      style={{
-                        backgroundColor: '#25d366',
-                        color: 'white',
-                        border: 'none',
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginLeft: '8px'
-                      }}
-                    >
-                      📝 Templates
-                    </button>
+                    {(() => {
+                      const currentConversation = allConversations.find((c: Conversation) => c.id === selectedConversation);
+                      const isSocialMedia = currentConversation?.id?.startsWith('sm_');
+                      
+                      if (isSocialMedia) {
+                        return (
+                          <>
+                            <button 
+                              className="action-btn" 
+                              onClick={() => {
+                                // TODO: Implement AI auto-suggest for social media
+                                console.log('Auto-suggest reply for social media');
+                              }}
+                              style={{
+                                backgroundColor: '#6c5ce7',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              🤖 AI Suggest Reply
+                            </button>
+                          </>
+                        );
+                      } else {
+                        return (
+                          <>
+                            {!savedContacts.has(currentConversation?.customerPhone || '') && (
+                              <button className="action-btn" onClick={handleSaveContact} style={{
+                                backgroundColor: '#28a745',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                📇 Save Contact
+                              </button>
+                            )}
+                            <button 
+                              className="action-btn" 
+                              onClick={() => setShowTemplateManager(true)}
+                              style={{
+                                backgroundColor: '#25d366',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                marginLeft: '8px'
+                              }}
+                            >
+                              📝 Templates
+                            </button>
+                          </>
+                        );
+                      }
+                    })()}
                   </div>
                 </div>
 
@@ -3949,6 +4213,74 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             );
                           })()}
                         </div>
+                      ) : message.type === 'social_post' && message.post ? (
+                        <div className="social-post-message" style={{
+                          border: '2px solid #e1e5e9',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          margin: '8px 0',
+                          backgroundColor: '#f8f9fa',
+                          maxWidth: '400px'
+                        }}>
+                          <div className="post-header" style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '12px'
+                          }}>
+                            <div className="platform-badge" style={{
+                              background: message.platform === 'facebook' ? '#1877f2' : 
+                                         message.platform === 'instagram' ? '#e4405f' : 
+                                         message.platform === 'tiktok' ? '#ff0050' : '#666',
+                              color: 'white',
+                              padding: '4px 8px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>
+                              {message.platform?.toUpperCase()} POST
+                            </div>
+                          </div>
+                          
+                          {message.post.image && (
+                            <div className="post-image" style={{ marginBottom: '12px' }}>
+                              <img 
+                                src={message.post.image} 
+                                alt="Social media post" 
+                                style={{
+                                  width: '100%',
+                                  borderRadius: '8px',
+                                  maxHeight: '200px',
+                                  objectFit: 'cover'
+                                }}
+                              />
+                            </div>
+                          )}
+                          
+                          <div className="post-content">
+                            <h4 style={{ 
+                              margin: '0 0 8px 0', 
+                              fontSize: '14px',
+                              color: '#333'
+                            }}>
+                              {message.post.title}
+                            </h4>
+                            
+                            <a 
+                              href={message.post.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              style={{
+                                color: '#6c5ce7',
+                                textDecoration: 'none',
+                                fontSize: '12px',
+                                fontWeight: '500'
+                              }}
+                            >
+                              View Original Post →
+                            </a>
+                          </div>
+                        </div>
                       ) : message.type === 'order' && message.orderData ? (
                         <div className="order-message">
                           <div className="order-confirmation">
@@ -4163,14 +4495,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             <VoiceMessageComponent 
                               audioSrc={`${API_BASE}/api/media/media/${message.media_file_id}`}
                               duration={message.voice_duration}
-                              sender={message.sender}
+                              sender={message.sender === 'system' ? 'agent' : message.sender}
                               mimeType={message.media_mime_type}
                             />
                           ) : message.media_url ? (
                             <VoiceMessageComponent 
                               audioSrc={`${API_BASE}/api/whatsapp/media-proxy/${message.media_url}`}
                               duration={message.voice_duration}
-                              sender={message.sender}
+                              sender={message.sender === 'system' ? 'agent' : message.sender}
                               mimeType={message.media_mime_type}
                             />
                           ) : (

@@ -1956,3 +1956,58 @@ mark {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Social Media Conversation Styles */
+.social-media-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.platform-badge {
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  width: fit-content;
+}
+
+.post-title {
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.post-link {
+  color: #6c5ce7;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.post-link:hover {
+  text-decoration: underline;
+}
+
+/* Social Media Conversation Item */
+.conversation-item[data-platform] {
+  border-left: 3px solid transparent;
+}
+
+.conversation-item[data-platform="facebook"] {
+  border-left-color: #1877f2;
+}
+
+.conversation-item[data-platform="instagram"] {
+  border-left-color: #e4405f;
+}
+
+.conversation-item[data-platform="tiktok"] {
+  border-left-color: #ff0050;
+}
