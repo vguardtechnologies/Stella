@@ -3,6 +3,7 @@
 
 const express = require('express');
 const Database = require('../config/database');
+const { pool } = require('../config/database');
 
 module.exports = async function handler(req, res) {
   // Enable CORS
@@ -309,7 +310,7 @@ async function handleSendReply(req, res) {
 
 // Handle incoming comment webhooks
 async function handleCommentWebhook(req, res) {
-  const { platform, data } = body;
+  const { platform, data } = req.body;
 
   try {
     // Process webhook based on platform
@@ -413,6 +414,119 @@ async function generateAIResponse(commentText, postContext, config) {
   } catch (error) {
     console.error('AI generation error:', error);
     throw error;
+  }
+}
+
+// Get connected platforms
+async function handleGetPlatforms(req, res) {
+  try {
+    const platformsQuery = `SELECT * FROM social_platforms WHERE user_id = $1 ORDER BY created_at DESC`;
+    const platforms = await pool.query(platformsQuery, ['default_user']);
+
+    return res.status(200).json({
+      success: true,
+      platforms: platforms.rows.map(platform => ({
+        id: platform.id,
+        type: platform.platform_type,
+        name: platform.name,
+        icon: platform.icon,
+        connected: platform.connected,
+        accountInfo: platform.account_info,
+        lastActivity: platform.last_activity
+      }))
+    });
+  } catch (error) {
+    console.error('Get platforms error:', error);
+    return res.status(500).json({ error: 'Failed to get platforms' });
+  }
+}
+
+// Connect a platform
+async function handleConnectPlatform(req, res) {
+  try {
+    const { platformType, name, accountInfo, accessToken } = req.body;
+
+    if (!platformType || !name) {
+      return res.status(400).json({ error: 'Platform type and name are required' });
+    }
+
+    // Insert or update platform connection
+    const upsertQuery = `
+      INSERT INTO social_platforms (user_id, platform_type, name, icon, connected, account_info, access_token, last_activity)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (user_id, platform_type)
+      DO UPDATE SET 
+        name = EXCLUDED.name,
+        connected = EXCLUDED.connected,
+        account_info = EXCLUDED.account_info,
+        access_token = EXCLUDED.access_token,
+        last_activity = NOW()
+      RETURNING *
+    `;
+
+    const icon = {
+      'facebook': '📘',
+      'instagram': '📷', 
+      'tiktok': '🎵',
+      'facebook-ads': '📊'
+    }[platformType] || '💬';
+
+    const result = await pool.query(upsertQuery, [
+      'default_user',
+      platformType,
+      name,
+      icon,
+      true,
+      JSON.stringify(accountInfo || {}),
+      accessToken || null
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      platform: {
+        id: result.rows[0].id,
+        type: result.rows[0].platform_type,
+        name: result.rows[0].name,
+        icon: result.rows[0].icon,
+        connected: result.rows[0].connected,
+        accountInfo: result.rows[0].account_info
+      }
+    });
+  } catch (error) {
+    console.error('Connect platform error:', error);
+    return res.status(500).json({ error: 'Failed to connect platform' });
+  }
+}
+
+// Disconnect a platform
+async function handleDisconnectPlatform(req, res) {
+  try {
+    const { platformType } = req.body;
+
+    if (!platformType) {
+      return res.status(400).json({ error: 'Platform type is required' });
+    }
+
+    const deleteQuery = `
+      UPDATE social_platforms 
+      SET connected = false, access_token = null, updated_at = NOW()
+      WHERE user_id = $1 AND platform_type = $2
+      RETURNING *
+    `;
+
+    const result = await pool.query(deleteQuery, ['default_user', platformType]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Platform connection not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `${platformType} disconnected successfully`
+    });
+  } catch (error) {
+    console.error('Disconnect platform error:', error);
+    return res.status(500).json({ error: 'Failed to disconnect platform' });
   }
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import FacebookCommenterBridge from './FacebookCommenterBridge';
 import './SocialMediaCommenter.css';
 
 interface SocialMediaCommenterProps {
@@ -65,85 +66,242 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
   });
 
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
+  const [showFacebookBridge, setShowFacebookBridge] = useState(false);
 
   // Check existing Facebook connection
   useEffect(() => {
-    const checkFacebookConnection = () => {
-      const savedConnection = localStorage.getItem('facebookConnection');
-      if (savedConnection) {
+    const initializePlatformConnections = async () => {
+      // Check existing Facebook connection from localStorage
+      const facebookConnection = localStorage.getItem('facebookConnection');
+      const simpleFacebookConfig = localStorage.getItem('simpleFacebookConfig');
+      
+      if (facebookConnection || simpleFacebookConfig) {
         try {
-          const connection = JSON.parse(savedConnection);
-          if (connection.connected) {
+          let connectionData = null;
+          
+          // Prefer the more complete facebookConnection, fallback to simpleFacebookConfig
+          if (facebookConnection) {
+            connectionData = JSON.parse(facebookConnection);
+          } else if (simpleFacebookConfig) {
+            const config = JSON.parse(simpleFacebookConfig);
+            connectionData = {
+              connected: true,
+              accountInfo: {
+                name: 'Facebook Business Account',
+                handle: '@business'
+              },
+              accessToken: config.accessToken,
+              appId: config.appId
+            };
+          }
+
+          if (connectionData?.connected || connectionData?.accessToken) {
+            // Update local state
             setPlatforms(prev => 
-              prev.map(platform => 
-                platform.id === 'facebook' || platform.id === 'instagram' ? 
-                  { ...platform, connected: true, accountInfo: connection.accountInfo } : 
-                  platform
-              )
+              prev.map(platform => {
+                if (platform.id === 'facebook' || platform.id === 'instagram' || platform.id === 'facebook-ads') {
+                  return { 
+                    ...platform, 
+                    connected: true, 
+                    accountInfo: connectionData.accountInfo || {
+                      name: 'Facebook Business',
+                      handle: '@business'
+                    }
+                  };
+                }
+                return platform;
+              })
             );
+
+            // Sync with backend database
+            await syncFacebookWithBackend(connectionData);
+            setShowFacebookBridge(false); // Hide bridge when connected
+          } else {
+            // No valid Facebook connection found
+            setShowFacebookBridge(true); // Show bridge for connection
           }
         } catch (error) {
           console.error('Error checking Facebook connection:', error);
+          setShowFacebookBridge(true); // Show bridge on error
         }
-      }
+        } else {
+        // No Facebook connection data found
+        setShowFacebookBridge(true); // Show bridge for first-time connection
+      }      // Load other connected platforms from backend
+      await loadConnectedPlatforms();
     };
 
-    checkFacebookConnection();
+    initializePlatformConnections();
   }, []);
+
+  // Sync Facebook connection with backend database
+  const syncFacebookWithBackend = async (connectionData: any) => {
+    try {
+      const response = await fetch('/api/social-commenter?action=connect-platform', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platformType: 'facebook',
+          name: connectionData.accountInfo?.name || 'Facebook Business',
+          accountInfo: connectionData.accountInfo || {
+            name: 'Facebook Business',
+            handle: '@business',
+            appId: connectionData.appId
+          },
+          accessToken: connectionData.accessToken
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to sync Facebook connection with backend');
+      }
+    } catch (error) {
+      console.error('Error syncing Facebook with backend:', error);
+    }
+  };
+
+  // Load connected platforms from backend
+  const loadConnectedPlatforms = async () => {
+    try {
+      const response = await fetch('/api/social-commenter?action=platforms');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Update platforms with backend data
+          setPlatforms(prev => 
+            prev.map(platform => {
+              const backendPlatform = data.platforms.find((p: any) => p.type === platform.id);
+              if (backendPlatform && backendPlatform.connected) {
+                return {
+                  ...platform,
+                  connected: true,
+                  accountInfo: typeof backendPlatform.accountInfo === 'string' 
+                    ? JSON.parse(backendPlatform.accountInfo) 
+                    : backendPlatform.accountInfo,
+                  lastActivity: backendPlatform.lastActivity ? new Date(backendPlatform.lastActivity) : undefined
+                };
+              }
+              return platform;
+            })
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error loading connected platforms:', error);
+    }
+  };
 
   const handlePlatformConnection = async (platformId: string) => {
     setIsConnecting(platformId);
 
     try {
       if (platformId === 'facebook' || platformId === 'instagram' || platformId === 'facebook-ads') {
-        // Use existing Facebook connection if available
-        const savedConnection = localStorage.getItem('facebookConnection');
-        if (savedConnection) {
-          const connection = JSON.parse(savedConnection);
-          if (connection.connected) {
+        // Check for existing Facebook connection
+        const facebookConnection = localStorage.getItem('facebookConnection');
+        const simpleFacebookConfig = localStorage.getItem('simpleFacebookConfig');
+        
+        let connectionData = null;
+        
+        if (facebookConnection) {
+          connectionData = JSON.parse(facebookConnection);
+        } else if (simpleFacebookConfig) {
+          const config = JSON.parse(simpleFacebookConfig);
+          connectionData = {
+            connected: true,
+            accessToken: config.accessToken,
+            appId: config.appId,
+            accountInfo: {
+              name: 'Facebook Business Account',
+              handle: '@business'
+            }
+          };
+        }
+
+        if (connectionData?.connected || connectionData?.accessToken) {
+          // Connect to backend
+          const response = await fetch('/api/social-commenter?action=connect-platform', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              platformType: platformId,
+              name: connectionData.accountInfo?.name || `${platformId} Business`,
+              accountInfo: connectionData.accountInfo || {
+                name: `${platformId} Business`,
+                handle: '@business',
+                appId: connectionData.appId
+              },
+              accessToken: connectionData.accessToken
+            }),
+          });
+
+          if (response.ok) {
             setPlatforms(prev => 
               prev.map(platform => 
                 platform.id === platformId ? 
                   { 
                     ...platform, 
                     connected: true, 
-                    accountInfo: connection.accountInfo,
+                    accountInfo: connectionData.accountInfo || {
+                      name: `${platformId} Business`,
+                      handle: '@business'
+                    },
                     lastActivity: new Date()
                   } : 
                   platform
               )
             );
-            setIsConnecting(null);
-            return;
+          } else {
+            throw new Error(`Failed to connect ${platformId} to backend`);
           }
+        } else {
+          // No Facebook connection available
+          alert('Please connect Facebook first from the main Facebook integration page, then return here to enable comment management.');
         }
 
-        // Redirect to Facebook integration for new connections
-        alert('Please connect Facebook first from the main Facebook integration button in the action bar, then return here to enable comment management.');
         setIsConnecting(null);
         return;
       }
 
       if (platformId === 'tiktok') {
-        // TikTok connection - placeholder for now
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        setPlatforms(prev => 
-          prev.map(platform => 
-            platform.id === 'tiktok' ? 
-              { 
-                ...platform, 
-                connected: true,
-                accountInfo: {
-                  name: 'Demo TikTok Business',
-                  handle: '@demobusiness',
-                  followers: 15400
-                },
-                lastActivity: new Date()
-              } : 
-              platform
-          )
-        );
+        // TikTok connection - connect to backend with demo data
+        const tiktokAccountInfo = {
+          name: 'Demo TikTok Business',
+          handle: '@demobusiness',
+          followers: 15400
+        };
+
+        const response = await fetch('/api/social-commenter?action=connect-platform', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            platformType: 'tiktok',
+            name: tiktokAccountInfo.name,
+            accountInfo: tiktokAccountInfo
+          }),
+        });
+
+        if (response.ok) {
+          setPlatforms(prev => 
+            prev.map(platform => 
+              platform.id === 'tiktok' ? 
+                { 
+                  ...platform, 
+                  connected: true,
+                  accountInfo: tiktokAccountInfo,
+                  lastActivity: new Date()
+                } : 
+                platform
+            )
+          );
+        } else {
+          throw new Error('Failed to connect TikTok to backend');
+        }
       }
 
     } catch (error) {
@@ -154,14 +312,33 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
     }
   };
 
-  const handleDisconnectPlatform = (platformId: string) => {
-    setPlatforms(prev => 
-      prev.map(platform => 
-        platform.id === platformId ? 
-          { ...platform, connected: false, accountInfo: undefined, lastActivity: undefined } : 
-          platform
-      )
-    );
+  const handleDisconnectPlatform = async (platformId: string) => {
+    try {
+      const response = await fetch('/api/social-commenter?action=disconnect-platform', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platformType: platformId
+        }),
+      });
+
+      if (response.ok) {
+        setPlatforms(prev => 
+          prev.map(platform => 
+            platform.id === platformId ? 
+              { ...platform, connected: false, accountInfo: undefined, lastActivity: undefined } : 
+              platform
+          )
+        );
+      } else {
+        throw new Error(`Failed to disconnect ${platformId}`);
+      }
+    } catch (error) {
+      console.error(`Error disconnecting ${platformId}:`, error);
+      alert(`Failed to disconnect from ${platformId}. Please try again.`);
+    }
   };
 
   const renderConnectionsTab = () => (
@@ -409,6 +586,22 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
           ✕
         </button>
       </div>
+
+      {showFacebookBridge && (
+        <div style={{ margin: '20px' }}>
+          <FacebookCommenterBridge 
+            onComplete={(success) => {
+              if (success) {
+                setShowFacebookBridge(false);
+                // Reload platforms after successful connection
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1000);
+              }
+            }} 
+          />
+        </div>
+      )}
 
       <div className="commenter-tabs">
         <button 
