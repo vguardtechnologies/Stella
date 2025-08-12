@@ -221,6 +221,23 @@ class SocialMediaService {
     }
   }
 
+  // Get connected platforms
+  async getPlatforms() {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/social-commenter?action=platforms`);
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get platforms');
+      }
+      
+      return data.platforms;
+    } catch (error) {
+      console.error('Error getting platforms:', error);
+      throw error;
+    }
+  }
+
   // Convert social media comment to chat conversation format
   convertCommentToConversation(comment: SocialComment) {
     const platformIcons: Record<string, string> = {
@@ -364,7 +381,7 @@ class SocialMediaService {
   }
 
   // Get suggested replies for auto-complete
-  async getSuggestedReplies(commentText: string, _platform: string, context: any = {}) {
+  async getSuggestedReplies(commentText: string, platform: string, context: any = {}) {
     try {
       // Generate AI suggestions
       const aiResponse = await this.generateAIResponse(
@@ -400,6 +417,91 @@ class SocialMediaService {
         aiSuggestion: null,
         quickReplies: []
       };
+    }
+  }
+
+  // Bulk AI Response Generation
+  async generateBulkAIResponses(options: { post_id?: string, platform?: string, exclude_replied?: boolean } = {}) {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/social-commenter?action=bulk-ai-respond`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(options)
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate bulk AI responses');
+      }
+
+      return {
+        responses: data.responses,
+        total: data.total_comments,
+        message: data.message
+      };
+
+    } catch (error) {
+      console.error('Error generating bulk AI responses:', error);
+      throw error;
+    }
+  }
+
+  // Send bulk replies
+  async sendBulkReplies(replies: Array<{ comment_id: number, response_text: string, platform: string }>) {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/social-commenter?action=bulk-send-replies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ replies })
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to send bulk replies');
+      }
+
+      return {
+        results: data.results,
+        summary: data.summary,
+        message: data.message
+      };
+
+    } catch (error) {
+      console.error('Error sending bulk replies:', error);
+      throw error;
+    }
+  }
+
+  // Get all comments for a specific post (for bulk operations)
+  async getPostComments(postId: string, platform?: string) {
+    try {
+      const params = new URLSearchParams({
+        action: 'post-comments',
+        post_id: postId
+      });
+
+      if (platform) {
+        params.append('platform', platform);
+      }
+
+      const response = await fetch(`${this.apiBaseUrl}/api/social-commenter?${params}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get post comments');
+      }
+
+      return data.comments || [];
+
+    } catch (error) {
+      console.error('Error getting post comments:', error);
+      throw error;
     }
   }
 }

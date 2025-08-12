@@ -61,9 +61,9 @@ try {
   app.use('/api/shopify', shopifyHandler);
   console.log('✅ Shopify routes loaded');
 
-  const facebookHandler = require('./api/FacebookAPI.js');
-  app.use('/api/facebook', facebookHandler);
-  console.log('✅ Facebook routes loaded');
+  // const facebookHandler = require('./api/facebook.js');
+  // app.use('/api/facebook', facebookHandler);
+  // console.log('✅ Facebook routes loaded');
 
   const simpleFacebookHandler = require('./api/FacebookAPI.js');
   app.use('/api/simple-facebook', simpleFacebookHandler);
@@ -76,10 +76,6 @@ try {
   const socialCommenterHandler = require('./api/social-commenter.js');
   app.use('/api/social-commenter', socialCommenterHandler);
   console.log('✅ Social Media Commenter routes loaded');
-
-  const facebookWebhookHandler = require('./api/facebook-webhook.js');
-  app.use('/api/webhook/facebook', facebookWebhookHandler);
-  console.log('✅ Facebook Webhook routes loaded');
   
 } catch (error) {
   console.log('⚠️ API routes error:', error.message);

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import FacebookCommenterBridge from './FacebookCommenterBridge';
 import './SocialMediaCommenter.css';
 
 interface SocialMediaCommenterProps {
@@ -11,6 +10,7 @@ interface PlatformConnection {
   name: string;
   icon: string;
   connected: boolean;
+  platform_type?: string;
   accountInfo?: {
     name: string;
     handle: string;
@@ -23,285 +23,157 @@ interface PlatformConnection {
 interface AIConfig {
   enabled: boolean;
   model: string;
+  auto_reply?: boolean;
   autoReply: boolean;
+  response_delay?: number;
   responseDelay: number; // in seconds
+  personality_prompt?: string;
   personalityPrompt: string;
 }
 
-const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'connections' | 'ai-config' | 'activity'>('connections');
-  const [platforms, setPlatforms] = useState<PlatformConnection[]>([
-    {
-      id: 'facebook',
-      name: 'Facebook Pages',
-      icon: '📘',
-      connected: false,
-    },
-    {
-      id: 'instagram',
-      name: 'Instagram Business',
-      icon: '📷',
-      connected: false,
-    },
-    {
-      id: 'tiktok',
-      name: 'TikTok Business',
-      icon: '🎵',
-      connected: false,
-    },
-    {
-      id: 'facebook-ads',
-      name: 'Facebook Ads',
-      icon: '📊',
-      connected: false,
-    }
-  ]);
+interface Comment {
+  id: number;
+  comment_text: string;
+  author_name: string;
+  author_handle: string;
+  post_title: string;
+  post_url: string;
+  platform_name: string;
+  platform_icon: string;
+  status: string;
+  created_at: string;
+}
 
+const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) => {
+  const [activeTab, setActiveTab] = useState<'connections' | 'ai-config' | 'activity' | 'comments'>('comments');
+  const [platforms, setPlatforms] = useState<PlatformConnection[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [aiConfig, setAiConfig] = useState<AIConfig>({
     enabled: false,
     model: 'llama-3.2-1b-q4',
     autoReply: false,
+    auto_reply: false,
     responseDelay: 30,
-    personalityPrompt: 'You are a helpful customer service representative. Respond professionally and friendly to customer comments.'
+    response_delay: 30,
+    personalityPrompt: 'You are a helpful customer service representative. Respond professionally and friendly to customer comments.',
+    personality_prompt: 'You are a helpful customer service representative. Respond professionally and friendly to customer comments.'
   });
 
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
-  const [showFacebookBridge, setShowFacebookBridge] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Check existing Facebook connection
+  // Load data from API
   useEffect(() => {
-    const initializePlatformConnections = async () => {
-      // Check existing Facebook connection from localStorage
-      const facebookConnection = localStorage.getItem('facebookConnection');
-      const simpleFacebookConfig = localStorage.getItem('simpleFacebookConfig');
-      
-      if (facebookConnection || simpleFacebookConfig) {
-        try {
-          let connectionData = null;
-          
-          // Prefer the more complete facebookConnection, fallback to simpleFacebookConfig
-          if (facebookConnection) {
-            connectionData = JSON.parse(facebookConnection);
-          } else if (simpleFacebookConfig) {
-            const config = JSON.parse(simpleFacebookConfig);
-            connectionData = {
-              connected: true,
-              accountInfo: {
-                name: 'Facebook Business Account',
-                handle: '@business'
-              },
-              accessToken: config.accessToken,
-              appId: config.appId
-            };
-          }
-
-          if (connectionData?.connected || connectionData?.accessToken) {
-            // Update local state
-            setPlatforms(prev => 
-              prev.map(platform => {
-                if (platform.id === 'facebook' || platform.id === 'instagram' || platform.id === 'facebook-ads') {
-                  return { 
-                    ...platform, 
-                    connected: true, 
-                    accountInfo: connectionData.accountInfo || {
-                      name: 'Facebook Business',
-                      handle: '@business'
-                    }
-                  };
-                }
-                return platform;
-              })
-            );
-
-            // Sync with backend database
-            await syncFacebookWithBackend(connectionData);
-            setShowFacebookBridge(false); // Hide bridge when connected
-          } else {
-            // No valid Facebook connection found
-            setShowFacebookBridge(true); // Show bridge for connection
-          }
-        } catch (error) {
-          console.error('Error checking Facebook connection:', error);
-          setShowFacebookBridge(true); // Show bridge on error
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Load platforms
+        const platformsResponse = await fetch('http://localhost:3000/api/social-commenter?action=platforms');
+        const platformsData = await platformsResponse.json();
+        
+        if (platformsData.success) {
+          const transformedPlatforms = platformsData.platforms.map((p: any) => ({
+            id: p.platform_type,
+            name: p.name,
+            icon: p.icon,
+            connected: p.connected,
+            platform_type: p.platform_type,
+            accountInfo: p.account_info,
+            lastActivity: p.last_activity ? new Date(p.last_activity) : undefined
+          }));
+          setPlatforms(transformedPlatforms);
         }
-        } else {
-        // No Facebook connection data found
-        setShowFacebookBridge(true); // Show bridge for first-time connection
-      }      // Load other connected platforms from backend
-      await loadConnectedPlatforms();
+
+        // Load AI config
+        const aiConfigResponse = await fetch('http://localhost:3000/api/social-commenter?action=ai-config');
+        const aiConfigData = await aiConfigResponse.json();
+        
+        if (aiConfigData.success) {
+          const config = aiConfigData.config;
+          setAiConfig({
+            enabled: config.enabled,
+            model: config.model,
+            autoReply: config.auto_reply,
+            auto_reply: config.auto_reply,
+            responseDelay: config.response_delay,
+            response_delay: config.response_delay,
+            personalityPrompt: config.personality_prompt,
+            personality_prompt: config.personality_prompt
+          });
+        }
+
+        // Load comments
+        const commentsResponse = await fetch('http://localhost:3000/api/social-commenter?action=comments&status=pending');
+        const commentsData = await commentsResponse.json();
+        
+        if (commentsData.success) {
+          setComments(commentsData.comments);
+        }
+
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    initializePlatformConnections();
+    loadData();
   }, []);
-
-  // Sync Facebook connection with backend database
-  const syncFacebookWithBackend = async (connectionData: any) => {
-    try {
-      const response = await fetch('/api/social-commenter?action=connect-platform', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          platformType: 'facebook',
-          name: connectionData.accountInfo?.name || 'Facebook Business',
-          accountInfo: connectionData.accountInfo || {
-            name: 'Facebook Business',
-            handle: '@business',
-            appId: connectionData.appId
-          },
-          accessToken: connectionData.accessToken
-        }),
-      });
-
-      if (!response.ok) {
-        console.warn('Failed to sync Facebook connection with backend');
-      }
-    } catch (error) {
-      console.error('Error syncing Facebook with backend:', error);
-    }
-  };
-
-  // Load connected platforms from backend
-  const loadConnectedPlatforms = async () => {
-    try {
-      const response = await fetch('/api/social-commenter?action=platforms');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          // Update platforms with backend data
-          setPlatforms(prev => 
-            prev.map(platform => {
-              const backendPlatform = data.platforms.find((p: any) => p.type === platform.id);
-              if (backendPlatform && backendPlatform.connected) {
-                return {
-                  ...platform,
-                  connected: true,
-                  accountInfo: typeof backendPlatform.accountInfo === 'string' 
-                    ? JSON.parse(backendPlatform.accountInfo) 
-                    : backendPlatform.accountInfo,
-                  lastActivity: backendPlatform.lastActivity ? new Date(backendPlatform.lastActivity) : undefined
-                };
-              }
-              return platform;
-            })
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Error loading connected platforms:', error);
-    }
-  };
 
   const handlePlatformConnection = async (platformId: string) => {
     setIsConnecting(platformId);
 
     try {
       if (platformId === 'facebook' || platformId === 'instagram' || platformId === 'facebook-ads') {
-        // Check for existing Facebook connection
-        const facebookConnection = localStorage.getItem('facebookConnection');
-        const simpleFacebookConfig = localStorage.getItem('simpleFacebookConfig');
-        
-        let connectionData = null;
-        
-        if (facebookConnection) {
-          connectionData = JSON.parse(facebookConnection);
-        } else if (simpleFacebookConfig) {
-          const config = JSON.parse(simpleFacebookConfig);
-          connectionData = {
-            connected: true,
-            accessToken: config.accessToken,
-            appId: config.appId,
-            accountInfo: {
-              name: 'Facebook Business Account',
-              handle: '@business'
-            }
-          };
-        }
-
-        if (connectionData?.connected || connectionData?.accessToken) {
-          // Connect to backend
-          const response = await fetch('/api/social-commenter?action=connect-platform', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              platformType: platformId,
-              name: connectionData.accountInfo?.name || `${platformId} Business`,
-              accountInfo: connectionData.accountInfo || {
-                name: `${platformId} Business`,
-                handle: '@business',
-                appId: connectionData.appId
-              },
-              accessToken: connectionData.accessToken
-            }),
-          });
-
-          if (response.ok) {
+        // Use existing Facebook connection if available
+        const savedConnection = localStorage.getItem('facebookConnection');
+        if (savedConnection) {
+          const connection = JSON.parse(savedConnection);
+          if (connection.connected) {
             setPlatforms(prev => 
               prev.map(platform => 
                 platform.id === platformId ? 
                   { 
                     ...platform, 
                     connected: true, 
-                    accountInfo: connectionData.accountInfo || {
-                      name: `${platformId} Business`,
-                      handle: '@business'
-                    },
+                    accountInfo: connection.accountInfo,
                     lastActivity: new Date()
                   } : 
                   platform
               )
             );
-          } else {
-            throw new Error(`Failed to connect ${platformId} to backend`);
+            setIsConnecting(null);
+            return;
           }
-        } else {
-          // No Facebook connection available
-          alert('Please connect Facebook first from the main Facebook integration page, then return here to enable comment management.');
         }
 
+        // Redirect to Facebook integration for new connections
+        alert('Please connect Facebook first from the main Facebook integration button in the action bar, then return here to enable comment management.');
         setIsConnecting(null);
         return;
       }
 
       if (platformId === 'tiktok') {
-        // TikTok connection - connect to backend with demo data
-        const tiktokAccountInfo = {
-          name: 'Demo TikTok Business',
-          handle: '@demobusiness',
-          followers: 15400
-        };
-
-        const response = await fetch('/api/social-commenter?action=connect-platform', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            platformType: 'tiktok',
-            name: tiktokAccountInfo.name,
-            accountInfo: tiktokAccountInfo
-          }),
-        });
-
-        if (response.ok) {
-          setPlatforms(prev => 
-            prev.map(platform => 
-              platform.id === 'tiktok' ? 
-                { 
-                  ...platform, 
-                  connected: true,
-                  accountInfo: tiktokAccountInfo,
-                  lastActivity: new Date()
-                } : 
-                platform
-            )
-          );
-        } else {
-          throw new Error('Failed to connect TikTok to backend');
-        }
+        // TikTok connection - placeholder for now
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        setPlatforms(prev => 
+          prev.map(platform => 
+            platform.id === 'tiktok' ? 
+              { 
+                ...platform, 
+                connected: true,
+                accountInfo: {
+                  name: 'Demo TikTok Business',
+                  handle: '@demobusiness',
+                  followers: 15400
+                },
+                lastActivity: new Date()
+              } : 
+              platform
+          )
+        );
       }
 
     } catch (error) {
@@ -312,33 +184,14 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
     }
   };
 
-  const handleDisconnectPlatform = async (platformId: string) => {
-    try {
-      const response = await fetch('/api/social-commenter?action=disconnect-platform', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          platformType: platformId
-        }),
-      });
-
-      if (response.ok) {
-        setPlatforms(prev => 
-          prev.map(platform => 
-            platform.id === platformId ? 
-              { ...platform, connected: false, accountInfo: undefined, lastActivity: undefined } : 
-              platform
-          )
-        );
-      } else {
-        throw new Error(`Failed to disconnect ${platformId}`);
-      }
-    } catch (error) {
-      console.error(`Error disconnecting ${platformId}:`, error);
-      alert(`Failed to disconnect from ${platformId}. Please try again.`);
-    }
+  const handleDisconnectPlatform = (platformId: string) => {
+    setPlatforms(prev => 
+      prev.map(platform => 
+        platform.id === platformId ? 
+          { ...platform, connected: false, accountInfo: undefined, lastActivity: undefined } : 
+          platform
+      )
+    );
   };
 
   const renderConnectionsTab = () => (
@@ -506,9 +359,76 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
             </div>
           )}
         </div>
+
+        <div className="ai-config-actions">
+          <button className="save-config-btn" onClick={handleSaveAIConfig}>
+            💾 Save Configuration
+          </button>
+          <button className="test-ai-btn" onClick={handleTestAI} disabled={!aiConfig.enabled}>
+            🧪 Test AI Response
+          </button>
+        </div>
       </div>
     </div>
   );
+
+  const handleSaveAIConfig = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/social-commenter?action=update-ai-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config: {
+            enabled: aiConfig.enabled,
+            model: aiConfig.model,
+            autoReply: aiConfig.autoReply,
+            responseDelay: aiConfig.responseDelay,
+            personalityPrompt: aiConfig.personalityPrompt
+          }
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('AI configuration saved successfully!');
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving AI config:', error);
+      alert('Failed to save AI configuration');
+    }
+  };
+
+  const handleTestAI = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/social-commenter?action=ai-respond', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          commentId: 0, // Test comment
+          commentText: "This looks great! How much does it cost?",
+          postContext: "Product showcase post"
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`Test AI Response:\n\n${data.response}\n\nConfidence: ${(data.confidence * 100).toFixed(1)}%`);
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error testing AI:', error);
+      alert('Failed to test AI response');
+    }
+  };
 
   const renderActivityTab = () => (
     <div className="activity-tab">
@@ -575,6 +495,173 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
     </div>
   );
 
+  const renderCommentsTab = () => (
+    <div className="comments-tab">
+      <div className="tab-header">
+        <h3>💬 Pending Comments</h3>
+        <p>Manage and respond to comments from all platforms</p>
+        <div className="comments-summary">
+          <span className="count">{comments.length} pending</span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading">Loading comments...</div>
+      ) : comments.length === 0 ? (
+        <div className="no-comments">
+          <div className="empty-state">
+            <h4>🎉 All caught up!</h4>
+            <p>No pending comments at the moment.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="comments-list">
+          {comments.map((comment) => (
+            <div key={comment.id} className="comment-card">
+              <div className="comment-header">
+                <div className="platform-info">
+                  <span className="platform-icon">{comment.platform_icon}</span>
+                  <span className="platform-name">{comment.platform_name}</span>
+                </div>
+                <span className="comment-time">
+                  {new Date(comment.created_at).toLocaleDateString()} {new Date(comment.created_at).toLocaleTimeString()}
+                </span>
+              </div>
+              
+              <div className="comment-content">
+                <div className="post-context">
+                  <strong>Post:</strong> {comment.post_title}
+                </div>
+                <div className="comment-text">
+                  <strong>{comment.author_name} ({comment.author_handle}):</strong>
+                  <p>{comment.comment_text}</p>
+                </div>
+              </div>
+
+              <div className="comment-actions">
+                <button 
+                  className="action-btn ai-response"
+                  onClick={() => handleGenerateAIResponse(comment)}
+                >
+                  🤖 AI Response
+                </button>
+                <button 
+                  className="action-btn manual-reply"
+                  onClick={() => handleManualReply(comment)}
+                >
+                  ✍️ Reply
+                </button>
+                <button 
+                  className="action-btn mark-handled"
+                  onClick={() => handleMarkHandled(comment)}
+                >
+                  ✅ Mark Handled
+                </button>
+                <a 
+                  href={comment.post_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="action-btn view-post"
+                >
+                  👀 View Post
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const handleGenerateAIResponse = async (comment: Comment) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/social-commenter?action=ai-respond', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          commentId: comment.id,
+          commentText: comment.comment_text,
+          postContext: comment.post_title
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`AI Suggestion:\n\n${data.response}\n\nConfidence: ${(data.confidence * 100).toFixed(1)}%`);
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      alert('Failed to generate AI response');
+    }
+  };
+
+  const handleManualReply = (comment: Comment) => {
+    const replyText = prompt(`Reply to ${comment.author_name}:\n\n"${comment.comment_text}"\n\nYour reply:`);
+    if (replyText) {
+      sendReply(comment, replyText);
+    }
+  };
+
+  const sendReply = async (comment: Comment, replyText: string) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/social-commenter?action=send-reply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          commentId: comment.id,
+          replyText,
+          platform: comment.platform_name.toLowerCase()
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Reply sent successfully!');
+        // Remove comment from pending list
+        setComments(prev => prev.filter(c => c.id !== comment.id));
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      alert('Failed to send reply');
+    }
+  };
+
+  const handleMarkHandled = async (comment: Comment) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/social-commenter?action=mark-handled', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          commentId: comment.id
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove comment from pending list
+        setComments(prev => prev.filter(c => c.id !== comment.id));
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error marking comment as handled:', error);
+      alert('Failed to mark comment as handled');
+    }
+  };
+
   return (
     <div className="social-media-commenter">
       <div className="commenter-header">
@@ -587,23 +674,13 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
         </button>
       </div>
 
-      {showFacebookBridge && (
-        <div style={{ margin: '20px' }}>
-          <FacebookCommenterBridge 
-            onComplete={(success) => {
-              if (success) {
-                setShowFacebookBridge(false);
-                // Reload platforms after successful connection
-                setTimeout(() => {
-                  window.location.reload();
-                }, 1000);
-              }
-            }} 
-          />
-        </div>
-      )}
-
       <div className="commenter-tabs">
+        <button 
+          className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`}
+          onClick={() => setActiveTab('comments')}
+        >
+          💬 Comments
+        </button>
         <button 
           className={`tab-btn ${activeTab === 'connections' ? 'active' : ''}`}
           onClick={() => setActiveTab('connections')}
@@ -625,6 +702,7 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
       </div>
 
       <div className="commenter-content">
+        {activeTab === 'comments' && renderCommentsTab()}
         {activeTab === 'connections' && renderConnectionsTab()}
         {activeTab === 'ai-config' && renderAIConfigTab()}
         {activeTab === 'activity' && renderActivityTab()}

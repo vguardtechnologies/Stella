@@ -557,3 +557,233 @@
     align-self: flex-start;
   }
 }
+
+/* Comments Tab Styles */
+.comments-tab {
+  padding: 2rem;
+}
+
+.comments-summary {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  color: white;
+  border-radius: 0.75rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.comments-summary .count {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+
+.no-comments {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.empty-state {
+  background: linear-gradient(135deg, #4ecdc4, #44a08d);
+  color: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  display: inline-block;
+}
+
+.empty-state h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.3rem;
+}
+
+.empty-state p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.comment-card {
+  background: var(--card-bg);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.comment-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.platform-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.platform-icon {
+  font-size: 1.2rem;
+}
+
+.platform-name {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.comment-time {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.comment-content {
+  margin-bottom: 1.5rem;
+}
+
+.post-context {
+  background: #f8f9fa;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.comment-text {
+  line-height: 1.6;
+}
+
+.comment-text p {
+  margin: 0.5rem 0 0 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.comment-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.action-btn.ai-response {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.action-btn.ai-response:hover {
+  background: linear-gradient(135deg, #5a6fd8, #6a4190);
+  transform: translateY(-1px);
+}
+
+.action-btn.manual-reply {
+  background: linear-gradient(135deg, #4ecdc4, #44a08d);
+  color: white;
+}
+
+.action-btn.manual-reply:hover {
+  background: linear-gradient(135deg, #3db8b0, #3a8f7d);
+  transform: translateY(-1px);
+}
+
+.action-btn.mark-handled {
+  background: linear-gradient(135deg, #11d44b, #0ea83e);
+  color: white;
+}
+
+.action-btn.mark-handled:hover {
+  background: linear-gradient(135deg, #0fc041, #0d923a);
+  transform: translateY(-1px);
+}
+
+.action-btn.view-post {
+  background: linear-gradient(135deg, #ffa726, #ff9800);
+  color: white;
+}
+
+.action-btn.view-post:hover {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  transform: translateY(-1px);
+}
+
+/* AI Config Actions */
+.ai-config-actions {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.save-config-btn {
+  background: linear-gradient(135deg, #4ecdc4, #44a08d);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.save-config-btn:hover {
+  background: linear-gradient(135deg, #3db8b0, #3a8f7d);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+}
+
+.test-ai-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.test-ai-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a6fd8, #6a4190);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.test-ai-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}

@@ -322,6 +322,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   // Smart Auto Cart UX Enhancement States
   const [cartFocusMode, setCartFocusMode] = useState(false);
   const [isHoveringCart, setIsHoveringCart] = useState(false);
+  const [lastCartInteraction, setLastCartInteraction] = useState<number>(0);
   const [autoRecoveryTimer, setAutoRecoveryTimer] = useState<NodeJS.Timeout | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -336,6 +337,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   
   // Social Media Integration State
   const [socialMediaConversations, setSocialMediaConversations] = useState<Conversation[]>([]);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiSuggestedReply, setAiSuggestedReply] = useState<string>('');
+  
+  // Bulk Comment Management State
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [bulkAIResponses, setBulkAIResponses] = useState<any[]>([]);
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+  const [isBulkSending, setIsBulkSending] = useState(false);
+  const [editableResponses, setEditableResponses] = useState<{[key: number]: string}>({});
+  const [selectedComments, setSelectedComments] = useState<Set<number>>(new Set());
   
   // Contact Management State
   const [showContactManager, setShowContactManager] = useState(false);
@@ -1629,7 +1640,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             sections: [
               {
                 title: 'Cart Items',
-                rows: cartItems.slice(0, 9).map((item) => ({ // WhatsApp limits to 10 rows total
+                rows: cartItems.slice(0, 9).map((item, index) => ({ // WhatsApp limits to 10 rows total
                   id: `view_item_${item.id}`,
                   title: item.title.substring(0, 24), // WhatsApp title limit
                   description: `$${item.displayPrice || item.price} × ${item.quantity}`.substring(0, 72) // WhatsApp description limit
@@ -1924,6 +1935,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // Smart Auto Cart UX Enhancement Functions
   const handleCartInteraction = () => {
+    setLastCartInteraction(Date.now());
     if (!cartFocusMode) {
       setCartFocusMode(true);
     }
@@ -2890,6 +2902,160 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
+  const handleAISuggestReply = async () => {
+    if (!selectedConversation?.startsWith('sm_') || isGeneratingAI) return;
+
+    const conversation = socialMediaConversations.find(c => c.id === selectedConversation);
+    if (!conversation) return;
+
+    setIsGeneratingAI(true);
+    
+    try {
+      console.log('🤖 Generating AI suggestion for social media comment...');
+      
+      const socialMediaService = new SocialMediaService(API_BASE);
+      const response = await socialMediaService.generateAIResponse(
+        parseInt(conversation.comment_id!),
+        conversation.lastMessage,
+        conversation.post_title || ''
+      );
+
+      console.log('✅ AI suggestion generated:', response);
+      
+      // Set the suggested reply in the message input
+      setNewMessage(response.response);
+      setAiSuggestedReply(response.response);
+      
+      // Show a subtle notification that AI generated a reply
+      console.log(`🎯 AI Confidence: ${(response.confidence * 100).toFixed(1)}%`);
+      
+    } catch (error) {
+      console.error('❌ Error generating AI suggestion:', error);
+      alert('Failed to generate AI suggestion. Please try again.');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  // Bulk AI Response Generation Handler
+  const handleBulkAIGenerate = async () => {
+    if (isBulkGenerating) return;
+
+    const currentConversation = socialMediaConversations.find(c => c.id === selectedConversation);
+    if (!currentConversation || !selectedConversation?.startsWith('sm_')) return;
+
+    setIsBulkGenerating(true);
+    
+    try {
+      console.log('🤖 Generating bulk AI responses...');
+      
+      const socialMediaService = new SocialMediaService(API_BASE);
+      const result = await socialMediaService.generateBulkAIResponses({
+        post_id: currentConversation.post_id,
+        platform: currentConversation.platform,
+        exclude_replied: true
+      });
+
+      console.log(`✅ Generated ${result.responses.length} AI responses`);
+      
+      // Set bulk responses and initialize editable responses
+      setBulkAIResponses(result.responses);
+      const initialEditable: {[key: number]: string} = {};
+      result.responses.forEach((response: any) => {
+        initialEditable[response.comment_id] = response.ai_response;
+      });
+      setEditableResponses(initialEditable);
+      
+      // Show notification
+      alert(`Generated AI responses for ${result.responses.length} comments`);
+      
+    } catch (error) {
+      console.error('❌ Error generating bulk AI responses:', error);
+      alert('Failed to generate bulk AI responses. Please try again.');
+    } finally {
+      setIsBulkGenerating(false);
+    }
+  };
+
+  // Handle editing individual AI responses
+  const handleEditResponse = (commentId: number, newResponse: string) => {
+    setEditableResponses(prev => ({
+      ...prev,
+      [commentId]: newResponse
+    }));
+  };
+
+  // Toggle comment selection for bulk operations
+  const handleToggleCommentSelection = (commentId: number) => {
+    setSelectedComments(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(commentId)) {
+        newSelected.delete(commentId);
+      } else {
+        newSelected.add(commentId);
+      }
+      return newSelected;
+    });
+  };
+
+  // Select all/none comments
+  const handleSelectAllComments = (selectAll: boolean) => {
+    if (selectAll) {
+      const allCommentIds = bulkAIResponses.map(response => response.comment_id);
+      setSelectedComments(new Set(allCommentIds));
+    } else {
+      setSelectedComments(new Set());
+    }
+  };
+
+  // Send bulk replies
+  const handleBulkSend = async () => {
+    if (isBulkSending || selectedComments.size === 0) return;
+
+    const repliesToSend = bulkAIResponses
+      .filter(response => selectedComments.has(response.comment_id))
+      .map(response => ({
+        comment_id: response.comment_id,
+        response_text: editableResponses[response.comment_id] || response.ai_response,
+        platform: response.platform
+      }));
+
+    if (repliesToSend.length === 0) {
+      alert('No replies selected');
+      return;
+    }
+
+    const confirmed = window.confirm(`Send ${repliesToSend.length} replies?`);
+    if (!confirmed) return;
+
+    setIsBulkSending(true);
+
+    try {
+      console.log(`📤 Sending ${repliesToSend.length} bulk replies...`);
+      
+      const socialMediaService = new SocialMediaService(API_BASE);
+      const result = await socialMediaService.sendBulkReplies(repliesToSend);
+
+      console.log(`✅ Bulk send completed: ${result.summary.successful} successful, ${result.summary.failed} failed`);
+      
+      // Update the conversations to reflect sent replies
+      await fetchSocialMediaConversations();
+      
+      // Clear selections and bulk data
+      setSelectedComments(new Set());
+      setBulkAIResponses([]);
+      setEditableResponses({});
+      
+      alert(`Bulk send completed:\n✅ ${result.summary.successful} successful\n❌ ${result.summary.failed} failed`);
+      
+    } catch (error) {
+      console.error('❌ Error sending bulk replies:', error);
+      alert('Failed to send bulk replies. Please try again.');
+    } finally {
+      setIsBulkSending(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && selectedFiles.length === 0) || !selectedConversation) return;
 
@@ -3745,12 +3911,29 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           <>
                             <button 
                               className="action-btn" 
-                              onClick={() => {
-                                // TODO: Implement AI auto-suggest for social media
-                                console.log('Auto-suggest reply for social media');
-                              }}
+                              onClick={handleAISuggestReply}
+                              disabled={isGeneratingAI}
                               style={{
-                                backgroundColor: '#6c5ce7',
+                                backgroundColor: isGeneratingAI ? '#9b59b6' : '#6c5ce7',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                cursor: isGeneratingAI ? 'not-allowed' : 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              {isGeneratingAI ? '🤖 Generating...' : '🤖 AI Suggest Reply'}
+                            </button>
+                            
+                            <button 
+                              className="action-btn" 
+                              onClick={() => setShowAllComments(!showAllComments)}
+                              style={{
+                                backgroundColor: showAllComments ? '#e74c3c' : '#3498db',
                                 color: 'white',
                                 border: 'none',
                                 padding: '8px 16px',
@@ -3762,8 +3945,30 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                 gap: '6px'
                               }}
                             >
-                              🤖 AI Suggest Reply
+                              {showAllComments ? '📝 Hide All Comments' : '📋 Show All Comments'}
                             </button>
+
+                            {showAllComments && (
+                              <button 
+                                className="action-btn" 
+                                onClick={handleBulkAIGenerate}
+                                disabled={isBulkGenerating}
+                                style={{
+                                  backgroundColor: isBulkGenerating ? '#f39c12' : '#e67e22',
+                                  color: 'white',
+                                  border: 'none',
+                                  padding: '8px 16px',
+                                  borderRadius: '6px',
+                                  cursor: isBulkGenerating ? 'not-allowed' : 'pointer',
+                                  fontSize: '14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                {isBulkGenerating ? '🔄 Generating...' : '🚀 AI Respond to All'}
+                              </button>
+                            )}
                           </>
                         );
                       } else {
@@ -4906,6 +5111,173 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                         Clear all
                       </button>
                     </div>
+                  </div>
+                )}
+                
+                {/* Bulk Comments Management Interface */}
+                {showAllComments && selectedConversation?.startsWith('sm_') && (
+                  <div className="bulk-comments-interface" style={{
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e1e8ed',
+                    borderRadius: '8px',
+                    margin: '10px',
+                    maxHeight: '400px',
+                    overflowY: 'auto'
+                  }}>
+                    <div style={{
+                      padding: '15px',
+                      borderBottom: '1px solid #e1e8ed',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '8px 8px 0 0',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <h4 style={{ margin: 0, color: '#333' }}>
+                          📋 All Comments {bulkAIResponses.length > 0 && `(${bulkAIResponses.length})`}
+                        </h4>
+                        {bulkAIResponses.length > 0 && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => handleSelectAllComments(selectedComments.size !== bulkAIResponses.length)}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                backgroundColor: 'white',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {selectedComments.size === bulkAIResponses.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                            <button
+                              onClick={handleBulkSend}
+                              disabled={selectedComments.size === 0 || isBulkSending}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                border: 'none',
+                                borderRadius: '4px',
+                                backgroundColor: selectedComments.size > 0 ? '#28a745' : '#6c757d',
+                                color: 'white',
+                                cursor: selectedComments.size > 0 && !isBulkSending ? 'pointer' : 'not-allowed'
+                              }}
+                            >
+                              {isBulkSending ? '📤 Sending...' : `📤 Send Selected (${selectedComments.size})`}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {bulkAIResponses.length === 0 ? (
+                        <p style={{ color: '#666', margin: 0, fontSize: '14px' }}>
+                          Click "🚀 AI Respond to All" to generate AI responses for all pending comments.
+                        </p>
+                      ) : (
+                        <p style={{ color: '#666', margin: 0, fontSize: '14px' }}>
+                          Review and edit AI-generated responses before sending. Select comments to send in bulk.
+                        </p>
+                      )}
+                    </div>
+
+                    {bulkAIResponses.length > 0 && (
+                      <div style={{ padding: '10px' }}>
+                        {bulkAIResponses.map((response) => (
+                          <div key={response.comment_id} style={{
+                            backgroundColor: 'white',
+                            border: '1px solid #e1e8ed',
+                            borderRadius: '8px',
+                            padding: '15px',
+                            marginBottom: '10px',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                          }}>
+                            {/* Comment Header */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedComments.has(response.comment_id)}
+                                  onChange={() => handleToggleCommentSelection(response.comment_id)}
+                                  style={{ cursor: 'pointer' }}
+                                />
+                                <div>
+                                  <strong style={{ color: '#333' }}>{response.author_name}</strong>
+                                  <span style={{ color: '#666', fontSize: '12px', marginLeft: '8px' }}>
+                                    {response.author_handle} • {response.platform}
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                backgroundColor: response.confidence > 0.8 ? '#d4edda' : response.confidence > 0.6 ? '#fff3cd' : '#f8d7da',
+                                color: response.confidence > 0.8 ? '#155724' : response.confidence > 0.6 ? '#856404' : '#721c24'
+                              }}>
+                                {Math.round(response.confidence * 100)}% confidence
+                              </div>
+                            </div>
+
+                            {/* Original Comment */}
+                            <div style={{
+                              backgroundColor: '#f8f9fa',
+                              padding: '10px',
+                              borderRadius: '6px',
+                              marginBottom: '10px',
+                              borderLeft: '3px solid #3498db'
+                            }}>
+                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Original Comment:</div>
+                              <div style={{ color: '#333', fontSize: '14px' }}>{response.comment_text}</div>
+                            </div>
+
+                            {/* AI Response Editor */}
+                            <div>
+                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>AI Response:</div>
+                              <textarea
+                                value={editableResponses[response.comment_id] || response.ai_response}
+                                onChange={(e) => handleEditResponse(response.comment_id, e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  minHeight: '60px',
+                                  padding: '8px',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  fontSize: '14px',
+                                  fontFamily: 'inherit',
+                                  resize: 'vertical'
+                                }}
+                                placeholder="Edit AI response..."
+                              />
+                            </div>
+
+                            {/* Post Context */}
+                            {response.post_title && (
+                              <div style={{
+                                fontSize: '12px',
+                                color: '#666',
+                                marginTop: '8px',
+                                paddingTop: '8px',
+                                borderTop: '1px solid #eee'
+                              }}>
+                                Post: {response.post_title}
+                                {response.post_url && (
+                                  <a
+                                    href={response.post_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ marginLeft: '8px', color: '#3498db' }}
+                                  >
+                                    View
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 
