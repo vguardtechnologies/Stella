@@ -87,7 +87,27 @@ async function handleGetComments(req, res) {
   try {
     // Query comments from database
     let query = `
-      SELECT c.*, p.name as platform_name, p.icon as platform_icon 
+      SELECT 
+        c.id,
+        c.external_comment_id,
+        c.external_post_id as post_id,
+        c.comment_text,
+        c.author_name,
+        c.author_handle,
+        c.author_id,
+        c.author_avatar_url,
+        c.post_title,
+        c.post_url,
+        c.post_media_url,
+        c.status,
+        c.sentiment,
+        c.priority,
+        c.tags,
+        c.created_at,
+        c.updated_at,
+        p.platform_type as platform,
+        p.name as platform_name, 
+        p.icon as platform_icon 
       FROM social_comments c 
       JOIN social_platforms p ON c.platform_id = p.id 
       WHERE c.status = $1

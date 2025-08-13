@@ -341,6 +341,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [socialMediaConversations, setSocialMediaConversations] = useState<Conversation[]>([]);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiSuggestedReply, setAiSuggestedReply] = useState<string>('');
+  const [allComments, setAllComments] = useState<any[]>([]);
   
   // Bulk Comment Management State
   const [showAllComments, setShowAllComments] = useState(false);
@@ -2272,14 +2273,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       await fetchWhatsAppMessages(phoneNumber.replace(/[^\d]/g, ''), isAutoRefresh);
     } else if (conversationId.startsWith('sm_')) {
       // Social Media conversation - fetch comment thread
-      console.log('Fetching social media conversation:', conversationId);
-      await fetchSocialMediaMessages(conversationId);
+      console.log('Fetching social media conversation:', conversationId, 'isAutoRefresh:', isAutoRefresh);
+      await fetchSocialMediaMessages(conversationId, isAutoRefresh);
     }
     // Can add other conversation types here in the future
   };
 
   // Fetch Social Media messages (comments and replies)
-  const fetchSocialMediaMessages = async (conversationId: string) => {
+  const fetchSocialMediaMessages = async (conversationId: string, preserveExpandedState = false) => {
     try {
       // Find the social media conversation
       const conversation = socialMediaConversations.find(c => c.id === conversationId);
@@ -2288,6 +2289,22 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         console.warn('Social media conversation not found:', conversationId);
         return;
       }
+
+      // If preserveExpandedState is true and we're currently showing all comments, don't reset
+      if (preserveExpandedState && showAllComments) {
+        console.log('� Auto-refresh skipped - preserving expanded comments view');
+        return;
+      }
+
+      console.log('�🔍 Social media conversation details:', {
+        id: conversation.id,
+        post_id: conversation.post_id,
+        comment_id: conversation.comment_id,
+        platform: conversation.platform,
+        customerName: conversation.customerName,
+        lastMessage: conversation.lastMessage,
+        preserveExpandedState
+      });
 
       // Initialize messages array with the original post
       const mockMessages: any[] = [
@@ -2310,62 +2327,201 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
       // Get all comments for this post
       const socialMediaService = new SocialMediaService(API_BASE);
-      let allComments = [];
+      let allCommentsData = [];
+      
+      console.log(`🔍 Attempting to fetch comments for post_id: ${conversation.post_id}, platform: ${conversation.platform}`);
       
       try {
-        allComments = await socialMediaService.getPostComments(
+        allCommentsData = await socialMediaService.getPostComments(
           conversation.post_id!,
           conversation.platform
         );
-        console.log(`📬 Found ${allComments.length} comments for post ${conversation.post_id}`);
+        console.log(`📬 Found ${allCommentsData.length} comments for post ${conversation.post_id}`);
+        console.log('📋 Comments details:', allCommentsData);
       } catch (error) {
-        console.error('Error fetching post comments:', error);
+        console.error('❌ Error fetching post comments:', error);
         // Fallback to single comment if API fails
-        allComments = [{
+        allCommentsData = [{
           id: conversation.comment_id,
           comment_text: conversation.lastMessage,
           author_name: conversation.customerName,
           created_at: conversation.timestamp,
           platform_type: conversation.platform
         }];
+        console.log('🔄 Using fallback comment:', allCommentsData[0]);
       }
 
-      // Create messages for each comment with individual reply bubbles
-      allComments.forEach((comment: any, index: number) => {
-        // Add comment message
-        mockMessages.push({
-          id: `comment_${comment.id}`,
-          sender: 'user' as const,
-          text: `${comment.author_name}: ${comment.comment_text}`,
-          timestamp: new Date(comment.created_at),
-          type: 'text' as const,
-          status: 'sent' as const,
-          author: comment.author_name,
-          platform: conversation.platform,
-          commentId: comment.id
-        });
+      // Store all comments for later use (always update this)
+      setAllComments(allCommentsData);
 
-        // Add individual reply input bubble for this comment
-        mockMessages.push({
-          id: `reply_${comment.id}`,
-          sender: 'agent' as const,
-          text: '',
-          placeholder: `Reply to ${comment.author_name}...`,
-          timestamp: new Date(),
-          type: 'reply_input' as const,
-          status: 'draft' as const,
-          author: 'Agent',
-          platform: conversation.platform,
-          commentId: comment.id
+      // Check if we should show all comments (expanded state) or just initial comment
+      if (showAllComments) {
+        // Show all comments - use the expanded view
+        console.log(`🔄 Maintaining expanded view with all ${allCommentsData.length} comments`);
+        
+        allCommentsData.forEach((comment: any, index: number) => {
+          console.log(`📝 Adding comment ${index + 1}:`, comment);
+          
+          // Add comment message
+          mockMessages.push({
+            id: `comment_${comment.id}`,
+            sender: 'user' as const,
+            text: `${comment.author_name}: ${comment.comment_text}`,
+            timestamp: new Date(comment.created_at),
+            type: 'text' as const,
+            status: 'sent' as const,
+            author: comment.author_name,
+            platform: conversation.platform,
+            commentId: comment.id
+          });
+
+          // Add individual reply input bubble for this comment
+          mockMessages.push({
+            id: `reply_${comment.id}`,
+            sender: 'agent' as const,
+            text: '',
+            placeholder: `Reply to ${comment.author_name}...`,
+            timestamp: new Date(),
+            type: 'reply_input' as const,
+            status: 'draft' as const,
+            author: 'Agent',
+            platform: conversation.platform,
+            commentId: comment.id
+          });
         });
-      });
+        
+        console.log(`✅ Maintained expanded view with all ${allCommentsData.length} comments`);
+        
+      } else {
+        // Show only initial comment (collapsed state)
+        const targetComment = allCommentsData.find((comment: any) => comment.id === conversation.comment_id);
+        const initialComment = targetComment || allCommentsData[0];
+
+        if (initialComment) {
+          console.log(`📝 Initially showing only comment: ${initialComment.id}`);
+          
+          // Add the initial comment and its reply bubble
+          mockMessages.push({
+            id: `comment_${initialComment.id}`,
+            sender: 'user' as const,
+            text: `${initialComment.author_name}: ${initialComment.comment_text}`,
+            timestamp: new Date(initialComment.created_at),
+            type: 'text' as const,
+            status: 'sent' as const,
+            author: initialComment.author_name,
+            platform: conversation.platform,
+            commentId: initialComment.id
+          });
+
+          mockMessages.push({
+            id: `reply_${initialComment.id}`,
+            sender: 'agent' as const,
+            text: '',
+            placeholder: `Reply to ${initialComment.author_name}...`,
+            timestamp: new Date(),
+            type: 'reply_input' as const,
+            status: 'draft' as const,
+            author: 'Agent',
+            platform: conversation.platform,
+            commentId: initialComment.id
+          });
+
+          // If there are more comments, add a "Show all comments" indicator
+          if (allCommentsData.length > 1) {
+            mockMessages.push({
+              id: `show_all_indicator`,
+              sender: 'system' as const,
+              text: `💬 ${allCommentsData.length - 1} more comments available. Click "Show All Comments" above to see them.`,
+              timestamp: new Date(),
+              type: 'text' as const,
+              status: 'sent' as const,
+              author: 'System',
+              platform: conversation.platform,
+              isSystemMessage: true
+            });
+          }
+        }
+        
+        console.log(`✅ Initially showing 1 comment out of ${allCommentsData.length} total comments`);
+      }
       
-      console.log(`✅ Created ${allComments.length} comment-reply pairs for social media conversation`);
       console.log('Setting social media messages:', mockMessages);
       setMessages(mockMessages);
+      
+      // Only reset showAllComments to false on initial load (not auto-refresh)
+      if (!preserveExpandedState) {
+        setShowAllComments(false);
+      }
+      
     } catch (error) {
       console.error('Error fetching social media messages:', error);
     }
+  };
+
+  // Function to expand and show all comments
+  const expandAllComments = async () => {
+    if (!selectedConversation || !selectedConversation.startsWith('sm_') || allComments.length === 0) {
+      return;
+    }
+
+    const conversation = socialMediaConversations.find(c => c.id === selectedConversation);
+    if (!conversation) return;
+
+    console.log(`🔄 Expanding to show all ${allComments.length} comments`);
+
+    // Initialize messages array with the original post
+    const expandedMessages: any[] = [
+      // Original post display
+      {
+        id: `post_${conversation.post_id}`,
+        sender: 'system' as const,
+        text: '',
+        timestamp: new Date(conversation.timestamp),
+        type: 'social_post' as const,
+        platform: conversation.platform,
+        status: 'sent' as const,
+        post: {
+          title: conversation.post_title!,
+          url: conversation.post_url!,
+          image: conversation.post_image
+        }
+      }
+    ];
+
+    // Add all comments with their reply bubbles
+    allComments.forEach((comment: any, index: number) => {
+      console.log(`📝 Adding comment ${index + 1}:`, comment);
+      
+      // Add comment message
+      expandedMessages.push({
+        id: `comment_${comment.id}`,
+        sender: 'user' as const,
+        text: `${comment.author_name}: ${comment.comment_text}`,
+        timestamp: new Date(comment.created_at),
+        type: 'text' as const,
+        status: 'sent' as const,
+        author: comment.author_name,
+        platform: conversation.platform,
+        commentId: comment.id
+      });
+
+      // Add individual reply input bubble for this comment
+      expandedMessages.push({
+        id: `reply_${comment.id}`,
+        sender: 'agent' as const,
+        text: '',
+        placeholder: `Reply to ${comment.author_name}...`,
+        timestamp: new Date(),
+        type: 'reply_input' as const,
+        status: 'draft' as const,
+        author: 'Agent',
+        platform: conversation.platform,
+        commentId: comment.id
+      });
+    });
+
+    console.log(`✅ Expanded to show all ${allComments.length} comments`);
+    setMessages(expandedMessages);
   };
 
   // Function to get actual media URL from WhatsApp media ID
@@ -2849,15 +3005,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     if (!selectedConversation) return;
 
     const interval = setInterval(() => {
-      console.log('Auto-refreshing messages for selected conversation');
+      // Skip auto-refresh for social media conversations when all comments are expanded
+      // to prevent disrupting the user's expanded view
+      if (selectedConversation.startsWith('sm_') && showAllComments) {
+        console.log('Auto-refresh skipped for expanded social media conversation');
+        return;
+      }
       
+      console.log('Auto-refreshing messages for selected conversation');
       fetchMessages(selectedConversation, true); // Pass true for isAutoRefresh
     }, 15000); // Refresh messages every 15 seconds
 
     return () => {
       clearInterval(interval);
     };
-  }, [selectedConversation]);
+  }, [selectedConversation, showAllComments]); // Added showAllComments dependency
 
   // Use real WhatsApp conversations and Social Media conversations
   const allConversations = [...whatsappConversations, ...socialMediaConversations]
@@ -3988,7 +4150,19 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             
                             <button 
                               className="action-btn" 
-                              onClick={() => setShowAllComments(!showAllComments)}
+                              onClick={async () => {
+                                if (!showAllComments) {
+                                  // Expanding comments - load all comments first
+                                  await expandAllComments();
+                                  setShowAllComments(true);
+                                } else {
+                                  // Collapsing comments - reload the conversation to show initial state
+                                  if (selectedConversation) {
+                                    await fetchSocialMediaMessages(selectedConversation);
+                                  }
+                                  setShowAllComments(false);
+                                }
+                              }}
                               style={{
                                 backgroundColor: showAllComments ? '#e74c3c' : '#3498db',
                                 color: 'white',
