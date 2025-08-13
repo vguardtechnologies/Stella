@@ -2803,14 +2803,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     const interval = setInterval(() => {
       console.log('Auto-refreshing conversations');
       fetchWhatsAppConversations();
-      // Only refresh social media conversations if we're not currently viewing expanded comments
-      // to prevent disrupting the user's expanded view
-      if (!showAllCommentsRef.current) {
-        fetchSocialMediaConversations();
-      } else {
-        console.log('Skipping social media conversation refresh - comments are expanded');
-      }
+      // Always refresh social media conversations to pick up status changes (edits/deletes)
+      // even when comments are expanded - this ensures edit badges appear properly
+      fetchSocialMediaConversations();
     }, 30000);
+    
+    return () => clearInterval(interval);
     
     return () => clearInterval(interval);
   }, []);
