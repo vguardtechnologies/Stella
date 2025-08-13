@@ -278,6 +278,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const [actualShopName, setActualShopName] = useState<string>('');
   const [shopNameLoading, setShopNameLoading] = useState(true);
+  
+  // Ref to track current expanded state for intervals
+  const showAllCommentsRef = useRef(false);
   const [isShopifyConfigured, setIsShopifyConfigured] = useState(false);
   const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -2273,8 +2276,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       await fetchWhatsAppMessages(phoneNumber.replace(/[^\d]/g, ''), isAutoRefresh);
     } else if (conversationId.startsWith('sm_')) {
       // Social Media conversation - fetch comment thread
-      console.log('Fetching social media conversation:', conversationId, 'isAutoRefresh:', isAutoRefresh);
-      await fetchSocialMediaMessages(conversationId, isAutoRefresh);
+      await fetchSocialMediaMessages(conversationId, isAutoRefresh ? showAllCommentsRef.current : false);
     }
     // Can add other conversation types here in the future
   };
@@ -2290,11 +2292,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         return;
       }
 
-      // If preserveExpandedState is true and we're currently showing all comments, don't reset
-      if (preserveExpandedState && showAllComments) {
-        console.log('� Auto-refresh skipped - preserving expanded comments view');
-        return;
-      }
+      // If preserveExpandedState is true, we should maintain the expanded view
+      // Don't rely on showAllComments state as it might be stale
+      const shouldMaintainExpandedView = preserveExpandedState;
 
       console.log('�🔍 Social media conversation details:', {
         id: conversation.id,
@@ -2355,7 +2355,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       setAllComments(allCommentsData);
 
       // Check if we should show all comments (expanded state) or just initial comment
-      if (showAllComments) {
+      if (shouldMaintainExpandedView) {
         // Show all comments - use the expanded view
         console.log(`🔄 Maintaining expanded view with all ${allCommentsData.length} comments`);
         
@@ -2448,9 +2448,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       console.log('Setting social media messages:', mockMessages);
       setMessages(mockMessages);
       
-      // Only reset showAllComments to false on initial load (not auto-refresh)
+      // Only reset showAllComments to false on initial load (not auto-refresh)  
+      // If we're maintaining expanded view, keep it expanded
       if (!preserveExpandedState) {
         setShowAllComments(false);
+      } else if (shouldMaintainExpandedView) {
+        console.log('✅ Auto-refresh completed - maintained expanded comments view');
+        // Keep showAllComments as true - no need to re-expand since we handled it above
       }
       
     } catch (error) {
@@ -2777,6 +2781,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setFilePreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Keep ref in sync with showAllComments state for use in intervals
+  useEffect(() => {
+    showAllCommentsRef.current = showAllComments;
+  }, [showAllComments]);
+
   // Load WhatsApp and Social Media data on component mount
   useEffect(() => {
     fetchWhatsAppConversations();
@@ -2786,7 +2795,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     const interval = setInterval(() => {
       console.log('Auto-refreshing conversations');
       fetchWhatsAppConversations();
-      fetchSocialMediaConversations();
+      // Only refresh social media conversations if we're not currently viewing expanded comments
+      // to prevent disrupting the user's expanded view
+      if (!showAllCommentsRef.current) {
+        fetchSocialMediaConversations();
+      } else {
+        console.log('Skipping social media conversation refresh - comments are expanded');
+      }
     }, 30000);
     
     return () => clearInterval(interval);
@@ -2998,20 +3013,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     if (selectedConversation) {
       fetchMessages(selectedConversation);
     }
-  }, [selectedConversation, whatsappConversations]);
+  }, [selectedConversation]);
 
   // Auto-refresh messages for the selected conversation
   useEffect(() => {
     if (!selectedConversation) return;
 
-    const interval = setInterval(() => {
-      // Skip auto-refresh for social media conversations when all comments are expanded
-      // to prevent disrupting the user's expanded view
-      if (selectedConversation.startsWith('sm_') && showAllComments) {
-        console.log('Auto-refresh skipped for expanded social media conversation');
-        return;
-      }
-      
+    const interval = setInterval(() => {      
       console.log('Auto-refreshing messages for selected conversation');
       fetchMessages(selectedConversation, true); // Pass true for isAutoRefresh
     }, 15000); // Refresh messages every 15 seconds
@@ -3019,7 +3027,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     return () => {
       clearInterval(interval);
     };
-  }, [selectedConversation, showAllComments]); // Added showAllComments dependency
+  }, [selectedConversation]); // Removed showAllComments dependency to prevent timer restart
 
   // Use real WhatsApp conversations and Social Media conversations
   const allConversations = [...whatsappConversations, ...socialMediaConversations]
