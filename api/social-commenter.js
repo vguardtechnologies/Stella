@@ -208,6 +208,64 @@ async function handleGetPlatforms(req, res) {
   }
 }
 
+// Get all comments for a specific post
+async function handleGetPostComments(req, res) {
+  const { post_id, platform } = req.query;
+
+  if (!post_id) {
+    return res.status(400).json({
+      success: false,
+      error: 'post_id is required'
+    });
+  }
+
+  try {
+    let query = `
+      SELECT 
+        c.id,
+        c.comment_text,
+        c.author_name,
+        c.author_handle,
+        c.author_id,
+        c.created_at,
+        c.status,
+        c.sentiment,
+        c.priority,
+        c.tags,
+        p.platform_type,
+        p.name as platform_name,
+        p.icon as platform_icon,
+        c.post_title,
+        c.post_url,
+        c.post_media_url
+      FROM social_comments c
+      JOIN social_platforms p ON c.platform_id = p.id
+      WHERE c.external_post_id = $1
+    `;
+
+    const params = [post_id];
+
+    // Add platform filter if specified
+    if (platform) {
+      query += ` AND p.platform_type = $2`;
+      params.push(platform);
+    }
+
+    query += ` ORDER BY c.created_at ASC`;
+
+    const result = await pool.query(query, params);
+
+    return res.status(200).json({
+      success: true,
+      comments: result.rows
+    });
+
+  } catch (error) {
+    console.error('Get post comments error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
 // Update AI configuration
 async function handleUpdateAIConfig(req, res) {
   const { config } = req.body;

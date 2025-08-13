@@ -270,6 +270,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [activeReplyCommentId, setActiveReplyCommentId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [emojiSearchQuery, setEmojiSearchQuery] = useState('');
@@ -2288,8 +2289,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         return;
       }
 
-      // Create mock messages for the social media post and comment
-      const mockMessages = [
+      // Initialize messages array with the original post
+      const mockMessages: any[] = [
         // Original post display
         {
           id: `post_${conversation.post_id}`,
@@ -2304,32 +2305,62 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             url: conversation.post_url!,
             image: conversation.post_image
           }
-        },
-        // The comment to respond to
-        {
-          id: conversation.comment_id!,
+        }
+      ];
+
+      // Get all comments for this post
+      const socialMediaService = new SocialMediaService(API_BASE);
+      let allComments = [];
+      
+      try {
+        allComments = await socialMediaService.getPostComments(
+          conversation.post_id!,
+          conversation.platform
+        );
+        console.log(`📬 Found ${allComments.length} comments for post ${conversation.post_id}`);
+      } catch (error) {
+        console.error('Error fetching post comments:', error);
+        // Fallback to single comment if API fails
+        allComments = [{
+          id: conversation.comment_id,
+          comment_text: conversation.lastMessage,
+          author_name: conversation.customerName,
+          created_at: conversation.timestamp,
+          platform_type: conversation.platform
+        }];
+      }
+
+      // Create messages for each comment with individual reply bubbles
+      allComments.forEach((comment: any, index: number) => {
+        // Add comment message
+        mockMessages.push({
+          id: `comment_${comment.id}`,
           sender: 'user' as const,
-          text: `${conversation.customerName}: ${conversation.lastMessage}`,
-          timestamp: new Date(conversation.timestamp),
+          text: `${comment.author_name}: ${comment.comment_text}`,
+          timestamp: new Date(comment.created_at),
           type: 'text' as const,
           status: 'sent' as const,
-          author: conversation.customerName,
-          platform: conversation.platform
-        },
-        // Reply input bubble
-        {
-          id: `reply_${conversation.comment_id}`,
+          author: comment.author_name,
+          platform: conversation.platform,
+          commentId: comment.id
+        });
+
+        // Add individual reply input bubble for this comment
+        mockMessages.push({
+          id: `reply_${comment.id}`,
           sender: 'agent' as const,
           text: '',
-          placeholder: 'Reply here...',
+          placeholder: `Reply to ${comment.author_name}...`,
           timestamp: new Date(),
           type: 'reply_input' as const,
           status: 'draft' as const,
           author: 'Agent',
-          platform: conversation.platform
-        }
-      ];
+          platform: conversation.platform,
+          commentId: comment.id
+        });
+      });
       
+      console.log(`✅ Created ${allComments.length} comment-reply pairs for social media conversation`);
       console.log('Setting social media messages:', mockMessages);
       setMessages(mockMessages);
     } catch (error) {
@@ -2868,7 +2899,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // Handle sending social media replies
   const handleSendSocialMediaReply = async () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+    if (!newMessage.trim() || !selectedConversation || !activeReplyCommentId) return;
 
     const conversation = socialMediaConversations.find(c => c.id === selectedConversation);
     if (!conversation) {
@@ -2878,7 +2909,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     // Store the message before clearing
     const messageToSend = newMessage;
+    const commentIdToReplyTo = activeReplyCommentId;
     setNewMessage('');
+    setActiveReplyCommentId(null);
 
     try {
       // Add optimistic message to UI
@@ -2889,20 +2922,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         timestamp: new Date(),
         type: 'text' as const,
         status: 'sending' as const,
-        platform: conversation.platform
+        platform: conversation.platform,
+        commentId: commentIdToReplyTo
       };
 
       setMessages(prev => [...prev, newReplyMessage]);
 
-      // Send to API
+      // Send to API using the specific comment ID
       const socialMediaService = new SocialMediaService(API_BASE);
       await socialMediaService.sendReply(
-        parseInt(conversation.comment_id!),
+        parseInt(commentIdToReplyTo),
         messageToSend,
         conversation.platform!
       );
 
-      console.log('✅ Social media reply sent successfully');
+      console.log(`✅ Social media reply sent successfully to comment ${commentIdToReplyTo}`);
       
     } catch (error) {
       console.error('❌ Error sending social media reply:', error);
@@ -2910,6 +2944,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       // Remove optimistic message on error
       setMessages(prev => prev.filter(msg => !msg.id.startsWith('temp_')));
       setNewMessage(messageToSend); // Restore message
+      setActiveReplyCommentId(commentIdToReplyTo); // Restore active comment
       
       // Show error in console (or could show in UI if needed)
       console.error('Failed to send social media reply. Please try again.');
@@ -3393,6 +3428,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     if (existingConversation) {
       // Select the existing conversation
       setSelectedConversation(existingConversation.id);
+      setActiveReplyCommentId(null);
+      setNewMessage('');
       setNewConversationPhone('+1 (868) ');
       return;
     }
@@ -3418,6 +3455,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       // Select the new conversation
       setSelectedConversation(newConversation.id);
+      setActiveReplyCommentId(null);
+      setNewMessage('');
       
       // Reset the input to the prefix
       setNewConversationPhone('+1 (868) ');
@@ -3811,7 +3850,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     key={conversation.id}
                     className={`conversation-item ${selectedConversation === conversation.id ? 'selected' : ''}`}
                     data-platform={conversation.platform || 'whatsapp'}
-                    onClick={() => setSelectedConversation(conversation.id)}
+                    onClick={() => {
+                      setSelectedConversation(conversation.id);
+                      setActiveReplyCommentId(null);
+                      setNewMessage('');
+                    }}
                   >
                     <div className="conversation-avatar">
                       {conversation.avatar || getDisplayNameForPhone(conversation.customerPhone, conversation.customerName).charAt(0)}
@@ -4900,9 +4943,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
                         </div>
                       ) : message.type === 'reply_input' ? (
-                        <div className="reply-input-bubble" onClick={() => messageInputRef.current?.focus()}>
+                        <div 
+                          className="reply-input-bubble" 
+                          onClick={() => {
+                            setActiveReplyCommentId(message.commentId);
+                            messageInputRef.current?.focus();
+                          }}
+                        >
                           <div className="reply-input-content">
-                            {newMessage || message.placeholder || 'Reply here...'}
+                            {(activeReplyCommentId === message.commentId ? newMessage : '') || message.placeholder || 'Reply here...'}
                           </div>
                         </div>
                       ) : message.type === 'location' ? (
@@ -5303,6 +5352,35 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 
                 {/* Message Input Container */}
                 <div className="message-input-container">
+                  {/* Reply Indicator for Social Media */}
+                  {selectedConversation?.startsWith('sm_') && activeReplyCommentId && (
+                    <div style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#f0f8ff',
+                      borderLeft: '3px solid #6c5ce7',
+                      fontSize: '12px',
+                      color: '#666',
+                      borderRadius: '4px 4px 0 0'
+                    }}>
+                      💬 Replying to comment #{activeReplyCommentId}
+                      <button
+                        onClick={() => {
+                          setActiveReplyCommentId(null);
+                          setNewMessage('');
+                        }}
+                        style={{
+                          marginLeft: '8px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#999',
+                          cursor: 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                   <div className="message-input-wrapper" style={{ position: 'relative' }}>
                   {/* Attachment Menu - moved inside wrapper for proper positioning */}
                   {showAttachmentMenu && (
@@ -5675,7 +5753,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   <button 
                     className="send-btn"
                     onClick={handleSendMessage}
-                    disabled={!newMessage.trim() && selectedFiles.length === 0}
+                    disabled={
+                      (!newMessage.trim() && selectedFiles.length === 0) || 
+                      (selectedConversation?.startsWith('sm_') && !activeReplyCommentId)
+                    }
                   >
                     Send
                   </button>
