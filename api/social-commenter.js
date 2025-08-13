@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
 
 // Get comments from all connected platforms
 async function handleGetComments(req, res) {
-  const { platform, status = 'pending', limit = 50, offset = 0 } = req.query;
+  const { platform, status, limit = 50, offset = 0 } = req.query;
 
   try {
     // Query comments from database
@@ -116,13 +116,24 @@ async function handleGetComments(req, res) {
         p.icon as platform_icon 
       FROM social_comments c 
       JOIN social_platforms p ON c.platform_id = p.id 
-      WHERE c.status = $1
     `;
-    const params = [status];
+    let params = [];
+
+    // Add WHERE clause conditionally
+    let whereConditions = [];
+    
+    if (status) {
+      whereConditions.push(`c.status = $${params.length + 1}`);
+      params.push(status);
+    }
 
     if (platform) {
-      query += ` AND p.platform_type = $${params.length + 1}`;
+      whereConditions.push(`p.platform_type = $${params.length + 1}`);
       params.push(platform);
+    }
+
+    if (whereConditions.length > 0) {
+      query += ` WHERE ${whereConditions.join(' AND ')}`;
     }
 
     query += ` ORDER BY c.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;

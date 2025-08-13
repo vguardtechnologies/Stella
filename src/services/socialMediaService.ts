@@ -93,15 +93,19 @@ class SocialMediaService {
     }
   }
 
-  // Get pending comments from all platforms
-  async getPendingComments(options: CommentOptions = {}) {
+  // Get comments from all platforms with optional status filter
+  async getComments(options: CommentOptions & { status?: string } = {}) {
     try {
       const params = new URLSearchParams({
         action: 'comments',
-        status: 'pending',
         limit: String(options.limit || 50),
         offset: String(options.offset || 0)
       });
+
+      // Only add status filter if specified, otherwise get all comments
+      if (options.status) {
+        params.append('status', options.status);
+      }
 
       if (options.platform) {
         params.append('platform', options.platform);
@@ -116,9 +120,14 @@ class SocialMediaService {
       
       return data.comments;
     } catch (error) {
-      console.error('Error getting pending comments:', error);
+      console.error('Error getting comments:', error);
       throw error;
     }
+  }
+
+  // Get pending comments from all platforms (backward compatibility)
+  async getPendingComments(options: CommentOptions = {}) {
+    return this.getComments({ ...options, status: 'pending' });
   }
 
   // Get recent activity

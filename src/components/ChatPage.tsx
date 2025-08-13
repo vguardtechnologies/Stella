@@ -490,11 +490,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     try {
       console.log('Fetching Social Media conversations...');
       const socialMediaService = new SocialMediaService(API_BASE);
-      const pendingComments = await socialMediaService.getPendingComments();
+      // Use getComments() without status filter to include deleted/edited comments in conversations
+      const allComments = await socialMediaService.getComments();
       
-      console.log('Pending comments:', pendingComments);
+      console.log('All social media comments:', allComments);
       
-      const convertedConversations = pendingComments.map((comment: any) => ({
+      const convertedConversations = allComments.map((comment: any) => ({
         id: `sm_${comment.id}`,
         customerName: comment.author_name || comment.author_username || 'Social Media User',
         customerPhone: `social_${comment.platform}_${comment.author_id}`,
@@ -2362,13 +2363,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         allCommentsData.forEach((comment: any, index: number) => {
           console.log(`📝 Adding comment ${index + 1}:`, comment);
           
-          // Add comment message
+          // Use the service method to properly convert comment to message with status indicators
+          const socialMediaService = new SocialMediaService(API_BASE);
+          const commentMessage = socialMediaService.convertCommentToMessage(comment);
+          
+          // Ensure proper sender assignment for chat display
           mockMessages.push({
-            id: `comment_${comment.id}`,
+            ...commentMessage,
             sender: 'user' as const,
             text: `${comment.author_name}: ${comment.comment_text}`,
-            timestamp: new Date(comment.created_at),
-            type: 'text' as const,
+            type: 'social_comment' as const,
             status: 'sent' as const,
             author: comment.author_name,
             platform: conversation.platform,
@@ -2400,13 +2404,17 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         if (initialComment) {
           console.log(`📝 Initially showing only comment: ${initialComment.id}`);
           
-          // Add the initial comment and its reply bubble
+          // Use the service method to properly convert comment to message with status indicators
+          const socialMediaService = new SocialMediaService(API_BASE);
+          const commentMessage = socialMediaService.convertCommentToMessage(initialComment);
+          
+          // Add the initial comment with proper status indicators
           mockMessages.push({
+            ...commentMessage,
             id: `comment_${initialComment.id}`,
             sender: 'user' as const,
             text: `${initialComment.author_name}: ${initialComment.comment_text}`,
-            timestamp: new Date(initialComment.created_at),
-            type: 'text' as const,
+            type: 'social_comment' as const,
             status: 'sent' as const,
             author: initialComment.author_name,
             platform: conversation.platform,

@@ -1,0 +1,22 @@
+{
+  "entry": [{
+    "id": "123456789",
+    "changes": [{
+      "field": "feed",
+      "value": {
+        "verb": "edit",
+        "item": "comment",
+        "comment_id": "new_test_comment_202508131941",
+        "post_id": "test_post_456",
+        "created_time": "2025-08-13T19:42:30.000Z",
+        "message": "This is an EDITED test comment for status tracking - NOW WITH CHANGES!",
+        "from": {
+          "id": "test_user_789",
+          "name": "Test User",
+          "username": "testuser"
+        },
+        "parent_id": "test_post_456"
+      }
+    }]
+  }]
+}
