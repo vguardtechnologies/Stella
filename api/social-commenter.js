@@ -105,6 +105,12 @@ async function handleGetComments(req, res) {
         c.tags,
         c.created_at,
         c.updated_at,
+        c.is_deleted,
+        c.is_edited,
+        c.deleted_at,
+        c.last_edited_at,
+        c.edit_count,
+        c.original_text,
         p.platform_type as platform,
         p.name as platform_name, 
         p.icon as platform_icon 
@@ -257,7 +263,13 @@ async function handleGetPostComments(req, res) {
         p.icon as platform_icon,
         c.post_title,
         c.post_url,
-        c.post_media_url
+        c.post_media_url,
+        c.is_deleted,
+        c.is_edited,
+        c.deleted_at,
+        c.last_edited_at,
+        c.edit_count,
+        c.original_text
       FROM social_comments c
       JOIN social_platforms p ON c.platform_id = p.id
       WHERE c.external_post_id = $1
@@ -482,79 +494,51 @@ async function handleCommentWebhook(req, res) {
       return res.status(200).json({ success: true, message: 'No action needed' });
     }
 
-    console.log('💾 Saving comment to database:', commentData);
+    console.log('💾 Processing comment action:', commentData.action || 'add');
 
-    // Save comment to database
-    const commentQuery = `
-      INSERT INTO social_comments (
-        platform_id, external_comment_id, external_post_id, 
-        comment_text, author_name, author_handle, author_id,
-        post_title, post_url, status, created_at, updated_at
-      ) VALUES (
-        (SELECT id FROM social_platforms WHERE platform_type = $1 LIMIT 1),
-        $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW(), NOW()
-      ) RETURNING id
-    `;
-
-    const result = await pool.query(commentQuery, [
-      commentData.platform,
-      commentData.commentId,
-      commentData.postId,
-      commentData.text,
-      commentData.authorName,
-      commentData.authorHandle,
-      commentData.authorId,
-      commentData.postTitle,
-      commentData.postUrl
-    ]);
-
-    const newCommentId = result.rows[0].id;
-    console.log(`✅ Comment saved with ID: ${newCommentId}`);
-
-    // Check if AI auto-reply is enabled
-    const aiConfigQuery = `SELECT * FROM ai_config WHERE user_id = $1 AND enabled = true AND auto_reply = true`;
-    const aiConfig = await pool.query(aiConfigQuery, ['default_user']);
-
-    if (aiConfig.rows.length > 0) {
-      console.log('🤖 AI auto-reply is enabled, scheduling response...');
-      // Schedule AI response
-      setTimeout(async () => {
-        try {
-          await processAutoReply(newCommentId, commentData, aiConfig.rows[0]);
-        } catch (error) {
-          console.error('Auto-reply error:', error);
-        }
-      }, aiConfig.rows[0].response_delay * 1000);
+    // Handle different comment actions and get the comment ID
+    let commentId;
+    if (commentData.action === 'remove') {
+      // Comment was deleted
+      commentId = await handleCommentDeletion(commentData);
+    } else if (commentData.action === 'edit') {
+      // Comment was edited  
+      commentId = await handleCommentEdit(commentData);
+    } else {
+      // New comment (default: 'add')
+      commentId = await handleNewComment(commentData);
     }
 
-    // Log activity (with column name compatibility check)
-    try {
-      await pool.query(`
-        INSERT INTO social_activity (comment_id, action_type, action_data, created_at)
-        VALUES ($1, 'comment_received', $2, NOW())
-      `, [newCommentId, JSON.stringify(commentData)]);
-    } catch (activityError) {
-      // Fallback for legacy column name
-      if (activityError.message.includes('column "action_type"')) {
-        console.log('⚠️ Using legacy activity_type column');
-        await pool.query(`
-          INSERT INTO social_activity (comment_id, activity_type, action_data, created_at)
-          VALUES ($1, 'comment_received', $2, NOW())
-        `, [newCommentId, JSON.stringify(commentData)]);
-      } else {
-        console.error('❌ Activity logging error:', activityError.message);
+    // Only proceed with AI auto-reply for new comments
+    if (commentData.action !== 'remove' && commentId) {
+      // Check if AI auto-reply is enabled
+      const aiConfigQuery = `SELECT * FROM ai_config WHERE user_id = $1 AND enabled = true AND auto_reply = true`;
+      const aiConfig = await pool.query(aiConfigQuery, ['default_user']);
+
+      if (aiConfig.rows.length > 0) {
+        console.log('🤖 AI auto-reply is enabled, scheduling response...');
+        // Schedule AI response
+        setTimeout(async () => {
+          try {
+            await processAutoReply(commentId, commentData, aiConfig.rows[0]);
+          } catch (error) {
+            console.error('Auto-reply error:', error);
+          }
+        }, aiConfig.rows[0].response_delay * 1000);
       }
     }
 
     console.log('🎉 Webhook processed successfully!');
+    console.log('🔍 Final commentId value:', commentId);
     return res.status(200).json({
       success: true,
       message: 'Comment processed successfully',
-      commentId: newCommentId
+      commentId: commentId
     });
 
   } catch (error) {
     console.error('❌ Webhook processing error:', error);
+    console.error('❌ Error details:', error.stack);
     return res.status(500).json({ error: error.message });
   }
 }
@@ -777,6 +761,9 @@ async function processFacebookWebhook(data) {
       
       if (change.field === 'feed' && change.value.item === 'comment') {
         const comment = change.value;
+        const verb = comment.verb || 'add'; // Facebook sends: add, edit, remove
+        
+        console.log(`📝 Facebook comment ${verb}:`, comment.comment_id);
         
         // Get post information
         let postTitle = 'Facebook Post';
@@ -792,13 +779,16 @@ async function processFacebookWebhook(data) {
           platform: 'facebook',
           commentId: comment.comment_id,
           postId: comment.post_id,
-          text: comment.message,
+          text: comment.message || '[Comment content unavailable]', // May be empty for deleted comments
           authorName: comment.from?.name || 'Facebook User',
           authorHandle: `@${comment.from?.id || 'unknown'}`,
           authorId: comment.from?.id || 'unknown',
           postTitle: postTitle,
           postUrl: postUrl,
-          createdTime: comment.created_time || new Date().toISOString()
+          createdTime: comment.created_time || new Date().toISOString(),
+          action: verb, // 'add', 'edit', 'remove'
+          isDeleted: verb === 'remove',
+          isEdited: verb === 'edit'
         };
       }
     }
@@ -1101,5 +1091,178 @@ async function handleBulkSendReplies(req, res) {
       error: 'Failed to send bulk replies',
       details: error.message
     });
+  }
+}
+
+// Handle new comment creation
+async function handleNewComment(commentData) {
+  const commentQuery = `
+    INSERT INTO social_comments (
+      platform_id, external_comment_id, external_post_id, 
+      comment_text, author_name, author_handle, author_id,
+      post_title, post_url, status, created_at, updated_at
+    ) VALUES (
+      (SELECT id FROM social_platforms WHERE platform_type = $1 LIMIT 1),
+      $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW(), NOW()
+    ) RETURNING id
+  `;
+
+  const result = await pool.query(commentQuery, [
+    commentData.platform,
+    commentData.commentId,
+    commentData.postId,
+    commentData.text,
+    commentData.authorName,
+    commentData.authorHandle,
+    commentData.authorId,
+    commentData.postTitle,
+    commentData.postUrl
+  ]);
+
+  const newCommentId = result.rows[0].id;
+  console.log(`✅ New comment saved with ID: ${newCommentId}`);
+
+  // Check if AI auto-reply is enabled
+  const aiConfigQuery = `SELECT * FROM ai_config WHERE user_id = $1 AND enabled = true AND auto_reply = true`;
+  const aiConfig = await pool.query(aiConfigQuery, ['default_user']);
+
+  if (aiConfig.rows.length > 0) {
+    console.log('🤖 AI auto-reply is enabled, scheduling response...');
+    // Schedule AI response
+    setTimeout(async () => {
+      try {
+        await processAutoReply(newCommentId, commentData, aiConfig.rows[0]);
+      } catch (error) {
+        console.error('Auto-reply error:', error);
+      }
+    }, aiConfig.rows[0].response_delay * 1000);
+  }
+
+  // Log activity
+  if (newCommentId) {
+    await logCommentActivity(newCommentId, 'comment_received', commentData);
+  }
+  
+  return newCommentId;
+}
+
+// Handle comment deletion
+async function handleCommentDeletion(commentData) {
+  console.log(`🗑️ Comment ${commentData.commentId} was deleted`);
+  
+  // Find and update existing comment
+  const updateQuery = `
+    UPDATE social_comments 
+    SET 
+      is_deleted = TRUE,
+      deleted_at = NOW(),
+      status = 'deleted',
+      updated_at = NOW()
+    WHERE external_comment_id = $1
+    RETURNING id
+  `;
+
+  const result = await pool.query(updateQuery, [commentData.commentId]);
+  
+  if (result.rows.length > 0) {
+    const commentId = result.rows[0].id;
+    console.log(`✅ Comment ${commentId} marked as deleted`);
+    
+    // Log deletion activity
+    if (commentId) {
+      await logCommentActivity(commentId, 'comment_deleted', {
+        ...commentData,
+        deleted_by: commentData.authorName,
+        deletion_time: new Date().toISOString()
+      });
+    }
+    
+    return commentId;
+  } else {
+    console.log(`⚠️ Comment ${commentData.commentId} not found for deletion`);
+    return null;
+  }
+}
+
+// Handle comment editing
+async function handleCommentEdit(commentData) {
+  console.log(`✏️ Comment ${commentData.commentId} was edited`);
+  
+  // Find existing comment and store original text
+  const existingQuery = `
+    SELECT id, comment_text, edit_count 
+    FROM social_comments 
+    WHERE external_comment_id = $1
+  `;
+  
+  const existing = await pool.query(existingQuery, [commentData.commentId]);
+  
+  if (existing.rows.length > 0) {
+    const comment = existing.rows[0];
+    
+    // Store original text if this is the first edit
+    const originalText = comment.edit_count === 0 ? comment.comment_text : null;
+    
+    // Update comment with edited content
+    const updateQuery = `
+      UPDATE social_comments 
+      SET 
+        comment_text = $1,
+        is_edited = TRUE,
+        last_edited_at = NOW(),
+        edit_count = edit_count + 1,
+        updated_at = NOW()
+        ${originalText ? ', original_text = $3' : ''}
+      WHERE external_comment_id = $2
+      RETURNING id, edit_count
+    `;
+
+    const params = [commentData.text, commentData.commentId];
+    if (originalText) {
+      params.push(originalText);
+    }
+
+    const result = await pool.query(updateQuery, params);
+    const commentId = result.rows[0].id;
+    const editCount = result.rows[0].edit_count;
+    
+    console.log(`✅ Comment ${commentId} updated (edit #${editCount})`);
+    
+    // Log edit activity
+    if (commentId) {
+      await logCommentActivity(commentId, 'comment_edited', {
+        ...commentData,
+        edit_count: editCount,
+        previous_text: comment.comment_text,
+        new_text: commentData.text,
+        edit_time: new Date().toISOString()
+      });
+    }
+    
+    return commentId;
+  } else {
+    console.log(`⚠️ Comment ${commentData.commentId} not found for editing`);
+    return null;
+  }
+}
+
+// Helper function to log comment activities
+async function logCommentActivity(commentId, actionType, data) {
+  try {
+    await pool.query(`
+      INSERT INTO social_activity (comment_id, action_type, action_data, created_at)
+      VALUES ($1, $2, $3, NOW())
+    `, [commentId, actionType, JSON.stringify(data)]);
+  } catch (activityError) {
+    // Fallback for legacy column name
+    if (activityError.message.includes('column "action_type"')) {
+      console.log('⚠️ Using legacy activity_type column');
+      await pool.query(`
+        INSERT INTO social_activity (comment_id, activity_type, action_data, created_at)
+        VALUES ($1, $2, $3, NOW())
+      `, [commentId, actionType, JSON.stringify(data)]);
+    } else {
+      console.error('❌ Activity logging error:', activityError.message);
+    }
   }
 }

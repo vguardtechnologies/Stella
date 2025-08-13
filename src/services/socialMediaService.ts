@@ -36,6 +36,13 @@ interface SocialComment {
   priority?: number;
   tags?: any;
   created_at: string;
+  // New status tracking fields
+  is_deleted?: boolean;
+  is_edited?: boolean;
+  deleted_at?: string;
+  last_edited_at?: string;
+  edit_count?: number;
+  original_text?: string;
 }
 
 class SocialMediaService {
@@ -294,6 +301,15 @@ class SocialMediaService {
         authorId: comment.author_id,
         sentiment: comment.sentiment,
         priority: comment.priority
+      },
+      // Status tracking for deleted/edited comments
+      statusIndicators: {
+        isDeleted: comment.is_deleted || false,
+        isEdited: comment.is_edited || false,
+        deletedAt: comment.deleted_at,
+        lastEditedAt: comment.last_edited_at,
+        editCount: comment.edit_count || 0,
+        originalText: comment.original_text
       }
     };
   }

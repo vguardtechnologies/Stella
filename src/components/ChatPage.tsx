@@ -5136,6 +5136,119 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             {(activeReplyCommentId === message.commentId ? newMessage : '') || message.placeholder || 'Reply here...'}
                           </div>
                         </div>
+                      ) : message.type === 'social_comment' ? (
+                        <div className="social-comment-message">
+                          <div className="social-comment-header">
+                            <div className="platform-badge" style={{
+                              backgroundColor: message.platform === 'facebook' ? '#1877f2' : message.platform === 'instagram' ? '#E4405F' : '#333',
+                              color: 'white',
+                              padding: '2px 6px',
+                              borderRadius: '10px',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase'
+                            }}>
+                              {message.platform}
+                            </div>
+                            <div className="comment-author" style={{
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#555'
+                            }}>
+                              {message.senderName || 'Unknown User'}
+                              {message.senderHandle && (
+                                <span style={{ color: '#999', marginLeft: '4px' }}>
+                                  @{message.senderHandle}
+                                </span>
+                              )}
+                            </div>
+                            {/* Status Indicators */}
+                            <div className="status-badges" style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                              {message.statusIndicators?.isDeleted && (
+                                <span className="deleted-badge" style={{
+                                  backgroundColor: '#dc3545',
+                                  color: 'white',
+                                  padding: '2px 6px',
+                                  borderRadius: '10px',
+                                  fontSize: '9px',
+                                  fontWeight: 'bold'
+                                }} title={`Deleted ${message.statusIndicators.deletedAt ? new Date(message.statusIndicators.deletedAt).toLocaleString() : ''}`}>
+                                  🗑️ DELETED
+                                </span>
+                              )}
+                              {message.statusIndicators?.isEdited && (
+                                <span className="edited-badge" style={{
+                                  backgroundColor: '#ffc107',
+                                  color: '#212529',
+                                  padding: '2px 6px',
+                                  borderRadius: '10px',
+                                  fontSize: '9px',
+                                  fontWeight: 'bold'
+                                }} title={`Edited ${message.statusIndicators.editCount || 1} time(s). Last edited: ${message.statusIndicators.lastEditedAt ? new Date(message.statusIndicators.lastEditedAt).toLocaleString() : 'N/A'}`}>
+                                  ✏️ EDITED ({message.statusIndicators.editCount || 1}x)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="social-comment-content" style={{
+                            backgroundColor: message.statusIndicators?.isDeleted ? '#f8f9fa' : 'white',
+                            opacity: message.statusIndicators?.isDeleted ? 0.7 : 1,
+                            padding: '8px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            marginTop: '6px'
+                          }}>
+                            <div className="comment-text" style={{
+                              fontSize: '14px',
+                              lineHeight: '1.4',
+                              color: message.statusIndicators?.isDeleted ? '#6c757d' : '#333',
+                              fontStyle: message.statusIndicators?.isDeleted ? 'italic' : 'normal'
+                            }}>
+                              {message.statusIndicators?.isDeleted 
+                                ? '[This comment has been deleted]' 
+                                : (message.content || message.text)
+                              }
+                            </div>
+                            {message.statusIndicators?.isEdited && message.statusIndicators?.originalText && (
+                              <div style={{
+                                marginTop: '8px',
+                                padding: '6px',
+                                backgroundColor: '#f8f9fa',
+                                borderRadius: '4px',
+                                border: '1px solid #dee2e6'
+                              }}>
+                                <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                                  Original text:
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>
+                                  {message.statusIndicators.originalText}
+                                </div>
+                              </div>
+                            )}
+                            {message.postContext && (
+                              <div className="post-context" style={{
+                                marginTop: '8px',
+                                fontSize: '12px',
+                                color: '#666',
+                                borderTop: '1px solid #eee',
+                                paddingTop: '6px'
+                              }}>
+                                <div style={{ fontWeight: '500' }}>Post: {message.postContext.title}</div>
+                                {message.postContext.url && (
+                                  <a href={message.postContext.url} target="_blank" rel="noopener noreferrer" 
+                                     style={{ color: '#25d366', textDecoration: 'none' }}>
+                                    View Original Post →
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="message-meta" style={{ marginTop: '4px' }}>
+                            <div className="message-timestamp" style={{ fontSize: '11px', color: '#999' }}>
+                              {formatTime(message.timestamp)}
+                            </div>
+                          </div>
+                        </div>
                       ) : message.type === 'location' ? (
                         <div className="whatsapp-message location-message">
                           📍 Location
