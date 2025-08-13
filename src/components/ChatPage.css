@@ -529,6 +529,12 @@ mark {
   max-width: 60%;
 }
 
+/* Override max-width for reply input messages */
+.agent-message:has(.reply-input-bubble),
+.agent-message.reply-input-container {
+  max-width: 95% !important;
+}
+
 .message-content {
   background: var(--glass-bg);
   padding: 8px 12px;
@@ -2010,4 +2016,42 @@ mark {
 
 .conversation-item[data-platform="tiktok"] {
   border-left-color: #ff0050;
+}
+
+/* Reply Input Bubble Styles */
+.reply-input-bubble {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px dashed rgba(102, 102, 255, 0.3);
+  border-radius: 12px;
+  padding: 15px 20px;
+  min-height: 60px;
+  width: 23.75vw !important;
+  max-width: none !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  position: relative;
+  right: 0;
+  margin-left: auto;
+}
+
+.reply-input-bubble:hover {
+  border-color: rgba(102, 102, 255, 0.6);
+  background: rgba(255, 255, 255, 0.98);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 102, 255, 0.2);
+}
+
+.reply-input-content {
+  color: #666;
+  font-style: italic;
+  line-height: 1.4;
+  min-height: 20px;
+  word-wrap: break-word;
+}
+
+.reply-input-content:not(:empty) {
+  color: #333;
+  font-style: normal;
 }

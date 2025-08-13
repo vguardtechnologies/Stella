@@ -178,7 +178,7 @@ interface Message {
   text: string;
   sender: 'user' | 'agent' | 'system';
   timestamp: Date;
-  type: 'text' | 'product' | 'order' | 'cart' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location' | 'social_post';
+  type: 'text' | 'product' | 'order' | 'cart' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location' | 'social_post' | 'reply_input';
   productData?: Product;
   orderData?: Order;
   cartData?: {
@@ -211,6 +211,7 @@ interface Message {
     image?: string;
   };
   author?: string;
+  placeholder?: string;
 }
 
 interface Conversation {
@@ -366,6 +367,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
   // File Preview State
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -491,7 +493,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         id: `sm_${comment.id}`,
         customerName: comment.author_name || comment.author_username || 'Social Media User',
         customerPhone: `social_${comment.platform}_${comment.author_id}`,
-        lastMessage: comment.content || 'Social media comment',
+        lastMessage: comment.comment_text || comment.content || 'Social media comment',
         timestamp: new Date(comment.created_at),
         unreadCount: comment.reply_count || 0,
         status: 'active',
@@ -2307,11 +2309,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         {
           id: conversation.comment_id!,
           sender: 'user' as const,
-          text: conversation.lastMessage,
+          text: `${conversation.customerName}: ${conversation.lastMessage}`,
           timestamp: new Date(conversation.timestamp),
           type: 'text' as const,
           status: 'sent' as const,
           author: conversation.customerName,
+          platform: conversation.platform
+        },
+        // Reply input bubble
+        {
+          id: `reply_${conversation.comment_id}`,
+          sender: 'agent' as const,
+          text: '',
+          placeholder: 'Reply here...',
+          timestamp: new Date(),
+          type: 'reply_input' as const,
+          status: 'draft' as const,
+          author: 'Agent',
           platform: conversation.platform
         }
       ];
@@ -4020,7 +4034,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                   {messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`message ${message.sender === 'agent' ? 'agent-message' : 'user-message'}`}
+                      className={`message ${message.sender === 'agent' ? 'agent-message' : 'user-message'} ${message.type === 'reply_input' ? 'reply-input-container' : ''}`}
                     >
                       {message.type === 'product' && message.productData ? (
                         <div className="product-message" style={{ 
@@ -4885,6 +4899,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           😄 Sticker
                           {message.media_url && <div className="media-id">ID: {message.media_url}</div>}
                         </div>
+                      ) : message.type === 'reply_input' ? (
+                        <div className="reply-input-bubble" onClick={() => messageInputRef.current?.focus()}>
+                          <div className="reply-input-content">
+                            {newMessage || message.placeholder || 'Reply here...'}
+                          </div>
+                        </div>
                       ) : message.type === 'location' ? (
                         <div className="whatsapp-message location-message">
                           📍 Location
@@ -5612,6 +5632,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     )}
                     
                     <textarea
+                      ref={messageInputRef}
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
