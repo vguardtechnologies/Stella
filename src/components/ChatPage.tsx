@@ -310,6 +310,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [isShopifyConfigured, setIsShopifyConfigured] = useState(false);
   const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [messagesRefreshing, setMessagesRefreshing] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const productSearchFilter = 'all'; // Always search all fields
   const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
@@ -2284,28 +2285,38 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // General function to fetch messages for any conversation
   const fetchMessages = async (conversationId: string, isAutoRefresh = false) => {
-    if (conversationId.startsWith('wa_')) {
-      // WhatsApp conversation - extract phone number from ID
-      let phoneNumber: string;
-      const conversation = whatsappConversations.find(c => c.id === conversationId);
-      
-      if (conversation) {
-        phoneNumber = conversation.customerPhone;
-      } else {
-        // Extract phone from wa_<phone> format and add + prefix if needed
-        phoneNumber = conversationId.replace('wa_', '');
-        if (!phoneNumber.startsWith('+')) {
-          phoneNumber = '+' + phoneNumber;
-        }
-      }
-      
-      console.log('Fetching messages for conversation ID:', conversationId, 'Phone:', phoneNumber);
-      await fetchWhatsAppMessages(phoneNumber.replace(/[^\d]/g, ''), isAutoRefresh);
-    } else if (conversationId.startsWith('sm_')) {
-      // Social Media conversation - fetch comment thread
-      await fetchSocialMediaMessages(conversationId, isAutoRefresh ? showAllCommentsRef.current : false);
+    if (isAutoRefresh) {
+      setMessagesRefreshing(true);
     }
-    // Can add other conversation types here in the future
+    
+    try {
+      if (conversationId.startsWith('wa_')) {
+        // WhatsApp conversation - extract phone number from ID
+        let phoneNumber: string;
+        const conversation = whatsappConversations.find(c => c.id === conversationId);
+        
+        if (conversation) {
+          phoneNumber = conversation.customerPhone;
+        } else {
+          // Extract phone from wa_<phone> format and add + prefix if needed
+          phoneNumber = conversationId.replace('wa_', '');
+          if (!phoneNumber.startsWith('+')) {
+            phoneNumber = '+' + phoneNumber;
+          }
+        }
+        
+        console.log('Fetching messages for conversation ID:', conversationId, 'Phone:', phoneNumber);
+        await fetchWhatsAppMessages(phoneNumber.replace(/[^\d]/g, ''), isAutoRefresh);
+      } else if (conversationId.startsWith('sm_')) {
+        // Social Media conversation - fetch comment thread
+        await fetchSocialMediaMessages(conversationId, isAutoRefresh ? showAllCommentsRef.current : false);
+      }
+      // Can add other conversation types here in the future
+    } finally {
+      if (isAutoRefresh) {
+        setMessagesRefreshing(false);
+      }
+    }
   };
 
   // Fetch Social Media messages (comments and replies)
@@ -2482,7 +2493,32 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       }
       
       console.log('Setting social media messages:', mockMessages);
-      setMessages(mockMessages);
+      
+      // Smart message merging to prevent glitching during auto-refresh
+      if (preserveExpandedState && messages.length > 0) {
+        // Merge new messages with existing ones, preserving reactions and UI state
+        setMessages(prevMessages => {
+          const newMessages = [...mockMessages];
+          
+          // Preserve existing reactions for matching messages
+          prevMessages.forEach(prevMsg => {
+            const matchingNewMsg = newMessages.find(newMsg => 
+              newMsg.id === prevMsg.id || 
+              (newMsg.commentId && newMsg.commentId === prevMsg.commentId)
+            );
+            
+            if (matchingNewMsg && prevMsg.reactions && prevMsg.reactions.length > 0) {
+              console.log(`🔄 Preserving reactions for message ${matchingNewMsg.id}:`, prevMsg.reactions);
+              matchingNewMsg.reactions = prevMsg.reactions;
+            }
+          });
+          
+          return newMessages;
+        });
+      } else {
+        // Initial load - set messages normally
+        setMessages(mockMessages);
+      }
       
       // Load reactions for all social comment messages
       await loadReactionsForMessages(mockMessages);
@@ -2885,16 +2921,27 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       const socialMediaService = new SocialMediaService(API_BASE);
       const reactionsByComment = await socialMediaService.getReactions(undefined, commentIds);
 
-      // Update messages with reactions
-      setMessages(prev => prev.map(msg => {
-        if (msg.type === 'social_comment' && msg.commentId && reactionsByComment[msg.commentId]) {
-          return {
-            ...msg,
-            reactions: reactionsByComment[msg.commentId] || []
-          };
-        }
-        return msg;
-      }));
+      // Update messages with reactions - use functional update to prevent unnecessary re-renders
+      setMessages(prev => {
+        let hasChanges = false;
+        const newMessages = prev.map(msg => {
+          if (msg.type === 'social_comment' && msg.commentId && reactionsByComment[msg.commentId]) {
+            const newReactions = reactionsByComment[msg.commentId] || [];
+            // Only update if reactions have actually changed
+            if (!msg.reactions || JSON.stringify(msg.reactions) !== JSON.stringify(newReactions)) {
+              hasChanges = true;
+              return {
+                ...msg,
+                reactions: newReactions
+              };
+            }
+          }
+          return msg;
+        });
+        
+        // Only trigger re-render if there were actual changes
+        return hasChanges ? newMessages : prev;
+      });
 
       console.log('✅ Loaded reactions for all comments');
       
@@ -3230,7 +3277,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     const interval = setInterval(() => {      
       console.log('Auto-refreshing messages for selected conversation');
       fetchMessages(selectedConversation, true); // Pass true for isAutoRefresh
-    }, 15000); // Refresh messages every 15 seconds
+    }, 30000); // Refresh messages every 30 seconds (increased from 15s)
 
     return () => {
       clearInterval(interval);
@@ -4468,6 +4515,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 </div>
 
                 <div className="messages-container" onScroll={handleScroll}>
+                  {messagesRefreshing && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '10px',
+                      background: 'rgba(0,0,0,0.7)',
+                      color: 'white',
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      zIndex: 1000
+                    }}>
+                      🔄 Refreshing...
+                    </div>
+                  )}
                   {messages.map((message) => (
                     <div
                       key={message.id}
