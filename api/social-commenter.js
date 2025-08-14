@@ -71,6 +71,8 @@ module.exports = async function handler(req, res) {
       case 'DELETE':
         if (query.action === 'disconnect-platform') {
           return handleDisconnectPlatform(req, res);
+        } else if (query.action === 'delete-comment') {
+          return handleDeleteComment(req, res);
         } else {
           return res.status(400).json({ error: 'Invalid action' });
         }
@@ -594,6 +596,78 @@ async function handleDisconnectPlatform(req, res) {
     success: true,
     message: 'Platform disconnection handled'
   });
+}
+
+// Handle manual comment deletion from frontend
+async function handleDeleteComment(req, res) {
+  try {
+    const { commentId } = req.query;
+    
+    if (!commentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Comment ID is required'
+      });
+    }
+    
+    // Find the comment first to get its details for logging
+    const findQuery = `
+      SELECT id, external_comment_id, author_name, comment_text 
+      FROM social_comments 
+      WHERE id = $1
+    `;
+    
+    const findResult = await pool.query(findQuery, [commentId]);
+    
+    if (findResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Comment not found'
+      });
+    }
+    
+    const comment = findResult.rows[0];
+    
+    // Log deletion activity before removing
+    await logCommentActivity(comment.id, 'comment_deleted', {
+      external_comment_id: comment.external_comment_id,
+      author_name: comment.author_name,
+      comment_text: comment.comment_text,
+      deleted_by: 'admin',
+      deletion_time: new Date().toISOString(),
+      action: 'manual_removal'
+    });
+    
+    // Delete associated reactions first (foreign key constraint)
+    const deleteReactionsQuery = `
+      DELETE FROM comment_reactions 
+      WHERE comment_id = $1
+    `;
+    await pool.query(deleteReactionsQuery, [commentId]);
+    
+    // Delete the comment completely
+    const deleteCommentQuery = `
+      DELETE FROM social_comments 
+      WHERE id = $1
+    `;
+    
+    await pool.query(deleteCommentQuery, [commentId]);
+    
+    console.log(`✅ Comment ${commentId} manually deleted and removed from database`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Comment permanently deleted',
+      commentId: commentId
+    });
+    
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to delete comment'
+    });
+  }
 }
 
 // AI Response Generation using Llama
@@ -1161,38 +1235,49 @@ async function handleNewComment(commentData) {
   return newCommentId;
 }
 
-// Handle comment deletion
+// Handle comment deletion - completely remove from database
 async function handleCommentDeletion(commentData) {
-  console.log(`🗑️ Comment ${commentData.commentId} was deleted`);
+  console.log(`🗑️ Comment ${commentData.commentId} was deleted - removing from database`);
   
-  // Find and update existing comment
-  const updateQuery = `
-    UPDATE social_comments 
-    SET 
-      is_deleted = TRUE,
-      deleted_at = NOW(),
-      status = 'deleted',
-      updated_at = NOW()
+  // Find the comment to get its ID for logging
+  const findQuery = `
+    SELECT id FROM social_comments 
     WHERE external_comment_id = $1
-    RETURNING id
   `;
-
-  const result = await pool.query(updateQuery, [commentData.commentId]);
   
-  if (result.rows.length > 0) {
-    const commentId = result.rows[0].id;
-    console.log(`✅ Comment ${commentId} marked as deleted`);
+  const findResult = await pool.query(findQuery, [commentData.commentId]);
+  
+  if (findResult.rows.length > 0) {
+    const commentId = findResult.rows[0].id;
     
-    // Log deletion activity
-    if (commentId) {
-      await logCommentActivity(commentId, 'comment_deleted', {
-        ...commentData,
-        deleted_by: commentData.authorName,
-        deletion_time: new Date().toISOString()
-      });
+    // Log deletion activity before removing
+    await logCommentActivity(commentId, 'comment_deleted', {
+      ...commentData,
+      deleted_by: commentData.authorName,
+      deletion_time: new Date().toISOString(),
+      action: 'permanent_removal'
+    });
+    
+    // Delete associated reactions first (foreign key constraint)
+    const deleteReactionsQuery = `
+      DELETE FROM comment_reactions 
+      WHERE comment_id = $1
+    `;
+    await pool.query(deleteReactionsQuery, [commentId]);
+    
+    // Now delete the comment completely
+    const deleteCommentQuery = `
+      DELETE FROM social_comments 
+      WHERE external_comment_id = $1
+      RETURNING id
+    `;
+    
+    const result = await pool.query(deleteCommentQuery, [commentData.commentId]);
+    
+    if (result.rows.length > 0) {
+      console.log(`✅ Comment ${commentId} permanently removed from database`);
+      return commentId;
     }
-    
-    return commentId;
   } else {
     console.log(`⚠️ Comment ${commentData.commentId} not found for deletion`);
     return null;

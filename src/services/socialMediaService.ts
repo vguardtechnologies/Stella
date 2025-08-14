@@ -584,6 +584,30 @@ class SocialMediaService {
       throw error;
     }
   }
+
+  // Delete comment completely from database
+  async deleteComment(commentId: number): Promise<{success: boolean, message: string}> {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/social-commenter?action=delete-comment&commentId=${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to delete comment');
+      }
+
+      return data;
+
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      throw error;
+    }
+  }
 }
 
 export default SocialMediaService;

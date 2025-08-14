@@ -223,9 +223,7 @@ interface Message {
     mediaUrl?: string;
   };
   statusIndicators?: {
-    isDeleted?: boolean;
     isEdited?: boolean;
-    deletedAt?: string;
     lastEditedAt?: string;
     editCount?: number;
     originalText?: string;
@@ -302,6 +300,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [emojiSearchQuery, setEmojiSearchQuery] = useState('');
   const [recentlyUsedEmojis, setRecentlyUsedEmojis] = useState<string[]>([]);
+  const [emojiUsageCount, setEmojiUsageCount] = useState<Record<string, number>>({});
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const [actualShopName, setActualShopName] = useState<string>('');
   const [shopNameLoading, setShopNameLoading] = useState(true);
@@ -517,7 +516,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     try {
       console.log('Fetching Social Media conversations...');
       const socialMediaService = new SocialMediaService(API_BASE);
-      // Use getComments() without status filter to include deleted/edited comments in conversations
+      // Get all comments (deleted comments are automatically removed from database)
       const allComments = await socialMediaService.getComments();
       
       console.log('All social media comments:', allComments);
@@ -2775,10 +2774,38 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setSearchQuery(''); // Clear search when emoji is selected
   };
 
+  // Track emoji usage frequency
+  const trackEmojiUsage = (emoji: string) => {
+    setEmojiUsageCount(prev => {
+      const updated = {
+        ...prev,
+        [emoji]: (prev[emoji] || 0) + 1
+      };
+      
+      // Save to localStorage for persistence
+      try {
+        localStorage.setItem('stella_emoji_usage', JSON.stringify(updated));
+      } catch (error) {
+        console.warn('Failed to save emoji usage to localStorage:', error);
+      }
+      
+      return updated;
+    });
+    
+    // Also update recently used emojis
+    setRecentlyUsedEmojis(prev => {
+      const filtered = prev.filter(e => e !== emoji);
+      return [emoji, ...filtered].slice(0, 8);
+    });
+  };
+
   // Handle comment emoji reactions
   const handleCommentReaction = async (commentId: number, emoji: string) => {
     try {
       console.log(`🎭 Adding reaction ${emoji} to comment ${commentId}`);
+      
+      // Track emoji usage for dynamic quick reactions
+      trackEmojiUsage(emoji);
       
       const socialMediaService = new SocialMediaService(API_BASE);
       const result = await socialMediaService.toggleReaction(commentId, emoji);
@@ -2819,28 +2846,28 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  // Get quick reaction emojis - simple Facebook-style reactions
+  // Get quick reaction emojis - 4 most frequently used emojis
   const getQuickReactionEmojis = (): string[] => {
-    const popularEmojis = ['👍', '❤️', '😍', '😂'];
+    // Default fallback emojis
+    const defaultEmojis = ['👍', '❤️', '😍', '😂'];
     
-    // Use recently used emojis first, then fill with popular defaults
-    const quickEmojis = [];
+    // Get emojis sorted by usage frequency (highest first)
+    const sortedByFrequency = Object.entries(emojiUsageCount)
+      .sort(([, a], [, b]) => b - a)
+      .map(([emoji]) => emoji);
     
-    // Add recent emojis (up to 5)
-    for (const emoji of recentlyUsedEmojis) {
-      if (quickEmojis.length < 5) {
-        quickEmojis.push(emoji);
+    // Take the top 4 most used emojis
+    const mostUsedEmojis = sortedByFrequency.slice(0, 4);
+    
+    // If we have fewer than 4 frequent emojis, fill with defaults
+    const result = [...mostUsedEmojis];
+    for (const defaultEmoji of defaultEmojis) {
+      if (result.length < 4 && !result.includes(defaultEmoji)) {
+        result.push(defaultEmoji);
       }
     }
     
-    // Fill remaining spots with popular emojis that aren't already included
-    for (const emoji of popularEmojis) {
-      if (quickEmojis.length < 5 && !quickEmojis.includes(emoji)) {
-        quickEmojis.push(emoji);
-      }
-    }
-    
-    return quickEmojis;
+    return result.slice(0, 4); // Ensure exactly 4 emojis
   };
 
   // Load reactions for all social comment messages
@@ -2940,19 +2967,30 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     showAllCommentsRef.current = showAllComments;
   }, [showAllComments]);
 
-  // Load recently used emojis from localStorage on component mount
+  // Load recently used emojis and usage counts from localStorage on component mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('stella_recent_emojis');
-      if (stored) {
-        const recentEmojis = JSON.parse(stored);
+      // Load recent emojis
+      const storedRecent = localStorage.getItem('stella_recent_emojis');
+      if (storedRecent) {
+        const recentEmojis = JSON.parse(storedRecent);
         if (Array.isArray(recentEmojis)) {
           setRecentlyUsedEmojis(recentEmojis.slice(0, 8)); // Ensure max 8 items
           console.log('💾 Loaded recent emojis from localStorage:', recentEmojis);
         }
       }
+      
+      // Load emoji usage counts
+      const storedUsage = localStorage.getItem('stella_emoji_usage');
+      if (storedUsage) {
+        const usageData = JSON.parse(storedUsage);
+        if (typeof usageData === 'object' && usageData !== null) {
+          setEmojiUsageCount(usageData);
+          console.log('💾 Loaded emoji usage counts from localStorage:', usageData);
+        }
+      }
     } catch (error) {
-      console.warn('Failed to load recent emojis from localStorage:', error);
+      console.warn('Failed to load emoji data from localStorage:', error);
       // Initialize with some default recent emojis if localStorage fails
       setRecentlyUsedEmojis(['👍', '❤️']);
     }
@@ -5338,18 +5376,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             </div>
                             {/* Status Indicators */}
                             <div className="status-badges" style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                              {message.statusIndicators?.isDeleted && (
-                                <span className="deleted-badge" style={{
-                                  backgroundColor: '#dc3545',
-                                  color: 'white',
-                                  padding: '2px 6px',
-                                  borderRadius: '10px',
-                                  fontSize: '9px',
-                                  fontWeight: 'bold'
-                                }} title={`Deleted ${message.statusIndicators.deletedAt ? new Date(message.statusIndicators.deletedAt).toLocaleString() : ''}`}>
-                                  🗑️ DELETED
-                                </span>
-                              )}
                               {message.statusIndicators?.isEdited && (
                                 <span className="edited-badge" style={{
                                   backgroundColor: '#ffc107',
@@ -5365,8 +5391,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             </div>
                           </div>
                           <div className="social-comment-content" style={{
-                            backgroundColor: message.statusIndicators?.isDeleted ? '#f8f9fa' : 'white',
-                            opacity: message.statusIndicators?.isDeleted ? 0.7 : 1,
+                            backgroundColor: 'white',
                             padding: '8px',
                             borderRadius: '8px',
                             border: '1px solid #e9ecef',
@@ -5375,13 +5400,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             <div className="comment-text" style={{
                               fontSize: '14px',
                               lineHeight: '1.4',
-                              color: message.statusIndicators?.isDeleted ? '#6c757d' : '#333',
-                              fontStyle: message.statusIndicators?.isDeleted ? 'italic' : 'normal'
+                              color: '#333'
                             }}>
-                              {message.statusIndicators?.isDeleted 
-                                ? '[This comment has been deleted]' 
-                                : (message.content || message.text)
-                              }
+                              {message.content || message.text}
                             </div>
                             {message.statusIndicators?.isEdited && message.statusIndicators?.originalText && (
                               <div style={{
@@ -5414,6 +5435,40 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                     View Original Post →
                                   </a>
                                 )}
+                              </div>
+                            )}
+                            
+                            {/* Display reactions at bottom of white comment box - Facebook style */}
+                            {(message.reactions || []).length > 0 && (
+                              <div className="comment-reactions" style={{
+                                marginTop: '8px',
+                                paddingTop: '8px',
+                                borderTop: '1px solid #e9ecef',
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '8px',
+                                justifyContent: 'flex-end'
+                              }}>
+                                {(message.reactions || []).map((reaction: any, index: number) => (
+                                  <div
+                                    key={index}
+                                    className="reaction-display"
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      cursor: 'pointer'
+                                    }}
+                                    title={`${reaction.count} ${reaction.count === 1 ? 'person' : 'people'} reacted with ${reaction.emoji}`}
+                                  >
+                                    <span style={{ fontSize: '18px' }}>
+                                      {reaction.emoji}
+                                    </span>
+                                    <span style={{ fontSize: '14px', color: '#666', fontWeight: '500' }}>
+                                      {reaction.count}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
@@ -5498,36 +5553,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                               >
                                 +
                               </button>
-                            </div>
-                            
-                            {/* Display existing reactions */}
-                            <div className="existing-reactions" style={{
-                              display: 'flex',
-                              gap: '4px',
-                              marginLeft: '8px'
-                            }}>
-                              {(message.reactions || []).map((reaction: any, index: number) => (
-                                <div
-                                  key={index}
-                                  className="reaction-display"
-                                  style={{
-                                    background: '#f0f2f5',
-                                    borderRadius: '12px',
-                                    padding: '2px 6px',
-                                    fontSize: '12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '2px',
-                                    color: '#444',
-                                    fontWeight: '500'
-                                  }}
-                                >
-                                  <span style={{ fontSize: '16px' }}>
-                                    {reaction.emoji}
-                                  </span>
-                                  <span>{reaction.count}</span>
-                                </div>
-                              ))}
                             </div>
                           </div>
                           <div className="message-meta" style={{ marginTop: '4px' }}>
