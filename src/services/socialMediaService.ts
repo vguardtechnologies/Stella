@@ -529,6 +529,61 @@ class SocialMediaService {
       throw error;
     }
   }
+
+  // Toggle emoji reaction on a comment
+  async toggleReaction(commentId: number, emoji: string) {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/social-commenter?action=toggle-reaction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          commentId,
+          emoji,
+          userId: 'agent'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to toggle reaction');
+      }
+
+      return data;
+
+    } catch (error) {
+      console.error('Error toggling reaction:', error);
+      throw error;
+    }
+  }
+
+  // Get reactions for comments
+  async getReactions(commentId?: number, commentIds?: number[]) {
+    try {
+      const params = new URLSearchParams({ action: 'reactions' });
+
+      if (commentId) {
+        params.append('commentId', commentId.toString());
+      } else if (commentIds && commentIds.length > 0) {
+        params.append('commentIds', commentIds.join(','));
+      }
+
+      const response = await fetch(`${this.apiBaseUrl}/api/social-commenter?${params}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get reactions');
+      }
+
+      return data.reactions || data.reactionsByComment || {};
+
+    } catch (error) {
+      console.error('Error getting reactions:', error);
+      throw error;
+    }
+  }
 }
 
 export default SocialMediaService;

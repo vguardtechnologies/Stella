@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emoji Test</title>
+</head>
+<body>
+    <h1>Testing Emoji Images</h1>
+    <div id="emoji-container"></div>
+    
+    <script>
+        // Test a few emoji images
+        const testEmojis = [
+            'Thumbs up 64.png',
+            'Red heart 64.png',
+            'Fire 64.png',
+            'Grinning face 64.png',
+            'Clapping hands 64.png'
+        ];
+        
+        const container = document.getElementById('emoji-container');
+        
+        testEmojis.forEach(filename => {
+            const img = document.createElement('img');
+            img.src = `/assets/emojis/vector-emojis/64px/No Outline/${filename}`;
+            img.style.width = '32px';
+            img.style.height = '32px';
+            img.style.margin = '5px';
+            img.alt = filename;
+            img.title = filename;
+            
+            img.onerror = () => {
+                console.error('Failed to load:', filename);
+                img.style.border = '2px solid red';
+            };
+            
+            img.onload = () => {
+                console.log('Loaded successfully:', filename);
+                img.style.border = '2px solid green';
+            };
+            
+            container.appendChild(img);
+        });
+        
+        // Also test the count from the mapping
+        fetch('/src/utils/emojiMapping.ts')
+            .then(response => response.text())
+            .then(text => {
+                const unicodeMatches = text.match(/unicode:/g);
+                console.log('Found emoji mappings:', unicodeMatches ? unicodeMatches.length : 0);
+            })
+            .catch(err => console.log('Could not fetch mapping file', err));
+    </script>
+</body>
+</html>
