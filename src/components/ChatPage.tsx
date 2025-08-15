@@ -374,6 +374,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [productImageIndices, setProductImageIndices] = useState<{[messageId: string]: number}>({});
 
+  // Loading state for initial data
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+
   // WhatsApp Integration State
   const [whatsappConversations, setWhatsappConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<any>(null);
@@ -469,9 +472,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   };
 
   // Fetch WhatsApp conversations from the database
-  const fetchWhatsAppConversations = async () => {
+  const fetchWhatsAppConversations = async (isAutoRefresh = false) => {
     try {
-      console.log('Fetching WhatsApp conversations from:', `${API_BASE}/api/messages/conversations`);
+      if (!isAutoRefresh) {
+        console.log('Fetching WhatsApp conversations from:', `${API_BASE}/api/messages/conversations`);
+      }
       const response = await fetch(`${API_BASE}/api/messages/conversations`);
       
       console.log('Response status:', response.status);
@@ -525,9 +530,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   };
 
   // Fetch Social Media conversations from the database
-  const fetchSocialMediaConversations = async () => {
+  const fetchSocialMediaConversations = async (isAutoRefresh = false) => {
     try {
-      console.log('Fetching Social Media conversations...');
+      if (!isAutoRefresh) {
+        console.log('Fetching Social Media conversations...');
+      }
       const socialMediaService = new SocialMediaService(API_BASE);
       // Get all comments (deleted comments are automatically removed from database)
       const allComments = await socialMediaService.getComments();
@@ -576,8 +583,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       // Fetch page replies for all customer comments to show "Replied" indicators
       // But only if enough time has passed since last fetch to avoid overloading the API
+      // And only during initial loads, not auto-refresh
       const now = Date.now();
-      const shouldFetchReplies = (now - lastReplyFetchTime) > REPLY_FETCH_COOLDOWN;
+      const shouldFetchReplies = !isAutoRefresh && (now - lastReplyFetchTime) > REPLY_FETCH_COOLDOWN;
       
       if (customerComments.length > 0 && shouldFetchReplies) {
         console.log('⏰ Reply fetch cooldown period passed, fetching fresh reply indicators...');
@@ -3243,19 +3251,31 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // Load WhatsApp and Social Media data on component mount
   useEffect(() => {
-    fetchWhatsAppConversations();
-    fetchSocialMediaConversations();
+    const loadInitialData = async () => {
+      setConversationsLoading(true);
+      
+      try {
+        await Promise.all([
+          fetchWhatsAppConversations(false),
+          fetchSocialMediaConversations(false)
+        ]);
+      } finally {
+        setConversationsLoading(false);
+      }
+    };
     
-    // Simple auto-refresh - fetch conversations every 30 seconds
+    loadInitialData();
+    
+    // Simple auto-refresh - fetch conversations every 30 seconds (but only after initial load)
     const interval = setInterval(() => {
-      console.log('Auto-refreshing conversations');
-      fetchWhatsAppConversations();
-      // Always refresh social media conversations to pick up status changes (edits/deletes)
-      // even when comments are expanded - this ensures edit badges appear properly
-      fetchSocialMediaConversations();
+      if (!conversationsLoading) {
+        console.log('Auto-refreshing conversations');
+        fetchWhatsAppConversations(true);
+        // Always refresh social media conversations to pick up status changes (edits/deletes)
+        // even when comments are expanded - this ensures edit badges appear properly
+        fetchSocialMediaConversations(true);
+      }
     }, 30000);
-    
-    return () => clearInterval(interval);
     
     return () => clearInterval(interval);
   }, []);
@@ -3470,7 +3490,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // Auto-refresh messages for the selected conversation
   useEffect(() => {
-    if (!selectedConversation) return;
+    if (!selectedConversation || conversationsLoading) return;
 
     const interval = setInterval(() => {      
       console.log('Auto-refreshing messages for selected conversation');
@@ -3480,7 +3500,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     return () => {
       clearInterval(interval);
     };
-  }, [selectedConversation]); // Removed showAllComments dependency to prevent timer restart
+  }, [selectedConversation, conversationsLoading]); // Added conversationsLoading dependency
 
   // Use real WhatsApp conversations and Social Media conversations
   const allConversations = [...whatsappConversations, ...socialMediaConversations]
