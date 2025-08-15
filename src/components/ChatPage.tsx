@@ -228,6 +228,10 @@ interface Message {
     editCount?: number;
     originalText?: string;
   };
+  // Edit functionality fields
+  replyId?: string;
+  isEdited?: boolean;
+  lastEditedAt?: Date;
   content?: string;
   reactions?: Array<{
     emoji: string;
@@ -293,6 +297,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [activeReplyCommentId, setActiveReplyCommentId] = useState<string | null>(null);
+  
+  // Edit reply state
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editReplyText, setEditReplyText] = useState('');
+  const [editReplyLoading, setEditReplyLoading] = useState(false);
+  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
+  
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFacebookEmojiPicker, setShowFacebookEmojiPicker] = useState(false);
   const [facebookEmojiPickerPosition, setFacebookEmojiPickerPosition] = useState({ top: 0, left: 0 });
@@ -2617,6 +2628,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               author: reply.from?.name || 'SUSA',
               platform: conversation.platform,
               commentId: comment.id,
+              replyId: reply.id, // Add the reply ID for editing
               isPageReply: true
             });
           });
@@ -2677,6 +2689,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               author: reply.from?.name || 'SUSA',
               platform: conversation.platform,
               commentId: initialComment.id,
+              replyId: reply.id, // Add the reply ID for editing
               isPageReply: true
             });
           });
@@ -3029,6 +3042,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     
     setShowEmojiPicker(false);
     setSearchQuery(''); // Clear search when emoji is selected
+  };
+
+  // Handle emoji selection for edit mode
+  const handleEditEmojiSelect = (emoji: string) => {
+    console.log('Edit emoji selected:', emoji);
+    setEditReplyText(prev => prev + emoji);
+    
+    // Update recently used emojis (same as main picker)
+    setRecentlyUsedEmojis(prev => {
+      const filtered = prev.filter(e => e !== emoji);
+      const updated = [emoji, ...filtered].slice(0, 8);
+      return updated;
+    });
+    
+    setShowEditEmojiPicker(false);
   };
 
   // Track emoji usage frequency
@@ -3614,6 +3642,43 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       // Show error in console (or could show in UI if needed)
       console.error('Failed to send social media reply. Please try again.');
+    }
+  };
+
+  // Handle editing social media replies
+  const handleEditSocialMediaReply = async (replyId: string, newText: string) => {
+    if (!newText.trim() || !replyId) return;
+
+    setEditReplyLoading(true);
+
+    try {
+      const socialMediaService = new SocialMediaService(API_BASE);
+      await socialMediaService.editReply(replyId, newText);
+
+      // Update the message in the UI
+      setMessages(prev => prev.map(msg => {
+        if (msg.type === 'page_reply' && msg.replyId === replyId) {
+          return {
+            ...msg,
+            text: newText,
+            isEdited: true,
+            lastEditedAt: new Date()
+          };
+        }
+        return msg;
+      }));
+
+      // Clear edit state
+      setEditingReplyId(null);
+      setEditReplyText('');
+
+      console.log(`✅ Social media reply edited successfully: ${replyId}`);
+      
+    } catch (error) {
+      console.error('❌ Error editing social media reply:', error);
+      console.error('Failed to edit social media reply. Please try again.');
+    } finally {
+      setEditReplyLoading(false);
     }
   };
 
@@ -4336,21 +4401,24 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   // Close attachment menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showAttachmentMenu || showEmojiPicker) {
+      if (showAttachmentMenu || showEmojiPicker || showEditEmojiPicker) {
         const target = event.target as HTMLElement;
         if (!target.closest('.attachment-menu') && 
             !target.closest('.attachment-btn') &&
             !target.closest('.emoji-menu') &&
-            !target.closest('.emoji-picker-btn')) {
+            !target.closest('.emoji-picker-btn') &&
+            !target.closest('.edit-emoji-menu') &&
+            !target.closest('.edit-emoji-btn')) {
           setShowAttachmentMenu(false);
           setShowEmojiPicker(false);
+          setShowEditEmojiPicker(false);
         }
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showAttachmentMenu, showEmojiPicker]);
+  }, [showAttachmentMenu, showEmojiPicker, showEditEmojiPicker]);
 
   // Filter conversations based on search query
   const filteredConversations = allConversations.filter((conversation: Conversation) => 
@@ -5895,33 +5963,237 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           <div className="page-reply-header" style={{
                             display: 'flex',
                             alignItems: 'center',
+                            justifyContent: 'space-between',
                             gap: '8px',
                             marginBottom: '8px',
                             fontSize: '12px',
                             fontWeight: '600',
                             color: '#1976d2'
                           }}>
-                            <span style={{ 
-                              backgroundColor: '#2196f3',
-                              color: 'white',
-                              padding: '2px 6px',
-                              borderRadius: '10px',
-                              fontSize: '10px'
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ 
+                                backgroundColor: '#2196f3',
+                                color: 'white',
+                                padding: '2px 6px',
+                                borderRadius: '10px',
+                                fontSize: '10px'
+                              }}>
+                                PAGE REPLY
+                              </span>
+                              <span>{message.author}</span>
+                              {message.isEdited && (
+                                <span style={{ 
+                                  fontSize: '10px', 
+                                  color: '#666',
+                                  fontStyle: 'italic'
+                                }}>
+                                  (edited)
+                                </span>
+                              )}
+                            </div>
+                            {message.replyId && (
+                              <button
+                                onClick={() => {
+                                  if (editingReplyId === message.replyId) {
+                                    setEditingReplyId(null);
+                                    setEditReplyText('');
+                                    setShowEditEmojiPicker(false); // Close emoji picker
+                                  } else {
+                                    setEditingReplyId(message.replyId || null);
+                                    setEditReplyText(message.text);
+                                    setShowEditEmojiPicker(false); // Close any open emoji picker
+                                  }
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#1976d2',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  padding: '2px 4px',
+                                  borderRadius: '4px',
+                                  opacity: 0.7
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                                title="Edit reply"
+                              >
+                                ✏️ Edit
+                              </button>
+                            )}
+                          </div>
+                          
+                          {editingReplyId === message.replyId ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
+                              <div style={{ position: 'relative' }}>
+                                <textarea
+                                  value={editReplyText}
+                                  onChange={(e) => setEditReplyText(e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    minHeight: '60px',
+                                    padding: '8px 40px 8px 8px', // Add right padding for emoji button
+                                    border: '1px solid #2196f3',
+                                    borderRadius: '8px',
+                                    fontSize: '14px',
+                                    resize: 'vertical',
+                                    outline: 'none'
+                                  }}
+                                  disabled={editReplyLoading}
+                                />
+                                {/* Emoji button */}
+                                <button
+                                  className="edit-emoji-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowEditEmojiPicker(!showEditEmojiPicker);
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    right: '8px',
+                                    top: '8px',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    fontSize: '16px',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    opacity: 0.7
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                                  title="Add emoji"
+                                  disabled={editReplyLoading}
+                                >
+                                  😊
+                                </button>
+                                
+                                {/* Edit Emoji Picker */}
+                                {showEditEmojiPicker && (
+                                  <div className="edit-emoji-menu" style={{
+                                    position: 'absolute',
+                                    bottom: '100%',
+                                    right: '0',
+                                    marginBottom: '8px',
+                                    backgroundColor: 'white',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '8px',
+                                    padding: '8px',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                    zIndex: 1000,
+                                    width: '300px',
+                                    maxHeight: '200px',
+                                    overflowY: 'auto'
+                                  }} onClick={(e) => e.stopPropagation()}>
+                                    {/* Recent emojis */}
+                                    {recentlyUsedEmojis.length > 0 && (
+                                      <div style={{ marginBottom: '8px' }}>
+                                        <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>Recently used:</div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                          {recentlyUsedEmojis.map((emoji, index) => (
+                                            <button
+                                              key={index}
+                                              onClick={() => handleEditEmojiSelect(emoji)}
+                                              style={{
+                                                border: 'none',
+                                                background: 'transparent',
+                                                fontSize: '16px',
+                                                cursor: 'pointer',
+                                                padding: '4px',
+                                                borderRadius: '4px'
+                                              }}
+                                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
+                                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                            >
+                                              {emoji}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Common emojis */}
+                                    <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>Popular:</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                      {['😊', '😂', '❤️', '👍', '👏', '🎉', '🔥', '💯', '😍', '🙏', '👌', '😎', '🤔', '😢', '😭', '🤗', '😘', '🥰', '😴', '🤯', '🚀', '⭐', '💪', '🙌'].map((emoji, index) => (
+                                        <button
+                                          key={index}
+                                          onClick={() => handleEditEmojiSelect(emoji)}
+                                          style={{
+                                            border: 'none',
+                                            background: 'transparent',
+                                            fontSize: '16px',
+                                            cursor: 'pointer',
+                                            padding: '4px',
+                                            borderRadius: '4px'
+                                          }}
+                                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
+                                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                        >
+                                          {emoji}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={() => {
+                                    setEditingReplyId(null);
+                                    setEditReplyText('');
+                                    setShowEditEmojiPicker(false); // Close emoji picker when canceling
+                                  }}
+                                  style={{
+                                    background: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    color: '#666',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px'
+                                  }}
+                                  disabled={editReplyLoading}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => message.replyId && handleEditSocialMediaReply(message.replyId, editReplyText)}
+                                  style={{
+                                    background: '#2196f3',
+                                    border: 'none',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    opacity: editReplyLoading || !editReplyText.trim() || !message.replyId ? 0.6 : 1
+                                  }}
+                                  disabled={editReplyLoading || !editReplyText.trim() || !message.replyId}
+                                >
+                                  {editReplyLoading ? 'Saving...' : 'Save'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="page-reply-content" style={{
+                              fontSize: '14px',
+                              lineHeight: '1.4',
+                              color: '#1565c0'
                             }}>
-                              PAGE REPLY
-                            </span>
-                            <span>{message.author}</span>
-                          </div>
-                          <div className="page-reply-content" style={{
-                            fontSize: '14px',
-                            lineHeight: '1.4',
-                            color: '#1565c0'
-                          }}>
-                            {message.text}
-                          </div>
+                              {message.text}
+                            </div>
+                          )}
+                          
                           <div className="message-meta" style={{ marginTop: '6px' }}>
                             <div className="message-timestamp" style={{ fontSize: '11px', color: '#1976d2' }}>
                               {formatTime(message.timestamp)}
+                              {message.isEdited && message.lastEditedAt && (
+                                <span style={{ marginLeft: '8px' }}>
+                                  • Edited {formatTime(message.lastEditedAt)}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

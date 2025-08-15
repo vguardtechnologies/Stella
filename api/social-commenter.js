@@ -47,6 +47,8 @@ module.exports = async function handler(req, res) {
           return handleAIResponse(req, res);
         } else if (query.action === 'send-reply') {
           return handleSendReply(req, res);
+        } else if (query.action === 'edit-reply') {
+          return handleEditReply(req, res);
         } else if (query.action === 'update-ai-config') {
           return handleUpdateAIConfig(req, res);
         } else if (query.action === 'connect-platform') {
@@ -575,6 +577,64 @@ async function handleSendReply(req, res) {
   }
 }
 
+// Edit existing reply to social media comment
+async function handleEditReply(req, res) {
+  const { replyId, newMessage } = req.body;
+
+  try {
+    // First, get the reply details from activity log to find the platform
+    const activityQuery = `
+      SELECT sa.*, sc.external_comment_id, sp.platform_type, sp.access_token, sc.id as comment_id
+      FROM social_activity sa
+      JOIN social_comments sc ON sa.comment_id = sc.id
+      JOIN social_platforms sp ON sc.platform_id = sp.id
+      WHERE sa.action_type IN ('manual_reply', 'ai_response') 
+      AND sa.action_data::json->>'replyId' = $1
+      ORDER BY sa.created_at DESC
+      LIMIT 1
+    `;
+    const activityResult = await pool.query(activityQuery, [replyId]);
+
+    if (activityResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Reply not found' });
+    }
+
+    const activity = activityResult.rows[0];
+
+    // Edit reply via appropriate platform API
+    let editResult;
+    switch (activity.platform_type) {
+      case 'facebook':
+        editResult = await editFacebookReply(replyId, newMessage, activity.access_token);
+        break;
+      case 'instagram':
+        editResult = await editInstagramReply(replyId, newMessage, activity.access_token);
+        break;
+      case 'tiktok':
+        editResult = await editTikTokReply(replyId, newMessage, activity.access_token);
+        break;
+      default:
+        throw new Error(`Unsupported platform: ${activity.platform_type}`);
+    }
+
+    // Log the edit activity
+    await pool.query(`
+      INSERT INTO social_activity (comment_id, action_type, action_data, created_at)
+      VALUES ($1, 'edit_reply', $2, NOW())
+    `, [activity.comment_id, JSON.stringify({ replyId, oldMessage: JSON.parse(activity.action_data).replyText, newMessage })]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Reply edited successfully',
+      replyId: replyId
+    });
+
+  } catch (error) {
+    console.error('Edit reply error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
 // Handle incoming comment webhooks
 async function handleCommentWebhook(req, res) {
   try {
@@ -951,6 +1011,59 @@ async function sendInstagramReply(commentId, replyText, accessToken) {
 async function sendTikTokReply(commentId, replyText, accessToken) {
   // Implementation for TikTok API reply - placeholder
   return { id: `tiktok_reply_${Date.now()}` };
+}
+
+// Platform-specific edit functions
+async function editFacebookReply(replyId, newMessage, accessToken) {
+  // Facebook Graph API supports editing comments
+  const response = await fetch(`https://graph.facebook.com/v18.0/${replyId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: newMessage,
+      access_token: accessToken
+    })
+  });
+
+  const responseText = await response.text();
+  console.log('📝 Facebook Edit Response:', {
+    status: response.status,
+    statusText: response.statusText,
+    responseText: responseText
+  });
+
+  if (!response.ok) {
+    throw new Error(`Facebook API edit error: ${response.statusText} - ${responseText}`);
+  }
+
+  return JSON.parse(responseText);
+}
+
+async function editInstagramReply(replyId, newMessage, accessToken) {
+  // Instagram Graph API supports editing comments
+  const response = await fetch(`https://graph.facebook.com/v18.0/${replyId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: newMessage
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Instagram API edit error: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+async function editTikTokReply(replyId, newMessage, accessToken) {
+  // Implementation for TikTok API edit - placeholder
+  return { id: replyId, success: true };
 }
 
 // Process auto-reply with AI
