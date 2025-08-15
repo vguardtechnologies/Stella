@@ -301,6 +301,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [emojiSearchQuery, setEmojiSearchQuery] = useState('');
   const [recentlyUsedEmojis, setRecentlyUsedEmojis] = useState<string[]>([]);
   const [emojiUsageCount, setEmojiUsageCount] = useState<Record<string, number>>({});
+  
+  // Track which comments have page replies for showing "Replied" indicators
+  const [commentPageReplies, setCommentPageReplies] = useState<Record<string, { count: number; hasReplies: boolean }>>({});
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const [actualShopName, setActualShopName] = useState<string>('');
   const [shopNameLoading, setShopNameLoading] = useState(true);
@@ -561,8 +564,71 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       console.log(`✅ Social Media conversations (customer comments only): ${convertedConversations.length}`);
       setSocialMediaConversations(convertedConversations);
+      
+      // Fetch page replies for all customer comments to show "Replied" indicators
+      if (customerComments.length > 0) {
+        const commentIds = customerComments.map((comment: any) => comment.id.toString());
+        console.log('🔍 Fetching page reply status for conversation list...');
+        console.log('📋 Comment IDs to fetch replies for:', commentIds);
+        
+        try {
+          const repliesData = await fetchPageRepliesForIndicators(commentIds);
+          console.log('📊 Page replies data received for indicators:', repliesData);
+          
+          // Process the replies data to create our indicator mapping
+          const replyMapping: Record<string, { count: number; hasReplies: boolean }> = {};
+          
+          if (repliesData) {
+            console.log('📊 Processing replies data keys:', Object.keys(repliesData));
+            Object.keys(repliesData).forEach(commentId => {
+              const replies = repliesData[commentId] || [];
+              console.log(`📝 Comment ${commentId} has ${replies.length} total replies:`, replies);
+              // Count only SUSA/page replies
+              const pageReplies = replies.filter((reply: any) => 
+                reply.from?.name === 'SUSA' || reply.from?.id === '113981868340389'
+              );
+              console.log(`📝 Comment ${commentId} has ${pageReplies.length} page replies from SUSA`);
+              
+              replyMapping[commentId] = {
+                count: pageReplies.length,
+                hasReplies: pageReplies.length > 0
+              };
+            });
+          }
+          
+          console.log('📈 Reply indicator mapping created:', replyMapping);
+          setCommentPageReplies(replyMapping);
+        } catch (error) {
+          console.error('❌ Error fetching page reply indicators:', error);
+        }
+      }
     } catch (error) {
       console.error('Error fetching Social Media conversations:', error);
+    }
+  };
+
+  // Fetch page replies for social media comments to show "Replied" indicators
+  const fetchPageRepliesForIndicators = async (commentIds: string[]) => {
+    if (commentIds.length === 0) return;
+    
+    try {
+      console.log('🔍 Fetching page reply status for comments:', commentIds);
+      
+      // Direct API call instead of using the other function to avoid conflicts
+      const response = await fetch(`${API_BASE}/api/social-commenter?action=comment-replies&comment_ids=${commentIds.join(',')}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('📊 Page replies data received:', data.replies);
+        return data.replies;
+      } else {
+        console.error('Failed to fetch page replies:', data.error);
+        return {};
+      }
+      
+    } catch (error) {
+      console.error('❌ Error fetching page replies:', error);
+      return {};
     }
   };
 
@@ -2339,7 +2405,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   // Helper function to fetch existing page replies for comments
   const fetchPageReplies = async (commentIds: string[]) => {
     try {
-      const socialMediaService = new SocialMediaService(API_BASE);
       const response = await fetch(`${API_BASE}/api/social-commenter?action=comment-replies&comment_ids=${commentIds.join(',')}`);
       const data = await response.json();
       
@@ -4405,6 +4470,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             marginLeft: '4px'
                           }}>
                             📇
+                          </span>
+                        )}
+                        {/* Show "Replied" indicator for social media conversations */}
+                        {(conversation.isSocialMedia || conversation.platform) && 
+                         conversation.comment_id && 
+                         commentPageReplies[conversation.comment_id]?.hasReplies && (
+                          <span style={{
+                            fontSize: '10px',
+                            color: '#666',
+                            marginLeft: '4px'
+                          }} title={`SUSA has replied to this comment (${conversation.comment_id ? (commentPageReplies[conversation.comment_id]?.count || 0) : 0} replies)`}>
+                            Replied
                           </span>
                         )}
                       </div>
