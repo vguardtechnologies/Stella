@@ -68,6 +68,8 @@ module.exports = async function handler(req, res) {
       case 'PUT':
         if (query.action === 'mark-handled') {
           return handleMarkHandled(req, res);
+        } else if (query.action === 'hide-comment') {
+          return handleHideComment(req, res);
         } else {
           return res.status(400).json({ error: 'Invalid action' });
         }
@@ -156,6 +158,11 @@ async function handleGetComments(req, res) {
     // Filter out page replies by default (unless explicitly requested)
     if (include_page_replies !== 'true') {
       whereConditions.push(`NOT (c.author_id = '113981868340389' OR c.author_name = 'SUSA')`);
+    }
+
+    // Filter out hidden comments by default (unless specifically requesting hidden status)
+    if (status !== 'hidden') {
+      whereConditions.push(`c.status != 'hidden'`);
     }
 
     if (whereConditions.length > 0) {
@@ -853,6 +860,73 @@ async function handleDeleteComment(req, res) {
     return res.status(500).json({
       success: false,
       error: 'Failed to delete comment'
+    });
+  }
+}
+
+// Handle hiding comments from view (soft hide)
+async function handleHideComment(req, res) {
+  try {
+    const { commentId } = req.query;
+    
+    if (!commentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Comment ID is required'
+      });
+    }
+    
+    // Find the comment first to get its details for logging
+    const findQuery = `
+      SELECT id, external_comment_id, author_name, comment_text, status
+      FROM social_comments 
+      WHERE id = $1
+    `;
+    
+    const findResult = await pool.query(findQuery, [commentId]);
+    
+    if (findResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Comment not found'
+      });
+    }
+    
+    const comment = findResult.rows[0];
+    
+    // Update comment status to 'hidden'
+    const updateQuery = `
+      UPDATE social_comments 
+      SET status = 'hidden', updated_at = NOW()
+      WHERE id = $1
+    `;
+    
+    await pool.query(updateQuery, [commentId]);
+    
+    // Log hide activity
+    await logCommentActivity(comment.id, 'comment_hidden', {
+      external_comment_id: comment.external_comment_id,
+      author_name: comment.author_name,
+      comment_text: comment.comment_text,
+      previous_status: comment.status,
+      hidden_by: 'admin',
+      hidden_time: new Date().toISOString(),
+      action: 'manual_hide'
+    });
+    
+    console.log(`✅ Comment ${commentId} hidden from view`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Comment hidden successfully',
+      commentId: commentId
+    });
+    
+  } catch (error) {
+    console.error('Error hiding comment:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to hide comment'
     });
   }
 }

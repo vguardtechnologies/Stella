@@ -302,6 +302,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editReplyLoading, setEditReplyLoading] = useState(false);
   
+  // Three-dot menu state for comments
+  const [showMenu, setShowMenu] = useState<number | null>(null);
+  
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFacebookEmojiPicker, setShowFacebookEmojiPicker] = useState(false);
   const [facebookEmojiPickerPosition, setFacebookEmojiPickerPosition] = useState({ top: 0, left: 0 });
@@ -395,6 +398,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [socialMediaConversations, setSocialMediaConversations] = useState<Conversation[]>([]);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiSuggestedReply, setAiSuggestedReply] = useState<string>('');
+
+  // Click outside handler for three-dot menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.comment-menu')) {
+        setShowMenu(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
   const [allComments, setAllComments] = useState<any[]>([]);
   
   // Bulk Comment Management State
@@ -478,6 +496,72 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const closeProductModal = () => {
     setShowProductModal(false);
     setModalProduct(null);
+  };
+
+  // Hide comment function
+  const handleHideComment = async (commentId: number) => {
+    try {
+      const confirmed = window.confirm('Are you sure you want to hide this comment?');
+      if (!confirmed) return;
+
+      const response = await fetch(`http://localhost:3000/api/social-commenter?action=hide-comment&commentId=${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove the comment from the chat by filtering out messages with this commentId
+        setMessages(prevMessages => 
+          prevMessages.filter(message => 
+            !(message.type === 'social_comment' && message.commentId === commentId)
+          )
+        );
+        console.log('Comment hidden successfully');
+      } else {
+        console.error('Failed to hide comment:', data.error);
+        alert('Failed to hide comment');
+      }
+    } catch (error) {
+      console.error('Error hiding comment:', error);
+      alert('Error hiding comment');
+    }
+  };
+
+  // Delete comment function
+  const handleDeleteComment = async (commentId: number) => {
+    try {
+      const confirmed = window.confirm('Are you sure you want to permanently delete this comment? This action cannot be undone.');
+      if (!confirmed) return;
+
+      const response = await fetch(`http://localhost:3000/api/social-commenter?action=delete-comment&commentId=${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove the comment from the chat by filtering out messages with this commentId
+        setMessages(prevMessages => 
+          prevMessages.filter(message => 
+            !(message.type === 'social_comment' && message.commentId === commentId)
+          )
+        );
+        console.log('Comment deleted successfully');
+      } else {
+        console.error('Failed to delete comment:', data.error);
+        alert('Failed to delete comment');
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Error deleting comment');
+    }
   };
 
   // Fetch WhatsApp conversations from the database
@@ -5777,7 +5861,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                               )}
                             </div>
                             {/* Status Indicators */}
-                            <div className="status-badges" style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                            <div className="status-badges" style={{ marginLeft: 'auto', display: 'flex', gap: '4px', alignItems: 'center' }}>
                               {message.statusIndicators?.isEdited && (
                                 <span className="edited-badge" style={{
                                   backgroundColor: '#ffc107',
@@ -5789,6 +5873,95 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                 }} title={`Edited ${message.statusIndicators.editCount || 1} time(s). Last edited: ${message.statusIndicators.lastEditedAt ? new Date(message.statusIndicators.lastEditedAt).toLocaleString() : 'N/A'}`}>
                                   ✏️ EDITED ({message.statusIndicators.editCount || 1}x)
                                 </span>
+                              )}
+                              
+                              {/* Three-dot menu for comment actions */}
+                              {message.commentId && (
+                                <div className="comment-menu" style={{ position: 'relative', marginLeft: '8px' }}>
+                                  <button 
+                                    className="menu-trigger"
+                                    onClick={() => {
+                                      console.log('Menu clicked for comment:', message.commentId);
+                                      setShowMenu(showMenu === message.commentId ? null : message.commentId);
+                                    }}
+                                    title="Comment options"
+                                    style={{
+                                      background: 'rgba(0, 0, 0, 0.1)',
+                                      border: '1px solid #ccc',
+                                      fontSize: '14px',
+                                      color: '#333',
+                                      cursor: 'pointer',
+                                      padding: '4px 6px',
+                                      borderRadius: '50%',
+                                      transition: 'all 0.2s ease',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: '24px',
+                                      height: '24px',
+                                      fontWeight: 'bold'
+                                    }}
+                                  >
+                                    ⋯
+                                  </button>
+                                  {showMenu === message.commentId && (
+                                    <div className="menu-dropdown" style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      right: '0',
+                                      background: 'white',
+                                      border: '1px solid #e0e0e0',
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 1000,
+                                      minWidth: '140px',
+                                      overflow: 'hidden'
+                                    }}>
+                                      <button 
+                                        className="menu-item hide-option"
+                                        onClick={() => {
+                                          setShowMenu(null);
+                                          handleHideComment(message.commentId!);
+                                        }}
+                                        style={{
+                                          display: 'block',
+                                          width: '100%',
+                                          padding: '12px 16px',
+                                          background: 'none',
+                                          border: 'none',
+                                          textAlign: 'left',
+                                          cursor: 'pointer',
+                                          transition: 'background-color 0.2s ease',
+                                          fontSize: '13px',
+                                          color: '#333'
+                                        }}
+                                      >
+                                        👁️‍🗨️ Hide Comment
+                                      </button>
+                                      <button 
+                                        className="menu-item delete-option"
+                                        onClick={() => {
+                                          setShowMenu(null);
+                                          handleDeleteComment(message.commentId!);
+                                        }}
+                                        style={{
+                                          display: 'block',
+                                          width: '100%',
+                                          padding: '12px 16px',
+                                          background: 'none',
+                                          border: 'none',
+                                          textAlign: 'left',
+                                          cursor: 'pointer',
+                                          transition: 'background-color 0.2s ease',
+                                          fontSize: '13px',
+                                          color: '#d32f2f'
+                                        }}
+                                      >
+                                        🗑️ Delete Comment
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>

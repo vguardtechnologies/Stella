@@ -61,6 +61,24 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
 
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showMenu, setShowMenu] = useState<number | null>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMenu !== null) {
+        const target = event.target as Element;
+        if (!target.closest('.comment-menu')) {
+          setShowMenu(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
 
   // Load data from API
   useEffect(() => {
@@ -108,7 +126,10 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
         const commentsData = await commentsResponse.json();
         
         if (commentsData.success) {
+          console.log('Comments loaded:', commentsData.comments);
           setComments(commentsData.comments);
+        } else {
+          console.log('No comments loaded:', commentsData);
         }
 
       } catch (error) {
@@ -523,9 +544,45 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
                   <span className="platform-icon">{comment.platform_icon}</span>
                   <span className="platform-name">{comment.platform_name}</span>
                 </div>
-                <span className="comment-time">
-                  {new Date(comment.created_at).toLocaleDateString()} {new Date(comment.created_at).toLocaleTimeString()}
-                </span>
+                <div className="comment-meta">
+                  <span className="comment-time">
+                    {new Date(comment.created_at).toLocaleDateString()} {new Date(comment.created_at).toLocaleTimeString()}
+                  </span>
+                  <div className="comment-menu">
+                    <button 
+                      className="menu-trigger"
+                      onClick={() => {
+                        console.log('Menu clicked for comment:', comment.id);
+                        setShowMenu(showMenu === comment.id ? null : comment.id);
+                      }}
+                      title="Comment options"
+                    >
+                      ⋯
+                    </button>
+                    {showMenu === comment.id && (
+                      <div className="menu-dropdown">
+                        <button 
+                          className="menu-item hide-option"
+                          onClick={() => {
+                            setShowMenu(null);
+                            handleHideComment(comment);
+                          }}
+                        >
+                          👁️‍🗨️ Hide Comment
+                        </button>
+                        <button 
+                          className="menu-item delete-option"
+                          onClick={() => {
+                            setShowMenu(null);
+                            handleDeleteComment(comment);
+                          }}
+                        >
+                          🗑️ Delete Comment
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               
               <div className="comment-content">
@@ -659,6 +716,73 @@ const SocialMediaCommenter: React.FC<SocialMediaCommenterProps> = ({ onClose }) 
     } catch (error) {
       console.error('Error marking comment as handled:', error);
       alert('Failed to mark comment as handled');
+    }
+  };
+
+  const handleHideComment = async (comment: Comment) => {
+    try {
+      const confirmHide = window.confirm(
+        `Are you sure you want to hide this comment from ${comment.author_name}?\n\n"${comment.comment_text}"\n\nThis will remove it from your pending list but keep it in the database.`
+      );
+      
+      if (!confirmHide) return;
+
+      const response = await fetch(`http://localhost:3000/api/social-commenter?action=hide-comment&commentId=${comment.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove comment from pending list
+        setComments(prev => prev.filter(c => c.id !== comment.id));
+        alert('Comment hidden successfully');
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error hiding comment:', error);
+      alert('Failed to hide comment');
+    }
+  };
+
+  const handleDeleteComment = async (comment: Comment) => {
+    try {
+      const confirmDelete = window.confirm(
+        `⚠️ Are you sure you want to PERMANENTLY DELETE this comment from ${comment.author_name}?\n\n"${comment.comment_text}"\n\nThis action CANNOT be undone and will remove the comment completely from the database.`
+      );
+      
+      if (!confirmDelete) return;
+
+      // Double confirmation for delete
+      const doubleConfirm = window.confirm(
+        `🚨 FINAL CONFIRMATION 🚨\n\nThis will PERMANENTLY DELETE the comment. Are you absolutely sure?\n\nClick OK to delete forever, or Cancel to abort.`
+      );
+      
+      if (!doubleConfirm) return;
+
+      const response = await fetch(`http://localhost:3000/api/social-commenter?action=delete-comment&commentId=${comment.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove comment from pending list
+        setComments(prev => prev.filter(c => c.id !== comment.id));
+        alert('Comment permanently deleted');
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment');
     }
   };
 

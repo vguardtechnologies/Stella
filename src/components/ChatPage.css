@@ -2055,3 +2055,42 @@ mark {
   color: #333;
   font-style: normal;
 }
+
+/* Comment Three-Dot Menu Styles */
+.comment-menu {
+  position: relative;
+}
+
+.menu-trigger:hover {
+  background: rgba(0, 0, 0, 0.2) !important;
+  color: #000 !important;
+}
+
+.menu-dropdown {
+  animation: menuSlideDown 0.2s ease-out;
+}
+
+.menu-item:hover {
+  background: #f5f5f5 !important;
+}
+
+.menu-item.hide-option:hover {
+  background: #f0f0f0 !important;
+  color: #666 !important;
+}
+
+.menu-item.delete-option:hover {
+  background: #fff5f5 !important;
+  color: #d32f2f !important;
+}
+
+@keyframes menuSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
