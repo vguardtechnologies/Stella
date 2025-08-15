@@ -90,7 +90,13 @@ module.exports = async function handler(req, res) {
 
 // Get comments from all connected platforms
 async function handleGetComments(req, res) {
-  const { platform, status, limit = 50, offset = 0 } = req.query;
+  const { 
+    platform, 
+    status, 
+    limit = 50, 
+    offset = 0, 
+    include_page_replies = 'false' // New parameter to control page reply inclusion
+  } = req.query;
 
   try {
     // Query comments from database
@@ -121,7 +127,12 @@ async function handleGetComments(req, res) {
         c.original_text,
         p.platform_type as platform,
         p.name as platform_name, 
-        p.icon as platform_icon 
+        p.icon as platform_icon,
+        CASE 
+          WHEN c.author_id = '113981868340389' OR c.author_name = 'SUSA' 
+          THEN true 
+          ELSE false 
+        END as is_page_reply
       FROM social_comments c 
       JOIN social_platforms p ON c.platform_id = p.id 
     `;
@@ -140,6 +151,11 @@ async function handleGetComments(req, res) {
       params.push(platform);
     }
 
+    // Filter out page replies by default (unless explicitly requested)
+    if (include_page_replies !== 'true') {
+      whereConditions.push(`NOT (c.author_id = '113981868340389' OR c.author_name = 'SUSA')`);
+    }
+
     if (whereConditions.length > 0) {
       query += ` WHERE ${whereConditions.join(' AND ')}`;
     }
@@ -147,6 +163,7 @@ async function handleGetComments(req, res) {
     query += ` ORDER BY c.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
+    console.log(`🔍 Fetching comments (include_page_replies: ${include_page_replies})`);
     const result = await pool.query(query, params);
 
     return res.status(200).json({

@@ -522,7 +522,24 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       console.log('All social media comments:', allComments);
       
-      const convertedConversations = allComments.map((comment: any) => ({
+      // Filter out page replies (comments made by our page/business account)
+      // Page replies should not appear as separate conversations
+      const customerComments = allComments.filter((comment: any) => {
+        // Filter out SUSA page replies by author ID and name
+        const isPageReply = comment.author_id === '113981868340389' || 
+                           comment.author_name === 'SUSA' ||
+                           comment.author_handle === '@113981868340389';
+        
+        if (isPageReply) {
+          console.log('🚫 Filtering out page reply:', comment.id, comment.author_name, comment.comment_text?.substring(0, 50));
+        }
+        
+        return !isPageReply;
+      });
+      
+      console.log(`🔍 Filtered ${allComments.length - customerComments.length} page replies from conversation list`);
+      
+      const convertedConversations = customerComments.map((comment: any) => ({
         id: `sm_${comment.id}`,
         customerName: comment.author_name || comment.author_username || 'Social Media User',
         customerPhone: `social_${comment.platform}_${comment.author_id}`,
@@ -542,7 +559,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         post_id: comment.post_id
       }));
       
-      console.log(`Social Media conversations: ${convertedConversations.length}`);
+      console.log(`✅ Social Media conversations (customer comments only): ${convertedConversations.length}`);
       setSocialMediaConversations(convertedConversations);
     } catch (error) {
       console.error('Error fetching Social Media conversations:', error);
