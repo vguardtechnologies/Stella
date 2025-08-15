@@ -385,6 +385,13 @@ async function handleGetCommentReplies(req, res) {
           comment.external_comment_id.split('_')[1] : 
           comment.external_comment_id;
 
+        // Skip invalid Facebook comment IDs
+        if (!actualCommentId || actualCommentId === 'comment' || actualCommentId.length < 10) {
+          console.log(`⚠️ Skipping comment ${commentId} - invalid FB ID: ${actualCommentId}`);
+          repliesByComment[commentId] = [];
+          continue;
+        }
+
         console.log(`Fetching replies for comment ${commentId} (FB ID: ${actualCommentId})`);
 
         // Fetch replies from Facebook

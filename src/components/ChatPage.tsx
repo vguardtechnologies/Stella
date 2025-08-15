@@ -304,6 +304,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   
   // Track which comments have page replies for showing "Replied" indicators
   const [commentPageReplies, setCommentPageReplies] = useState<Record<string, { count: number; hasReplies: boolean }>>({});
+  
+  // Cache for reply data to prevent excessive API calls
+  const [replyDataCache, setReplyDataCache] = useState<Record<string, { data: any; timestamp: number }>>({});
+  const REPLY_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+  
+  // Track last reply fetch time to reduce frequency
+  const [lastReplyFetchTime, setLastReplyFetchTime] = useState<number>(0);
+  const REPLY_FETCH_COOLDOWN = 2 * 60 * 1000; // Only fetch reply indicators every 2 minutes max
+  
   const [newConversationPhone, setNewConversationPhone] = useState('+1 (868) ');
   const [actualShopName, setActualShopName] = useState<string>('');
   const [shopNameLoading, setShopNameLoading] = useState(true);
@@ -566,7 +575,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       setSocialMediaConversations(convertedConversations);
       
       // Fetch page replies for all customer comments to show "Replied" indicators
-      if (customerComments.length > 0) {
+      // But only if enough time has passed since last fetch to avoid overloading the API
+      const now = Date.now();
+      const shouldFetchReplies = (now - lastReplyFetchTime) > REPLY_FETCH_COOLDOWN;
+      
+      if (customerComments.length > 0 && shouldFetchReplies) {
+        console.log('⏰ Reply fetch cooldown period passed, fetching fresh reply indicators...');
+        setLastReplyFetchTime(now);
+        
         const commentIds = customerComments.map((comment: any) => comment.id.toString());
         console.log('🔍 Fetching page reply status for conversation list...');
         console.log('📋 Comment IDs to fetch replies for:', commentIds);
@@ -601,6 +617,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         } catch (error) {
           console.error('❌ Error fetching page reply indicators:', error);
         }
+      } else if (customerComments.length > 0) {
+        console.log(`⏰ Reply fetch cooldown active (${Math.round((REPLY_FETCH_COOLDOWN - (now - lastReplyFetchTime)) / 1000)}s remaining), skipping reply indicator fetch`);
       }
     } catch (error) {
       console.error('Error fetching Social Media conversations:', error);
@@ -609,27 +627,64 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   // Fetch page replies for social media comments to show "Replied" indicators
   const fetchPageRepliesForIndicators = async (commentIds: string[]) => {
-    if (commentIds.length === 0) return;
+    if (commentIds.length === 0) return {};
     
-    try {
-      console.log('🔍 Fetching page reply status for comments:', commentIds);
-      
-      // Direct API call instead of using the other function to avoid conflicts
-      const response = await fetch(`${API_BASE}/api/social-commenter?action=comment-replies&comment_ids=${commentIds.join(',')}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        console.log('📊 Page replies data received:', data.replies);
-        return data.replies;
+    // Check cache first and filter out comments we already have fresh data for
+    const now = Date.now();
+    const cachedResults: Record<string, any> = {};
+    const uncachedIds: string[] = [];
+    
+    commentIds.forEach(id => {
+      const cached = replyDataCache[id];
+      if (cached && (now - cached.timestamp) < REPLY_CACHE_DURATION) {
+        // Use cached data
+        cachedResults[id] = cached.data;
+        console.log(`💾 Using cached reply data for comment ${id}`);
       } else {
-        console.error('Failed to fetch page replies:', data.error);
-        return {};
+        // Need to fetch fresh data
+        uncachedIds.push(id);
       }
+    });
+    
+    // Only fetch data for comments not in cache
+    let freshResults: Record<string, any> = {};
+    if (uncachedIds.length > 0) {
+      console.log(`🔍 Fetching fresh page reply status for ${uncachedIds.length} comments:`, uncachedIds);
       
-    } catch (error) {
-      console.error('❌ Error fetching page replies:', error);
-      return {};
+      try {
+        // Direct API call for uncached comments only
+        const response = await fetch(`${API_BASE}/api/social-commenter?action=comment-replies&comment_ids=${uncachedIds.join(',')}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          console.log(`📊 Fresh page replies data received for ${uncachedIds.length} comments`);
+          freshResults = data.replies || {};
+          
+          // Update cache with fresh data
+          const newCache = { ...replyDataCache };
+          uncachedIds.forEach(id => {
+            if (freshResults[id]) {
+              newCache[id] = {
+                data: freshResults[id],
+                timestamp: now
+              };
+            }
+          });
+          setReplyDataCache(newCache);
+          
+        } else {
+          console.error('Failed to fetch page replies:', data.error);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error fetching page replies:', error);
+      }
+    } else {
+      console.log(`💾 All ${commentIds.length} comments found in cache, no API calls needed`);
     }
+    
+    // Combine cached and fresh results
+    return { ...cachedResults, ...freshResults };
   };
 
   // Fetch Shopify products for display using new database-first API
@@ -3504,6 +3559,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           messageToSend,
           conversation.platform!
         );
+        
+        // Invalidate cache for this comment to ensure fresh reply indicator
+        const newCache = { ...replyDataCache };
+        delete newCache[commentIdToReplyTo];
+        setReplyDataCache(newCache);
+        console.log(`💾 Cache invalidated for comment ${commentIdToReplyTo} after sending reply`);
       }
 
       console.log(`✅ Social media reply sent successfully to comment ${commentIdToReplyTo}`);
@@ -3656,6 +3717,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       const result = await socialMediaService.sendBulkReplies(repliesToSend);
 
       console.log(`✅ Bulk send completed: ${result.summary.successful} successful, ${result.summary.failed} failed`);
+      
+      // Invalidate cache for all comment IDs that had replies sent to force fresh indicators
+      const newCache = { ...replyDataCache };
+      repliesToSend.forEach(reply => {
+        delete newCache[reply.comment_id.toString()];
+      });
+      setReplyDataCache(newCache);
+      console.log(`💾 Cache invalidated for ${repliesToSend.length} comments after bulk send`);
       
       // Update the conversations to reflect sent replies
       await fetchSocialMediaConversations();
