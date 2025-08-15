@@ -2538,8 +2538,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           conversation.post_id!,
           conversation.platform
         );
-        console.log(`📬 Found ${allCommentsData.length} comments for post ${conversation.post_id}`);
+        console.log(`📬 Found ${allCommentsData.length} total comments for post ${conversation.post_id}`);
         console.log('📋 Comments details:', allCommentsData);
+        
+        // Filter out page replies from the comments to avoid counting them
+        allCommentsData = allCommentsData.filter((comment: any) => {
+          const isPageReply = comment.author_id === '113981868340389' || 
+                             comment.author_name === 'SUSA' ||
+                             comment.author_handle === '@113981868340389';
+          
+          if (isPageReply) {
+            console.log('🚫 Filtering out page reply from chat:', comment.id, comment.author_name);
+          }
+          
+          return !isPageReply;
+        });
+        
+        console.log(`📬 Found ${allCommentsData.length} customer comments after filtering out page replies`);
       } catch (error) {
         console.error('❌ Error fetching post comments:', error);
         // Fallback to single comment if API fails
