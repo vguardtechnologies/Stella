@@ -30,6 +30,8 @@ module.exports = async function handler(req, res) {
           return handleGetPostComments(req, res);
         } else if (query.action === 'reactions') {
           return handleGetReactions(req, res);
+        } else if (query.action === 'comment-replies') {
+          return handleGetCommentReplies(req, res);
         } else if (query.action === 'webhook') {
           // Handle Facebook webhook verification
           return handleCommentWebhook(req, res);
@@ -311,6 +313,105 @@ async function handleGetPostComments(req, res) {
 
   } catch (error) {
     console.error('Get post comments error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+// Get existing page replies for comments
+async function handleGetCommentReplies(req, res) {
+  const { comment_ids } = req.query;
+
+  if (!comment_ids) {
+    return res.status(400).json({ error: 'comment_ids parameter is required' });
+  }
+
+  try {
+    // Parse comment IDs (can be comma-separated string or array)
+    const commentIdArray = Array.isArray(comment_ids) ? comment_ids : comment_ids.split(',');
+    
+    console.log('🔍 Fetching page replies for comments:', commentIdArray);
+
+    // Get Facebook access token
+    const tokenResult = await pool.query(`
+      SELECT access_token 
+      FROM social_platforms 
+      WHERE platform_type = 'facebook' 
+      LIMIT 1
+    `);
+
+    if (tokenResult.rows.length === 0) {
+      return res.status(500).json({ error: 'No Facebook access token found' });
+    }
+
+    const accessToken = tokenResult.rows[0].access_token;
+    const repliesByComment = {};
+
+    // Fetch replies for each comment from Facebook API
+    for (const commentId of commentIdArray) {
+      try {
+        // Get comment details from database first
+        const commentResult = await pool.query(`
+          SELECT external_comment_id, author_name, comment_text
+          FROM social_comments 
+          WHERE id = $1
+        `, [commentId]);
+
+        if (commentResult.rows.length === 0) {
+          console.log(`Comment ${commentId} not found in database`);
+          continue;
+        }
+
+        const comment = commentResult.rows[0];
+        
+        // Extract actual comment ID for Facebook API
+        const actualCommentId = comment.external_comment_id.includes('_') ? 
+          comment.external_comment_id.split('_')[1] : 
+          comment.external_comment_id;
+
+        console.log(`Fetching replies for comment ${commentId} (FB ID: ${actualCommentId})`);
+
+        // Fetch replies from Facebook
+        const response = await fetch(`https://graph.facebook.com/v18.0/${actualCommentId}/comments?access_token=${accessToken}&fields=id,message,from,created_time&limit=50`);
+        const data = await response.json();
+
+        if (data.error) {
+          console.error(`Error fetching replies for comment ${commentId}:`, data.error.message);
+          repliesByComment[commentId] = [];
+        } else {
+          // Filter only page replies (from SUSA page)
+          const pageReplies = (data.data || []).filter(reply => 
+            reply.from?.name === 'SUSA' || reply.from?.id === '113981868340389'
+          );
+
+          repliesByComment[commentId] = pageReplies.map(reply => ({
+            id: reply.id,
+            message: reply.message,
+            from: reply.from,
+            created_time: reply.created_time,
+            formatted_time: new Date(reply.created_time).toLocaleString()
+          }));
+
+          console.log(`Found ${pageReplies.length} page replies for comment ${commentId}`);
+        }
+
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+      } catch (error) {
+        console.error(`Error processing comment ${commentId}:`, error.message);
+        repliesByComment[commentId] = [];
+      }
+    }
+
+    console.log('✅ Page replies fetched successfully');
+
+    return res.status(200).json({
+      success: true,
+      replies: repliesByComment
+    });
+
+  } catch (error) {
+    console.error('Get comment replies error:', error);
     return res.status(500).json({ error: error.message });
   }
 }

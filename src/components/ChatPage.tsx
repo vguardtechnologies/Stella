@@ -179,7 +179,7 @@ interface Message {
   text: string;
   sender: 'user' | 'agent' | 'system';
   timestamp: Date;
-  type: 'text' | 'product' | 'order' | 'cart' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location' | 'social_post' | 'social_comment' | 'reply_input';
+  type: 'text' | 'product' | 'order' | 'cart' | 'recommendation' | 'voice' | 'image' | 'document' | 'video' | 'sticker' | 'location' | 'social_post' | 'social_comment' | 'page_reply' | 'reply_input';
   productData?: Product;
   orderData?: Order;
   cartData?: {
@@ -2319,6 +2319,25 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
+  // Helper function to fetch existing page replies for comments
+  const fetchPageReplies = async (commentIds: string[]) => {
+    try {
+      const socialMediaService = new SocialMediaService(API_BASE);
+      const response = await fetch(`${API_BASE}/api/social-commenter?action=comment-replies&comment_ids=${commentIds.join(',')}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.replies;
+      } else {
+        console.error('Failed to fetch page replies:', data.error);
+        return {};
+      }
+    } catch (error) {
+      console.error('Error fetching page replies:', error);
+      return {};
+    }
+  };
+
   // Fetch Social Media messages (comments and replies)
   const fetchSocialMediaMessages = async (conversationId: string, preserveExpandedState = false) => {
     try {
@@ -2392,6 +2411,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       // Store all comments for later use (always update this)
       setAllComments(allCommentsData);
 
+      // Get comment IDs for fetching page replies
+      const commentIds = allCommentsData.map((comment: any) => comment.id);
+      console.log('🔍 Fetching page replies for comments:', commentIds);
+      
+      // Fetch existing page replies
+      const pageRepliesByComment = await fetchPageReplies(commentIds);
+      console.log('📱 Page replies fetched:', pageRepliesByComment);
+
       // Check if we should show all comments (expanded state) or just initial comment
       if (shouldMaintainExpandedView) {
         // Show all comments - use the expanded view
@@ -2415,6 +2442,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             platform: conversation.platform,
             commentId: comment.id,
             reactions: [] // Will be loaded async
+          });
+
+          // Add existing page replies for this comment (if any)
+          const pageReplies = pageRepliesByComment[comment.id] || [];
+          pageReplies.forEach((reply: any, replyIndex: number) => {
+            mockMessages.push({
+              id: `page_reply_${comment.id}_${replyIndex}`,
+              sender: 'agent' as const,
+              text: reply.message,
+              timestamp: new Date(reply.created_time),
+              type: 'page_reply' as const,
+              status: 'sent' as const,
+              author: reply.from?.name || 'SUSA',
+              platform: conversation.platform,
+              commentId: comment.id,
+              isPageReply: true
+            });
           });
 
           // Add individual reply input bubble for this comment
@@ -2458,6 +2502,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             platform: conversation.platform,
             commentId: initialComment.id,
             reactions: [] // Will be loaded async
+          });
+
+          // Add existing page replies for the initial comment (if any)
+          const pageReplies = pageRepliesByComment[initialComment.id] || [];
+          pageReplies.forEach((reply: any, replyIndex: number) => {
+            mockMessages.push({
+              id: `page_reply_${initialComment.id}_${replyIndex}`,
+              sender: 'agent' as const,
+              text: reply.message,
+              timestamp: new Date(reply.created_time),
+              type: 'page_reply' as const,
+              status: 'sent' as const,
+              author: reply.from?.name || 'SUSA',
+              platform: conversation.platform,
+              commentId: initialComment.id,
+              isPageReply: true
+            });
           });
 
           mockMessages.push({
@@ -5619,6 +5680,49 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           </div>
                           <div className="message-meta" style={{ marginTop: '4px' }}>
                             <div className="message-timestamp" style={{ fontSize: '11px', color: '#999' }}>
+                              {formatTime(message.timestamp)}
+                            </div>
+                          </div>
+                        </div>
+                      ) : message.type === 'page_reply' ? (
+                        <div className="page-reply-message" style={{
+                          backgroundColor: '#e3f2fd',
+                          border: '2px solid #2196f3',
+                          borderRadius: '12px',
+                          padding: '12px',
+                          margin: '8px 0',
+                          position: 'relative',
+                          boxShadow: '0 2px 4px rgba(33,150,243,0.1)'
+                        }}>
+                          <div className="page-reply-header" style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '8px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: '#1976d2'
+                          }}>
+                            <span style={{ 
+                              backgroundColor: '#2196f3',
+                              color: 'white',
+                              padding: '2px 6px',
+                              borderRadius: '10px',
+                              fontSize: '10px'
+                            }}>
+                              PAGE REPLY
+                            </span>
+                            <span>{message.author}</span>
+                          </div>
+                          <div className="page-reply-content" style={{
+                            fontSize: '14px',
+                            lineHeight: '1.4',
+                            color: '#1565c0'
+                          }}>
+                            {message.text}
+                          </div>
+                          <div className="message-meta" style={{ marginTop: '6px' }}>
+                            <div className="message-timestamp" style={{ fontSize: '11px', color: '#1976d2' }}>
                               {formatTime(message.timestamp)}
                             </div>
                           </div>
