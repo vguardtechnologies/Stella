@@ -768,23 +768,39 @@ async function generateSmartResponse(commentText, postContext, systemPrompt) {
 
 // Platform-specific reply functions
 async function sendFacebookReply(commentId, replyText, accessToken) {
+  // Extract the actual comment ID from the full format (postId_commentId)
+  const actualCommentId = commentId.includes('_') ? commentId.split('_')[1] : commentId;
+  
+  console.log('🔍 Facebook Reply Debug:', {
+    originalCommentId: commentId,
+    actualCommentId: actualCommentId,
+    replyText: replyText
+  });
+
   // Implementation for Facebook Graph API reply
-  const response = await fetch(`https://graph.facebook.com/v18.0/${commentId}/comments`, {
+  const response = await fetch(`https://graph.facebook.com/v18.0/${actualCommentId}/comments`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      message: replyText
+      message: replyText,
+      access_token: accessToken
     })
   });
 
+  const responseText = await response.text();
+  console.log('📱 Facebook API Response:', {
+    status: response.status,
+    statusText: response.statusText,
+    responseText: responseText
+  });
+
   if (!response.ok) {
-    throw new Error(`Facebook API error: ${response.statusText}`);
+    throw new Error(`Facebook API error: ${response.statusText} - ${responseText}`);
   }
 
-  return await response.json();
+  return JSON.parse(responseText);
 }
 
 async function sendInstagramReply(commentId, replyText, accessToken) {
