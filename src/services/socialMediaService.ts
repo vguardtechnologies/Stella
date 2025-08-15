@@ -216,6 +216,8 @@ class SocialMediaService {
   // Edit existing reply to a social media comment
   async editReply(replyId: string, newMessage: string) {
     try {
+      console.log('🔧 Edit reply request:', { replyId, newMessage, url: `${this.apiBaseUrl}/api/social-commenter?action=edit-reply` });
+      
       const response = await fetch(`${this.apiBaseUrl}/api/social-commenter?action=edit-reply`, {
         method: 'POST',
         headers: {
@@ -227,7 +229,10 @@ class SocialMediaService {
         })
       });
       
+      console.log('🔧 Edit reply response status:', response.status);
+      
       const data = await response.json();
+      console.log('🔧 Edit reply response data:', data);
       
       if (!data.success) {
         throw new Error(data.error || 'Failed to edit reply');

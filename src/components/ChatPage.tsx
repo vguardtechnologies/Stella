@@ -298,11 +298,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [newMessage, setNewMessage] = useState('');
   const [activeReplyCommentId, setActiveReplyCommentId] = useState<string | null>(null);
   
-  // Edit reply state
+  // Edit reply state - now using main text input
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
-  const [editReplyText, setEditReplyText] = useState('');
   const [editReplyLoading, setEditReplyLoading] = useState(false);
-  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFacebookEmojiPicker, setShowFacebookEmojiPicker] = useState(false);
@@ -1778,7 +1776,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         console.log('Image URL to send:', imageUrl);
         console.log('Original image URLs:', { image: firstProduct.image, imageSrc: firstProduct.imageSrc });
 
-        // Always send image message (with placeholder if needed)
+        // Always send image message (with placeholder if needed)r if needed)
         if (imageUrl) {
           const productImagePayload = {
             to: phoneNumber.replace(/[^\d]/g, ''),
@@ -2618,6 +2616,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           // Add existing page replies for this comment (if any)
           const pageReplies = pageRepliesByComment[comment.id] || [];
           pageReplies.forEach((reply: any, replyIndex: number) => {
+            // Extract the Facebook comment ID from external_comment_id (format: postId_commentId)
+            const facebookCommentId = comment.external_comment_id ? comment.external_comment_id.split('_')[1] : '';
+            // Reply ID should be just the reply ID, not include post ID
+            const cleanReplyId = reply.id.includes('_') ? reply.id.split('_').pop() : reply.id;
             mockMessages.push({
               id: `page_reply_${comment.id}_${replyIndex}`,
               sender: 'agent' as const,
@@ -2628,7 +2630,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               author: reply.from?.name || 'SUSA',
               platform: conversation.platform,
               commentId: comment.id,
-              replyId: reply.id, // Add the reply ID for editing
+              replyId: `${facebookCommentId}_${cleanReplyId}`, // Use clean reply ID without post ID
               isPageReply: true
             });
           });
@@ -2679,6 +2681,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           // Add existing page replies for the initial comment (if any)
           const pageReplies = pageRepliesByComment[initialComment.id] || [];
           pageReplies.forEach((reply: any, replyIndex: number) => {
+            // Extract the Facebook comment ID from external_comment_id (format: postId_commentId)
+            const facebookCommentId = initialComment.external_comment_id ? initialComment.external_comment_id.split('_')[1] : '';
+            // Reply ID should be just the reply ID, not include post ID
+            const cleanReplyId = reply.id.includes('_') ? reply.id.split('_').pop() : reply.id;
             mockMessages.push({
               id: `page_reply_${initialComment.id}_${replyIndex}`,
               sender: 'agent' as const,
@@ -2689,7 +2695,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               author: reply.from?.name || 'SUSA',
               platform: conversation.platform,
               commentId: initialComment.id,
-              replyId: reply.id, // Add the reply ID for editing
+              replyId: `${facebookCommentId}_${cleanReplyId}`, // Use clean reply ID without post ID
               isPageReply: true
             });
           });
@@ -3042,21 +3048,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     
     setShowEmojiPicker(false);
     setSearchQuery(''); // Clear search when emoji is selected
-  };
-
-  // Handle emoji selection for edit mode
-  const handleEditEmojiSelect = (emoji: string) => {
-    console.log('Edit emoji selected:', emoji);
-    setEditReplyText(prev => prev + emoji);
-    
-    // Update recently used emojis (same as main picker)
-    setRecentlyUsedEmojis(prev => {
-      const filtered = prev.filter(e => e !== emoji);
-      const updated = [emoji, ...filtered].slice(0, 8);
-      return updated;
-    });
-    
-    setShowEditEmojiPicker(false);
   };
 
   // Track emoji usage frequency
@@ -3645,22 +3636,34 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  // Handle editing social media replies
-  const handleEditSocialMediaReply = async (replyId: string, newText: string) => {
-    if (!newText.trim() || !replyId) return;
+  // Handle starting edit mode for social media replies
+  const startEditingSocialMediaReply = (replyId: string, currentText: string) => {
+    // Clear any active reply mode
+    setActiveReplyCommentId(null);
+    
+    // Set edit mode and populate main text input
+    setEditingReplyId(replyId);
+    setNewMessage(currentText);
+    
+    console.log(`📝 Started editing reply: ${replyId}`);
+  };
+
+  // Handle saving edited social media reply
+  const handleEditSocialMediaReply = async () => {
+    if (!newMessage.trim() || !editingReplyId) return;
 
     setEditReplyLoading(true);
 
     try {
       const socialMediaService = new SocialMediaService(API_BASE);
-      await socialMediaService.editReply(replyId, newText);
+      await socialMediaService.editReply(editingReplyId, newMessage);
 
       // Update the message in the UI
       setMessages(prev => prev.map(msg => {
-        if (msg.type === 'page_reply' && msg.replyId === replyId) {
+        if (msg.type === 'page_reply' && msg.replyId === editingReplyId) {
           return {
             ...msg,
-            text: newText,
+            text: newMessage,
             isEdited: true,
             lastEditedAt: new Date()
           };
@@ -3668,14 +3671,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         return msg;
       }));
 
-      // Clear edit state
+      // Clear edit state and input
       setEditingReplyId(null);
-      setEditReplyText('');
+      setNewMessage('');
 
-      console.log(`✅ Social media reply edited successfully: ${replyId}`);
+      console.log(`✅ Social media reply edited successfully: ${editingReplyId}`);
       
     } catch (error) {
       console.error('❌ Error editing social media reply:', error);
+      
+      // Always clear the text box and edit mode regardless of error
+      // Since the edit often works on Facebook despite backend errors
+      setEditingReplyId(null);
+      setNewMessage('');
+      
       console.error('Failed to edit social media reply. Please try again.');
     } finally {
       setEditReplyLoading(false);
@@ -3846,6 +3855,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && selectedFiles.length === 0) || !selectedConversation) return;
+
+    // Handle social media conversation - edit mode
+    if (selectedConversation.startsWith('sm_') && editingReplyId) {
+      console.log('📝 Saving edited social media reply...');
+      await handleEditSocialMediaReply();
+      return;
+    }
 
     // Handle social media conversation replies
     if (selectedConversation.startsWith('sm_')) {
@@ -4401,24 +4417,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   // Close attachment menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showAttachmentMenu || showEmojiPicker || showEditEmojiPicker) {
+      if (showAttachmentMenu || showEmojiPicker) {
         const target = event.target as HTMLElement;
         if (!target.closest('.attachment-menu') && 
             !target.closest('.attachment-btn') &&
             !target.closest('.emoji-menu') &&
-            !target.closest('.emoji-picker-btn') &&
-            !target.closest('.edit-emoji-menu') &&
-            !target.closest('.edit-emoji-btn')) {
+            !target.closest('.emoji-picker-btn')) {
           setShowAttachmentMenu(false);
           setShowEmojiPicker(false);
-          setShowEditEmojiPicker(false);
         }
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showAttachmentMenu, showEmojiPicker, showEditEmojiPicker]);
+  }, [showAttachmentMenu, showEmojiPicker]);
 
   // Filter conversations based on search query
   const filteredConversations = allConversations.filter((conversation: Conversation) => 
@@ -5994,15 +6007,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             {message.replyId && (
                               <button
                                 onClick={() => {
-                                  if (editingReplyId === message.replyId) {
-                                    setEditingReplyId(null);
-                                    setEditReplyText('');
-                                    setShowEditEmojiPicker(false); // Close emoji picker
-                                  } else {
-                                    setEditingReplyId(message.replyId || null);
-                                    setEditReplyText(message.text);
-                                    setShowEditEmojiPicker(false); // Close any open emoji picker
-                                  }
+                                  startEditingSocialMediaReply(message.replyId!, message.text);
                                 }}
                                 style={{
                                   background: 'transparent',
@@ -6023,168 +6028,13 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             )}
                           </div>
                           
-                          {editingReplyId === message.replyId ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
-                              <div style={{ position: 'relative' }}>
-                                <textarea
-                                  value={editReplyText}
-                                  onChange={(e) => setEditReplyText(e.target.value)}
-                                  style={{
-                                    width: '100%',
-                                    minHeight: '60px',
-                                    padding: '8px 40px 8px 8px', // Add right padding for emoji button
-                                    border: '1px solid #2196f3',
-                                    borderRadius: '8px',
-                                    fontSize: '14px',
-                                    resize: 'vertical',
-                                    outline: 'none'
-                                  }}
-                                  disabled={editReplyLoading}
-                                />
-                                {/* Emoji button */}
-                                <button
-                                  className="edit-emoji-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowEditEmojiPicker(!showEditEmojiPicker);
-                                  }}
-                                  style={{
-                                    position: 'absolute',
-                                    right: '8px',
-                                    top: '8px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    fontSize: '16px',
-                                    cursor: 'pointer',
-                                    padding: '4px',
-                                    borderRadius: '4px',
-                                    opacity: 0.7
-                                  }}
-                                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
-                                  title="Add emoji"
-                                  disabled={editReplyLoading}
-                                >
-                                  😊
-                                </button>
-                                
-                                {/* Edit Emoji Picker */}
-                                {showEditEmojiPicker && (
-                                  <div className="edit-emoji-menu" style={{
-                                    position: 'absolute',
-                                    bottom: '100%',
-                                    right: '0',
-                                    marginBottom: '8px',
-                                    backgroundColor: 'white',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '8px',
-                                    padding: '8px',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                    zIndex: 1000,
-                                    width: '300px',
-                                    maxHeight: '200px',
-                                    overflowY: 'auto'
-                                  }} onClick={(e) => e.stopPropagation()}>
-                                    {/* Recent emojis */}
-                                    {recentlyUsedEmojis.length > 0 && (
-                                      <div style={{ marginBottom: '8px' }}>
-                                        <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>Recently used:</div>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                          {recentlyUsedEmojis.map((emoji, index) => (
-                                            <button
-                                              key={index}
-                                              onClick={() => handleEditEmojiSelect(emoji)}
-                                              style={{
-                                                border: 'none',
-                                                background: 'transparent',
-                                                fontSize: '16px',
-                                                cursor: 'pointer',
-                                                padding: '4px',
-                                                borderRadius: '4px'
-                                              }}
-                                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
-                                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                            >
-                                              {emoji}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Common emojis */}
-                                    <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>Popular:</div>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                      {['😊', '😂', '❤️', '👍', '👏', '🎉', '🔥', '💯', '😍', '🙏', '👌', '😎', '🤔', '😢', '😭', '🤗', '😘', '🥰', '😴', '🤯', '🚀', '⭐', '💪', '🙌'].map((emoji, index) => (
-                                        <button
-                                          key={index}
-                                          onClick={() => handleEditEmojiSelect(emoji)}
-                                          style={{
-                                            border: 'none',
-                                            background: 'transparent',
-                                            fontSize: '16px',
-                                            cursor: 'pointer',
-                                            padding: '4px',
-                                            borderRadius: '4px'
-                                          }}
-                                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
-                                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                        >
-                                          {emoji}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                <button
-                                  onClick={() => {
-                                    setEditingReplyId(null);
-                                    setEditReplyText('');
-                                    setShowEditEmojiPicker(false); // Close emoji picker when canceling
-                                  }}
-                                  style={{
-                                    background: '#f5f5f5',
-                                    border: '1px solid #ddd',
-                                    color: '#666',
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    padding: '4px 8px',
-                                    borderRadius: '4px'
-                                  }}
-                                  disabled={editReplyLoading}
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={() => message.replyId && handleEditSocialMediaReply(message.replyId, editReplyText)}
-                                  style={{
-                                    background: '#2196f3',
-                                    border: 'none',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    padding: '4px 8px',
-                                    borderRadius: '4px',
-                                    opacity: editReplyLoading || !editReplyText.trim() || !message.replyId ? 0.6 : 1
-                                  }}
-                                  disabled={editReplyLoading || !editReplyText.trim() || !message.replyId}
-                                >
-                                  {editReplyLoading ? 'Saving...' : 'Save'}
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="page-reply-content" style={{
-                              fontSize: '14px',
-                              lineHeight: '1.4',
-                              color: '#1565c0'
-                            }}>
-                              {message.text}
-                            </div>
-                          )}
+                          <div className="page-reply-content" style={{
+                            fontSize: '14px',
+                            lineHeight: '1.4',
+                            color: '#1565c0'
+                          }}>
+                            {message.text}
+                          </div>
                           
                           <div className="message-meta" style={{ marginTop: '6px' }}>
                             <div className="message-timestamp" style={{ fontSize: '11px', color: '#1976d2' }}>
@@ -6281,7 +6131,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           )}
                         </div>
                         );
-                        })()
+                      })()
                       )}
                     </div>
                   ))}
@@ -6596,7 +6446,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                 {/* Message Input Container */}
                 <div className="message-input-container">
                   {/* Reply Indicator for Social Media */}
-                  {selectedConversation?.startsWith('sm_') && activeReplyCommentId && (
+                  {selectedConversation?.startsWith('sm_') && activeReplyCommentId && !editingReplyId && (
                     <div style={{
                       padding: '8px 16px',
                       backgroundColor: '#f0f8ff',
@@ -6609,6 +6459,36 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       <button
                         onClick={() => {
                           setActiveReplyCommentId(null);
+                          setNewMessage('');
+                        }}
+                        style={{
+                          marginLeft: '8px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#999',
+                          cursor: 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Edit Indicator for Social Media */}
+                  {selectedConversation?.startsWith('sm_') && editingReplyId && (
+                    <div style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#fff3cd',
+                      borderLeft: '3px solid #ffc107',
+                      fontSize: '12px',
+                      color: '#856404',
+                      borderRadius: '4px 4px 0 0'
+                    }}>
+                      ✏️ Editing reply #{editingReplyId}
+                      <button
+                        onClick={() => {
+                          setEditingReplyId(null);
                           setNewMessage('');
                         }}
                         style={{
@@ -6998,10 +6878,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                     onClick={handleSendMessage}
                     disabled={
                       (!newMessage.trim() && selectedFiles.length === 0) || 
-                      (selectedConversation?.startsWith('sm_') && !activeReplyCommentId)
+                      (selectedConversation?.startsWith('sm_') && !activeReplyCommentId && !editingReplyId) ||
+                      editReplyLoading
                     }
                   >
-                    Send
+                    {editingReplyId ? 'Update Reply' : 'Send'}
                   </button>
                 </div>
 

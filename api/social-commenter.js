@@ -287,6 +287,7 @@ async function handleGetPostComments(req, res) {
     let query = `
       SELECT 
         c.id,
+        c.external_comment_id,
         c.comment_text,
         c.author_name,
         c.author_handle,
@@ -618,10 +619,11 @@ async function handleEditReply(req, res) {
     }
 
     // Log the edit activity
+    const actionData = typeof activity.action_data === 'string' ? JSON.parse(activity.action_data) : activity.action_data;
     await pool.query(`
       INSERT INTO social_activity (comment_id, action_type, action_data, created_at)
       VALUES ($1, 'edit_reply', $2, NOW())
-    `, [activity.comment_id, JSON.stringify({ replyId, oldMessage: JSON.parse(activity.action_data).replyText, newMessage })]);
+    `, [activity.comment_id, JSON.stringify({ replyId, oldMessage: actionData.replyText || '', newMessage })]);
 
     return res.status(200).json({
       success: true,
