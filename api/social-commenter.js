@@ -28,8 +28,6 @@ module.exports = async function handler(req, res) {
           return handleGetPlatforms(req, res);
         } else if (query.action === 'post-comments') {
           return handleGetPostComments(req, res);
-        } else if (query.action === 'reactions') {
-          return handleGetReactions(req, res);
         } else if (query.action === 'comment-replies') {
           return handleGetCommentReplies(req, res);
         } else if (query.action === 'webhook') {
@@ -59,8 +57,6 @@ module.exports = async function handler(req, res) {
           return handleBulkAIResponse(req, res);
         } else if (query.action === 'bulk-send-replies') {
           return handleBulkSendReplies(req, res);
-        } else if (query.action === 'toggle-reaction') {
-          return handleToggleReaction(req, res);
         } else if (query.action === 'get-platform-data') {
           return res.json({ platform: 'facebook' });
         } else {
@@ -872,10 +868,6 @@ async function handleDeleteComment(req, res) {
       action: 'manual_removal'
     });
     
-    // Delete associated reactions first (foreign key constraint)
-    const deleteReactionsQuery = `
-      DELETE FROM comment_reactions 
-      WHERE comment_id = $1
     `;
     await pool.query(deleteReactionsQuery, [commentId]);
     
@@ -1637,10 +1629,6 @@ async function handleCommentDeletion(commentData) {
       action: 'permanent_removal'
     });
     
-    // Delete associated reactions first (foreign key constraint)
-    const deleteReactionsQuery = `
-      DELETE FROM comment_reactions 
-      WHERE comment_id = $1
     `;
     await pool.query(deleteReactionsQuery, [commentId]);
     
@@ -1746,152 +1734,7 @@ async function logCommentActivity(commentId, actionType, data) {
   }
 }
 
-// Handle emoji reaction toggle
-async function handleToggleReaction(req, res) {
-  const { commentId, emoji, userId = 'agent' } = req.body;
 
-  try {
-    if (!commentId || !emoji) {
-      return res.status(400).json({ error: 'Missing commentId or emoji' });
-    }
-
-    console.log(`🎭 Toggling reaction ${emoji} for comment ${commentId}`);
-
-    // Check if reaction already exists
-    const existingQuery = `
-      SELECT id FROM comment_reactions 
-      WHERE comment_id = $1 AND user_id = $2 AND emoji = $3
-    `;
-    const existing = await pool.query(existingQuery, [commentId, userId, emoji]);
-
-    let action = '';
-    if (existing.rows.length > 0) {
-      // Remove reaction
-      await pool.query(`
-        DELETE FROM comment_reactions 
-        WHERE comment_id = $1 AND user_id = $2 AND emoji = $3
-      `, [commentId, userId, emoji]);
-      action = 'removed';
-      console.log(`➖ Removed reaction ${emoji} from comment ${commentId}`);
-    } else {
-      // Add reaction
-      await pool.query(`
-        INSERT INTO comment_reactions (comment_id, user_id, emoji)
-        VALUES ($1, $2, $3)
-      `, [commentId, userId, emoji]);
-      action = 'added';
-      console.log(`➕ Added reaction ${emoji} to comment ${commentId}`);
-    }
-
-    // Update reaction count
-    await pool.query(`
-      UPDATE social_comments 
-      SET reaction_count = (
-        SELECT COUNT(*) FROM comment_reactions 
-        WHERE comment_reactions.comment_id = $1
-      )
-      WHERE id = $1
-    `, [commentId]);
-
-    // Get updated reactions for this comment
-    const reactionsQuery = `
-      SELECT emoji, COUNT(*) as count, 
-             array_agg(user_id) as users
-      FROM comment_reactions 
-      WHERE comment_id = $1 
-      GROUP BY emoji 
-      ORDER BY count DESC, emoji
-    `;
-    const reactions = await pool.query(reactionsQuery, [commentId]);
-
-    // Log activity
-    await logCommentActivity(commentId, 'reaction_' + action, {
-      emoji,
-      userId,
-      action
-    });
-
-    return res.status(200).json({
-      success: true,
-      action,
-      reactions: reactions.rows
-    });
-
-  } catch (error) {
-    console.error('❌ Toggle reaction error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-}
-
-// Get reactions for comments
-async function handleGetReactions(req, res) {
-  const { commentId, commentIds } = req.query;
-
-  try {
-    let query = '';
-    let params = [];
-
-    if (commentId) {
-      // Get reactions for a single comment
-      query = `
-        SELECT comment_id, emoji, COUNT(*) as count,
-               array_agg(user_id) as users
-        FROM comment_reactions 
-        WHERE comment_id = $1 
-        GROUP BY comment_id, emoji 
-        ORDER BY count DESC, emoji
-      `;
-      params = [commentId];
-    } else if (commentIds) {
-      // Get reactions for multiple comments
-      const ids = commentIds.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
-      query = `
-        SELECT comment_id, emoji, COUNT(*) as count,
-               array_agg(user_id) as users
-        FROM comment_reactions 
-        WHERE comment_id = ANY($1)
-        GROUP BY comment_id, emoji 
-        ORDER BY comment_id, count DESC, emoji
-      `;
-      params = [ids];
-    } else {
-      return res.status(400).json({ error: 'Missing commentId or commentIds parameter' });
-    }
-
-    const result = await pool.query(query, params);
-
-    // Group reactions by comment_id for multiple comments
-    const reactionsByComment = {};
-    result.rows.forEach(row => {
-      if (!reactionsByComment[row.comment_id]) {
-        reactionsByComment[row.comment_id] = [];
-      }
-      reactionsByComment[row.comment_id].push({
-        emoji: row.emoji,
-        count: parseInt(row.count),
-        users: row.users
-      });
-    });
-
-    if (commentId) {
-      // Return reactions for single comment
-      return res.status(200).json({
-        success: true,
-        reactions: reactionsByComment[commentId] || []
-      });
-    } else {
-      // Return reactions grouped by comment
-      return res.status(200).json({
-        success: true,
-        reactionsByComment
-      });
-    }
-
-  } catch (error) {
-    console.error('❌ Get reactions error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-}
 
 // Scan Facebook post for all comments and sync with database
 async function scanAndSyncPostComments(postId, platform) {

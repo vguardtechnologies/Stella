@@ -5,7 +5,6 @@ import ImageModal from './ImageModal';
 import ProductModal from './ProductModal';
 import WhatsAppTemplateManager from './WhatsAppTemplateManager';
 import MediaBrowser from './MediaBrowser';
-import FacebookEmojiPicker from './FacebookEmojiPicker';
 import { shopifyService } from '../services/shopifyService';
 import SocialMediaService from '../services/socialMediaService';
 import './ChatPage.css';
@@ -233,11 +232,6 @@ interface Message {
   isEdited?: boolean;
   lastEditedAt?: Date;
   content?: string;
-  reactions?: Array<{
-    emoji: string;
-    count: number;
-    users: string[];
-  }>;
 }
 
 interface Conversation {
@@ -306,9 +300,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   const [showMenu, setShowMenu] = useState<number | null>(null);
   
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showFacebookEmojiPicker, setShowFacebookEmojiPicker] = useState(false);
-  const [facebookEmojiPickerPosition, setFacebookEmojiPickerPosition] = useState({ top: 0, left: 0 });
-  const [activeCommentForReaction, setActiveCommentForReaction] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [emojiSearchQuery, setEmojiSearchQuery] = useState('');
   const [recentlyUsedEmojis, setRecentlyUsedEmojis] = useState<string[]>([]);
@@ -2693,13 +2684,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             text: `${comment.author_name}: ${comment.comment_text}`,
             type: 'social_comment' as const,
             status: 'sent' as const,
-            author: comment.author_name,
-            platform: conversation.platform,
-            commentId: comment.id,
-            reactions: [] // Will be loaded async
-          });
-
-          // Add existing page replies for this comment (if any)
+        author: comment.author_name,
+        platform: conversation.platform,
+        commentId: comment.id
+      });          // Add existing page replies for this comment (if any)
           const pageReplies = pageRepliesByComment[comment.id] || [];
           pageReplies.forEach((reply: any, replyIndex: number) => {
             // Extract the Facebook comment ID from external_comment_id (format: postId_commentId)
@@ -2822,32 +2810,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       // Smart message merging to prevent glitching during auto-refresh
       if (preserveExpandedState && messages.length > 0) {
-        // Merge new messages with existing ones, preserving reactions and UI state
+        // Merge new messages with existing ones, preserving UI state
         setMessages(prevMessages => {
           const newMessages = [...mockMessages];
-          
-          // Preserve existing reactions for matching messages
-          prevMessages.forEach(prevMsg => {
-            const matchingNewMsg = newMessages.find(newMsg => 
-              newMsg.id === prevMsg.id || 
-              (newMsg.commentId && newMsg.commentId === prevMsg.commentId)
-            );
-            
-            if (matchingNewMsg && prevMsg.reactions && prevMsg.reactions.length > 0) {
-              console.log(`🔄 Preserving reactions for message ${matchingNewMsg.id}:`, prevMsg.reactions);
-              matchingNewMsg.reactions = prevMsg.reactions;
-            }
-          });
-          
           return newMessages;
         });
       } else {
         // Initial load - set messages normally
         setMessages(mockMessages);
       }
-      
-      // Load reactions for all social comment messages
-      await loadReactionsForMessages(mockMessages);
       
       // Only reset showAllComments to false on initial load (not auto-refresh)  
       // If we're maintaining expanded view, keep it expanded
@@ -2916,8 +2887,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         status: 'sent' as const,
         author: comment.author_name,
         platform: conversation.platform,
-        commentId: comment.id,
-        reactions: [] // Will be loaded async
+        commentId: comment.id
       });
 
       // Add individual reply input bubble for this comment
@@ -2937,9 +2907,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
 
     console.log(`✅ Expanded to show all ${allComments.length} comments`);
     setMessages(expandedMessages);
-    
-    // Load reactions for the expanded comments
-    await loadReactionsForMessages(expandedMessages);
   };
 
   // Function to get actual media URL from WhatsApp media ID
@@ -3168,121 +3135,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       const filtered = prev.filter(e => e !== emoji);
       return [emoji, ...filtered].slice(0, 8);
     });
-  };
-
-  // Handle comment emoji reactions
-  const handleCommentReaction = async (commentId: number, emoji: string) => {
-    try {
-      console.log(`🎭 Adding reaction ${emoji} to comment ${commentId}`);
-      
-      // Track emoji usage for dynamic quick reactions
-      trackEmojiUsage(emoji);
-      
-      const socialMediaService = new SocialMediaService(API_BASE);
-      const result = await socialMediaService.toggleReaction(commentId, emoji);
-      
-      console.log('Reaction result:', result);
-      
-      // Update recently used emojis when an emoji is used
-      setRecentlyUsedEmojis(prev => {
-        const filtered = prev.filter(e => e !== emoji);
-        const updated = [emoji, ...filtered].slice(0, 8); // Keep only 8 most recent
-        
-        // Save to localStorage for persistence
-        try {
-          localStorage.setItem('stella_recent_emojis', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Failed to save recent emojis to localStorage:', error);
-        }
-        
-        return updated;
-      });
-      
-      // Update the message in state with new reactions
-      setMessages(prev => prev.map(msg => {
-        if (msg.commentId === commentId) {
-          return {
-            ...msg,
-            reactions: result.reactions || []
-          };
-        }
-        return msg;
-      }));
-      
-      console.log(`✅ ${result.action === 'added' ? 'Added' : 'Removed'} reaction ${emoji} on comment ${commentId}`);
-      
-    } catch (error) {
-      console.error('❌ Failed to toggle reaction:', error);
-      // Optionally show user feedback here
-    }
-  };
-
-  // Get quick reaction emojis - 4 most frequently used emojis
-  const getQuickReactionEmojis = (): string[] => {
-    // Default fallback emojis
-    const defaultEmojis = ['👍', '❤️', '😍', '😂'];
-    
-    // Get emojis sorted by usage frequency (highest first)
-    const sortedByFrequency = Object.entries(emojiUsageCount)
-      .sort(([, a], [, b]) => b - a)
-      .map(([emoji]) => emoji);
-    
-    // Take the top 4 most used emojis
-    const mostUsedEmojis = sortedByFrequency.slice(0, 4);
-    
-    // If we have fewer than 4 frequent emojis, fill with defaults
-    const result = [...mostUsedEmojis];
-    for (const defaultEmoji of defaultEmojis) {
-      if (result.length < 4 && !result.includes(defaultEmoji)) {
-        result.push(defaultEmoji);
-      }
-    }
-    
-    return result.slice(0, 4); // Ensure exactly 4 emojis
-  };
-
-  // Load reactions for all social comment messages
-  const loadReactionsForMessages = async (messages: Message[]) => {
-    try {
-      const commentIds = messages
-        .filter(msg => msg.type === 'social_comment' && msg.commentId)
-        .map(msg => msg.commentId!)
-        .filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
-
-      if (commentIds.length === 0) return;
-
-      console.log(`🎭 Loading reactions for ${commentIds.length} comments`);
-      
-      const socialMediaService = new SocialMediaService(API_BASE);
-      const reactionsByComment = await socialMediaService.getReactions(undefined, commentIds);
-
-      // Update messages with reactions - use functional update to prevent unnecessary re-renders
-      setMessages(prev => {
-        let hasChanges = false;
-        const newMessages = prev.map(msg => {
-          if (msg.type === 'social_comment' && msg.commentId && reactionsByComment[msg.commentId]) {
-            const newReactions = reactionsByComment[msg.commentId] || [];
-            // Only update if reactions have actually changed
-            if (!msg.reactions || JSON.stringify(msg.reactions) !== JSON.stringify(newReactions)) {
-              hasChanges = true;
-              return {
-                ...msg,
-                reactions: newReactions
-              };
-            }
-          }
-          return msg;
-        });
-        
-        // Only trigger re-render if there were actual changes
-        return hasChanges ? newMessages : prev;
-      });
-
-      console.log('✅ Loaded reactions for all comments');
-      
-    } catch (error) {
-      console.error('❌ Failed to load reactions:', error);
-    }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -6053,122 +5905,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                               </div>
                             )}
                             
-                            {/* Display reactions at bottom of white comment box - Facebook style */}
-                            {(message.reactions || []).length > 0 && (
-                              <div className="comment-reactions" style={{
-                                marginTop: '8px',
-                                paddingTop: '8px',
-                                borderTop: '1px solid #e9ecef',
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                gap: '8px',
-                                justifyContent: 'flex-end'
-                              }}>
-                                {(message.reactions || []).map((reaction: any, index: number) => (
-                                  <div
-                                    key={index}
-                                    className="reaction-display"
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      cursor: 'pointer'
-                                    }}
-                                    title={`${reaction.count} ${reaction.count === 1 ? 'person' : 'people'} reacted with ${reaction.emoji}`}
-                                  >
-                                    <span style={{ fontSize: '18px' }}>
-                                      {reaction.emoji}
-                                    </span>
-                                    <span style={{ fontSize: '14px', color: '#666', fontWeight: '500' }}>
-                                      {reaction.count}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          {/* Emoji Reactions */}
-                          <div className="comment-reactions" style={{
-                            marginTop: '8px',
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: '6px',
-                            alignItems: 'center'
-                          }}>
-                            {/* Quick Reaction Buttons */}
-                            <div className="quick-reactions" style={{
-                              display: 'flex',
-                              gap: '4px'
-                            }}>
-                              {getQuickReactionEmojis().map(emoji => (
-                                <button
-                                  key={emoji}
-                                  className="reaction-button"
-                                  onClick={() => {
-                                    if (message.commentId !== undefined) {
-                                      handleCommentReaction(message.commentId, emoji);
-                                    }
-                                  }}
-                                  style={{
-                                    border: 'none',
-                                    background: 'transparent',
-                                    padding: '4px',
-                                    fontSize: '24px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.1)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                  }}
-                                  title={`React with ${emoji}`}
-                                >
-                                  <span>
-                                    {emoji}
-                                  </span>
-                                </button>
-                              ))}
-                              
-                              {/* More Emojis Button */}
-                              <button
-                                className="more-emojis-button"
-                                onClick={(e) => {
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  setFacebookEmojiPickerPosition({
-                                    top: rect.bottom + 8,
-                                    left: rect.left
-                                  });
-                                  if (message.commentId !== undefined) {
-                                    setActiveCommentForReaction(message.commentId);
-                                    setShowFacebookEmojiPicker(true);
-                                  }
-                                }}
-                                style={{
-                                  border: 'none',
-                                  background: 'transparent',
-                                  padding: '4px',
-                                  fontSize: '24px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#666'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.transform = 'scale(1.1)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                                title="More emoji reactions"
-                              >
-                                +
-                              </button>
-                            </div>
                           </div>
                           <div className="message-meta" style={{ marginTop: '4px' }}>
                             <div className="message-timestamp" style={{ fontSize: '11px', color: '#999' }}>
@@ -8970,21 +8706,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           </div>
         </div>
       )}
-
-      {/* Facebook Emoji Picker */}
-      <FacebookEmojiPicker
-        isOpen={showFacebookEmojiPicker}
-        onClose={() => {
-          setShowFacebookEmojiPicker(false);
-          setActiveCommentForReaction(null);
-        }}
-        onEmojiSelect={(emoji) => {
-          if (activeCommentForReaction) {
-            handleCommentReaction(activeCommentForReaction, emoji);
-          }
-        }}
-        position={facebookEmojiPickerPosition}
-      />
 
     </div>
     </>
