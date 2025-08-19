@@ -61,8 +61,8 @@ module.exports = async function handler(req, res) {
           return handleBulkSendReplies(req, res);
         } else if (query.action === 'toggle-reaction') {
           return handleToggleReaction(req, res);
-        } else if (query.action === 'sync-facebook-post') {
-          return handleSyncFacebookPost(req, res);
+        } else if (query.action === 'get-platform-data') {
+          return res.json({ platform: 'facebook' });
         } else {
           return res.status(400).json({ error: 'Invalid action' });
         }
@@ -407,7 +407,7 @@ async function handleGetCommentReplies(req, res) {
         console.log(`Fetching replies for comment ${commentId} (FB ID: ${actualCommentId})`);
 
         // Fetch replies from Facebook
-        const response = await fetch(`https://graph.facebook.com/v18.0/${actualCommentId}/comments?access_token=${accessToken}&fields=id,message,from,created_time&limit=50`);
+        const response = await fetch(`https://graph.facebook.com/v18.0/${actualCommentId}/comments?access_token=${accessToken}&fields=id,message,from{name,id},created_time&limit=50`);
         const data = await response.json();
 
         if (data.error) {
@@ -764,20 +764,12 @@ async function handleCommentWebhook(req, res) {
       }
     }
 
-    // WEBHOOK POST SCANNING: DISABLED to prevent duplicates
-    // The webhook already provides real-time updates, no need to scan the entire post
-    // Post scanning is still available via manual trigger if needed
-    /*
-    if (commentData.postId && commentData.platform === 'facebook') {
-      console.log(`🔍 Webhook processed - scanning Facebook post ${commentData.postId} for complete sync...`);
-      try {
-        await scanAndSyncPostComments(commentData.postId, commentData.platform);
-      } catch (error) {
-        console.error('❌ Error scanning post for additional changes:', error);
-        // Don't fail the webhook if post scanning fails
-      }
-    }
-    */
+    // WEBHOOK POST SCANNING: DISABLED to prevent overwriting webhook author names
+    // Webhooks provide the most accurate and timely data, especially for author names
+    // Post scanning can overwrite good webhook data with "Facebook User" due to API permission limits
+    
+    // If you need to manually scan posts, use the scan endpoint directly
+    // await scanAndSyncPostComments(commentData.postId, commentData.platform);
 
     // Log activity for all actions
     if (commentId && commentData.action !== 'remove') {
@@ -787,8 +779,8 @@ async function handleCommentWebhook(req, res) {
       );
     }
 
-    console.log('🎉 Webhook processed successfully!');
-    console.log('🔍 Final commentId value:', commentId);
+    console.log('Webhook processed successfully!');
+    console.log('Final commentId value:', commentId);
     return res.status(200).json({
       success: true,
       message: 'Comment processed successfully',
@@ -1941,7 +1933,7 @@ async function scanAndSyncPostComments(postId, platform) {
 
     // Fetch all comments from Facebook for this post
     let allCommentsFromFB = [];
-    let nextUrl = `https://graph.facebook.com/v18.0/${postId}/comments?access_token=${accessToken}&fields=id,message,from,created_time,parent&limit=100`;
+    let nextUrl = `https://graph.facebook.com/v18.0/${postId}/comments?access_token=${accessToken}&fields=id,message,from{name,id},created_time,parent&limit=100`;
 
     do {
       const response = await fetch(nextUrl);
@@ -2004,17 +1996,41 @@ async function scanAndSyncPostComments(postId, platform) {
         const fbMessage = fbComment.message || '[Comment content unavailable]';
         const fbAuthor = fbComment.from?.name || 'Facebook User';
         
-        if (existingComment.comment_text !== fbMessage || existingComment.author_name !== fbAuthor) {
+        // Only update if we have actual changes AND we have better author info
+        const shouldUpdateText = existingComment.comment_text !== fbMessage;
+        const shouldUpdateAuthor = existingComment.author_name !== fbAuthor && 
+                                 fbAuthor !== 'Facebook User' && 
+                                 existingComment.author_name === 'Facebook User';
+        
+        if (shouldUpdateText || shouldUpdateAuthor) {
           try {
-            // Update edited comment
-            await pool.query(`
-              UPDATE social_comments 
-              SET comment_text = $1, author_name = $2, updated_at = NOW()
-              WHERE external_comment_id = $3
-            `, [fbMessage, fbAuthor, commentId]);
+            if (shouldUpdateText && shouldUpdateAuthor) {
+              // Update both text and author
+              await pool.query(`
+                UPDATE social_comments 
+                SET comment_text = $1, author_name = $2, updated_at = NOW()
+                WHERE external_comment_id = $3
+              `, [fbMessage, fbAuthor, commentId]);
+              console.log(`📝 Updated comment text and author: ${fbAuthor} - "${fbMessage.substring(0, 30)}..."`);
+            } else if (shouldUpdateText) {
+              // Only update text, preserve existing author name
+              await pool.query(`
+                UPDATE social_comments 
+                SET comment_text = $1, updated_at = NOW()
+                WHERE external_comment_id = $2
+              `, [fbMessage, commentId]);
+              console.log(`📝 Updated comment text: ${existingComment.author_name} - "${fbMessage.substring(0, 30)}..."`);
+            } else if (shouldUpdateAuthor) {
+              // Only update author (upgrade from "Facebook User" to real name)
+              await pool.query(`
+                UPDATE social_comments 
+                SET author_name = $1, updated_at = NOW()
+                WHERE external_comment_id = $2
+              `, [fbAuthor, commentId]);
+              console.log(`👤 Updated author name: "${existingComment.author_name}" → "${fbAuthor}"`);
+            }
             
             commentsUpdated++;
-            console.log(`� Updated edited comment: ${fbAuthor} - "${fbMessage.substring(0, 30)}..."`);
           } catch (error) {
             console.error(`❌ Error updating comment ${fbComment.id}:`, error.message);
           }
@@ -2099,28 +2115,7 @@ async function scanAndSyncPostComments(postId, platform) {
   }
 }
 
-// Handle sync Facebook post request from frontend
-async function handleSyncFacebookPost(req, res) {
-  try {
-    const { postId } = req.body;
-
-    if (!postId) {
-      return res.status(400).json({ error: 'Post ID is required' });
-    }
-
-    console.log(`🔄 Frontend requested sync for Facebook post: ${postId}`);
-
-    // Call the existing scan and sync function
-    await scanAndSyncPostComments(postId, 'facebook');
-
-    return res.json({ 
-      success: true, 
-      message: `Facebook post ${postId} synced successfully`,
-      postId: postId 
-    });
-
-  } catch (error) {
-    console.error('❌ Error syncing Facebook post:', error);
-    return res.status(500).json({ error: error.message });
-  }
-}
+// POST-SCANNING FUNCTIONS REMOVED:
+// handleSyncFacebookPost() and scanAndSyncPostComments() removed since 
+// webhooks provide real-time updates and post-scanning conflicts with webhook data.
+// Webhooks handle all comment lifecycle events (add/edit/remove/hide) efficiently.

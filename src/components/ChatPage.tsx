@@ -2863,7 +2863,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  // Function to expand and show all comments with real-time Facebook sync
+  // Function to expand and show all comments (no Facebook sync needed - webhooks handle real-time updates)
   const expandAllComments = async () => {
     if (!selectedConversation || !selectedConversation.startsWith('sm_')) {
       return;
@@ -2872,34 +2872,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     const conversation = socialMediaConversations.find(c => c.id === selectedConversation);
     if (!conversation) return;
 
-    // First, sync with Facebook to get latest comments if this is a Facebook conversation
-    if (conversation.platform === 'facebook' && conversation.post_id) {
-      console.log(`🔄 Syncing with Facebook for post ${conversation.post_id} before expanding...`);
-      
-      try {
-        const syncResponse = await fetch(`${API_BASE}/api/social-media/sync-facebook-post`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            postId: conversation.post_id
-          })
-        });
-
-        if (syncResponse.ok) {
-          console.log('✅ Facebook sync completed, refreshing comments...');
-          // Refresh the comments after sync
-          await fetchSocialMediaMessages(selectedConversation);
-        } else {
-          console.warn('⚠️ Facebook sync failed, proceeding with cached data');
-        }
-      } catch (error) {
-        console.error('❌ Facebook sync error:', error);
-        console.log('⚠️ Proceeding with cached data');
-      }
-    }
-
+    // No need to sync with Facebook - webhooks provide real-time updates for edits/deletes
+    // Post-scanning logic removed as per user request since webhooks handle all changes
+    
     // Check if we have comments after potential sync
     if (allComments.length === 0) {
       console.log('ℹ️ No comments to expand');
@@ -3413,6 +3388,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
           fetchWhatsAppConversations(false),
           fetchSocialMediaConversations(false)
         ]);
+      } catch (error) {
+        console.error('❌ Error loading initial conversations:', error);
       } finally {
         setConversationsLoading(false);
       }
@@ -3420,18 +3397,30 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     
     loadInitialData();
     
-    // Simple auto-refresh - fetch conversations every 30 seconds (but only after initial load)
+    // Optimized auto-refresh with staggered intervals to reduce server load
     const interval = setInterval(() => {
       if (!conversationsLoading) {
-        console.log('Auto-refreshing conversations');
         fetchWhatsAppConversations(true);
-        // Always refresh social media conversations to pick up status changes (edits/deletes)
-        // even when comments are expanded - this ensures edit badges appear properly
-        fetchSocialMediaConversations(true);
+        // Stagger WhatsApp and Social Media calls by 2.5 seconds to spread load
+        setTimeout(() => {
+          if (!conversationsLoading) {
+            fetchSocialMediaConversations(true);
+          }
+        }, 2500);
+      }
+    }, 5000); // 5s interval for responsive updates
+
+    // Safety timeout: Reset loading state if it gets stuck for more than 30 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (conversationsLoading) {
+        setConversationsLoading(false);
       }
     }, 30000);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   // Fetch actual shop name from database-first API
@@ -3646,10 +3635,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   useEffect(() => {
     if (!selectedConversation || conversationsLoading) return;
 
+    // Auto-refresh messages for the selected conversation with reduced frequency
     const interval = setInterval(() => {      
-      console.log('Auto-refreshing messages for selected conversation');
       fetchMessages(selectedConversation, true); // Pass true for isAutoRefresh
-    }, 30000); // Refresh messages every 30 seconds (increased from 15s)
+    }, 8000); // 8s for messages (slightly slower than conversation list to balance load)
 
     return () => {
       clearInterval(interval);
