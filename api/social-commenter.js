@@ -61,6 +61,8 @@ module.exports = async function handler(req, res) {
           return handleBulkSendReplies(req, res);
         } else if (query.action === 'toggle-reaction') {
           return handleToggleReaction(req, res);
+        } else if (query.action === 'sync-facebook-post') {
+          return handleSyncFacebookPost(req, res);
         } else {
           return res.status(400).json({ error: 'Invalid action' });
         }
@@ -706,16 +708,39 @@ async function handleCommentWebhook(req, res) {
     }
 
     console.log('💾 Processing comment action:', commentData.action || 'add');
+    console.log('🔍 DEBUG: Full commentData object:', JSON.stringify(commentData, null, 2));
+    console.log('🔍 DEBUG: About to check action conditions...');
+    console.log('🔍 COMPREHENSIVE DEBUG: action value inspection');
+    console.log('  🔍 Raw action:', JSON.stringify(commentData.action));
+    console.log('  🔍 Action type:', typeof commentData.action);
+    console.log('  🔍 Action length:', commentData.action ? commentData.action.length : 'null/undefined');
+    console.log('  🔍 Action === "hide"?', commentData.action === 'hide');
+    console.log('  🔍 Action === "remove"?', commentData.action === 'remove');
+    console.log('  🔍 Action === "edit"?', commentData.action === 'edit');
+    console.log('  🔍 Action === "edited"?', commentData.action === 'edited');
 
     // Handle different comment actions and get the comment ID
     let commentId;
     if (commentData.action === 'remove') {
+      console.log('🗑️ Taking REMOVE path - action matched "remove"');
       // Comment was deleted
       commentId = await handleCommentDeletion(commentData);
     } else if (commentData.action === 'edit' || commentData.action === 'edited') {
+      console.log('✏️ Taking EDIT path - action matched "edit" or "edited"'); 
       // Comment was edited  
       commentId = await handleCommentEdit(commentData);
+    } else if (commentData.action === 'hide' || (typeof commentData.action === 'string' && commentData.action.trim().toLowerCase() === 'hide')) {
+      console.log('🙈 Taking HIDE path - this should work! Action matched "hide"');
+      console.log('🙈 HIDE action detected - comment will be marked as hidden, not creating new database entry');
+      // Comment was hidden - just log this, don't create new comment
+      console.log(`🙈 Comment ${commentData.commentId} was hidden`);
+      console.log('🙈 Returning success for hide action - no database insertion');
+      return res.status(200).json({ success: true, message: 'Comment hide action logged successfully' });
     } else {
+      console.log('➡️ Taking DEFAULT path (handleNewComment) - no action conditions matched');
+      console.log(`🔍 DEBUG: action is "${commentData.action}" (type: ${typeof commentData.action})`);
+      console.log(`🔍 DEBUG: action === 'hide'?`, commentData.action === 'hide');
+      console.log(`🔍 DEBUG: This means hide condition failed - why?`); 
       // New comment (default: 'add')
       commentId = await handleNewComment(commentData);
     }
@@ -737,6 +762,29 @@ async function handleCommentWebhook(req, res) {
           }
         }, aiConfig.rows[0].response_delay * 1000);
       }
+    }
+
+    // WEBHOOK POST SCANNING: DISABLED to prevent duplicates
+    // The webhook already provides real-time updates, no need to scan the entire post
+    // Post scanning is still available via manual trigger if needed
+    /*
+    if (commentData.postId && commentData.platform === 'facebook') {
+      console.log(`🔍 Webhook processed - scanning Facebook post ${commentData.postId} for complete sync...`);
+      try {
+        await scanAndSyncPostComments(commentData.postId, commentData.platform);
+      } catch (error) {
+        console.error('❌ Error scanning post for additional changes:', error);
+        // Don't fail the webhook if post scanning fails
+      }
+    }
+    */
+
+    // Log activity for all actions
+    if (commentId && commentData.action !== 'remove') {
+      await logCommentActivity(commentId, 
+        commentData.action === 'edit' ? 'comment_edited' : 'comment_received', 
+        commentData
+      );
     }
 
     console.log('🎉 Webhook processed successfully!');
@@ -1164,6 +1212,7 @@ async function processAutoReply(commentId, commentData, aiConfig) {
 // Webhook processors for different platforms
 async function processFacebookWebhook(data) {
   console.log('📘 Processing Facebook webhook data...');
+  console.log('🔍 NEW VERSION WITH COMPREHENSIVE DEBUGGING ACTIVE 🔍');
   
   try {
     if (!data.entry || !data.entry[0]) {
@@ -1180,7 +1229,7 @@ async function processFacebookWebhook(data) {
       
       if (change.field === 'feed' && change.value.item === 'comment') {
         const comment = change.value;
-        const verb = comment.verb || 'add'; // Facebook sends: add, edit, remove
+        const verb = comment.verb || 'add'; // Facebook sends: add, edit, remove, hide
         
         console.log(`📝 Facebook comment ${verb}:`, comment.comment_id);
         
@@ -1196,7 +1245,7 @@ async function processFacebookWebhook(data) {
 
         return {
           platform: 'facebook',
-          commentId: comment.comment_id,
+          commentId: comment.comment_id, // Use just the comment ID - will be normalized in handleNewComment
           postId: comment.post_id,
           text: comment.message || '[Comment content unavailable]', // May be empty for deleted comments
           authorName: comment.from?.name || 'Facebook User',
@@ -1515,6 +1564,33 @@ async function handleBulkSendReplies(req, res) {
 
 // Handle new comment creation
 async function handleNewComment(commentData) {
+  // Normalize comment ID format - always use post_id_comment_id format
+  let normalizedCommentId = commentData.commentId;
+  if (!normalizedCommentId.includes('_')) {
+    // If just comment ID, prepend post ID
+    normalizedCommentId = `${commentData.postId}_${commentData.commentId}`;
+  } else if (normalizedCommentId.split('_').length > 2) {
+    // If format like "pageId_postId_commentId", extract just "postId_commentId"
+    const parts = normalizedCommentId.split('_');
+    if (parts.length >= 2) {
+      normalizedCommentId = `${parts[parts.length - 2]}_${parts[parts.length - 1]}`;
+    }
+  }
+
+  console.log(`🔧 Normalized comment ID: ${commentData.commentId} → ${normalizedCommentId}`);
+
+  // Check if comment already exists (prevent duplicates from webhook + post scanning)
+  const existingComment = await pool.query(`
+    SELECT id FROM social_comments 
+    WHERE external_comment_id = $1 
+    AND platform_id = (SELECT id FROM social_platforms WHERE platform_type = $2 LIMIT 1)
+  `, [normalizedCommentId, commentData.platform]);
+
+  if (existingComment.rows.length > 0) {
+    console.log(`⚠️ Comment ${normalizedCommentId} already exists, skipping duplicate insertion`);
+    return existingComment.rows[0].id;
+  }
+
   const commentQuery = `
     INSERT INTO social_comments (
       platform_id, external_comment_id, external_post_id, 
@@ -1528,7 +1604,7 @@ async function handleNewComment(commentData) {
 
   const result = await pool.query(commentQuery, [
     commentData.platform,
-    commentData.commentId,
+    normalizedCommentId, // Use normalized ID
     commentData.postId,
     commentData.text,
     commentData.authorName,
@@ -1541,26 +1617,7 @@ async function handleNewComment(commentData) {
   const newCommentId = result.rows[0].id;
   console.log(`✅ New comment saved with ID: ${newCommentId}`);
 
-  // Check if AI auto-reply is enabled
-  const aiConfigQuery = `SELECT * FROM ai_config WHERE user_id = $1 AND enabled = true AND auto_reply = true`;
-  const aiConfig = await pool.query(aiConfigQuery, ['default_user']);
-
-  if (aiConfig.rows.length > 0) {
-    console.log('🤖 AI auto-reply is enabled, scheduling response...');
-    // Schedule AI response
-    setTimeout(async () => {
-      try {
-        await processAutoReply(newCommentId, commentData, aiConfig.rows[0]);
-      } catch (error) {
-        console.error('Auto-reply error:', error);
-      }
-    }, aiConfig.rows[0].response_delay * 1000);
-  }
-
-  // Log activity
-  if (newCommentId) {
-    await logCommentActivity(newCommentId, 'comment_received', commentData);
-  }
+  // NOTE: Post scanning moved to handleCommentWebhook to handle ALL webhook types consistently
   
   return newCommentId;
 }
@@ -1840,6 +1897,230 @@ async function handleGetReactions(req, res) {
 
   } catch (error) {
     console.error('❌ Get reactions error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+// Scan Facebook post for all comments and sync with database
+async function scanAndSyncPostComments(postId, platform) {
+  if (platform !== 'facebook') {
+    console.log('⚠️ Post scanning only supported for Facebook currently');
+    return;
+  }
+
+  // Prevent concurrent syncing of the same post
+  const syncKey = `sync_${postId}`;
+  if (global.activeSyncs && global.activeSyncs.has(syncKey)) {
+    console.log(`⚠️ Post ${postId} sync already in progress, skipping duplicate sync`);
+    return;
+  }
+
+  // Track active syncs
+  if (!global.activeSyncs) {
+    global.activeSyncs = new Set();
+  }
+  global.activeSyncs.add(syncKey);
+
+  try {
+    console.log(`🔍 Scanning Facebook post ${postId} for all comments...`);
+
+    // Get Facebook access token
+    const tokenResult = await pool.query(`
+      SELECT access_token 
+      FROM social_platforms 
+      WHERE platform_type = 'facebook' 
+      LIMIT 1
+    `);
+
+    if (tokenResult.rows.length === 0) {
+      console.log('❌ No Facebook access token found for post scanning');
+      return;
+    }
+
+    const accessToken = tokenResult.rows[0].access_token;
+
+    // Fetch all comments from Facebook for this post
+    let allCommentsFromFB = [];
+    let nextUrl = `https://graph.facebook.com/v18.0/${postId}/comments?access_token=${accessToken}&fields=id,message,from,created_time,parent&limit=100`;
+
+    do {
+      const response = await fetch(nextUrl);
+      const data = await response.json();
+
+      if (data.error) {
+        console.error('❌ Facebook API error during post scan:', data.error);
+        break;
+      }
+
+      if (data.data && data.data.length > 0) {
+        allCommentsFromFB = allCommentsFromFB.concat(data.data);
+        console.log(`📥 Found ${data.data.length} comments, total so far: ${allCommentsFromFB.length}`);
+      }
+
+      // Check for pagination
+      nextUrl = data.paging?.next || null;
+      
+      // Add delay to respect rate limits
+      if (nextUrl) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    } while (nextUrl);
+
+    console.log(`📊 Total comments found on Facebook post: ${allCommentsFromFB.length}`);
+
+    // Get existing comments in database for this post with their content
+    const existingComments = await pool.query(`
+      SELECT external_comment_id, id, comment_text, author_name
+      FROM social_comments 
+      WHERE external_post_id = $1 
+      AND platform_id = (SELECT id FROM social_platforms WHERE platform_type = 'facebook')
+    `, [postId]);
+
+    const existingCommentIds = new Set(existingComments.rows.map(c => c.external_comment_id));
+    const existingCommentMap = new Map(existingComments.rows.map(c => [c.external_comment_id, c]));
+    console.log(`💾 Existing comments in database: ${existingCommentIds.size}`);
+
+    // Track changes
+    let newCommentsAdded = 0;
+    let commentsUpdated = 0;
+    let commentsToDelete = [];
+    
+    // Create a set of Facebook comment IDs to check for deletions
+    const facebookCommentIds = new Set(allCommentsFromFB.map(fbComment => `${postId}_${fbComment.id}`));
+    
+    // Process Facebook comments - check for new and edited comments
+    for (const fbComment of allCommentsFromFB) {
+      const commentId = `${postId}_${fbComment.id}`;
+      
+      // Skip page replies (comments from our business account)
+      if (fbComment.from?.id === '113981868340389' || fbComment.from?.name === 'SUSA') {
+        console.log(`🚫 Skipping page reply: ${fbComment.from?.name}`);
+        continue;
+      }
+
+      if (existingCommentIds.has(commentId)) {
+        // Check if comment was edited
+        const existingComment = existingCommentMap.get(commentId);
+        const fbMessage = fbComment.message || '[Comment content unavailable]';
+        const fbAuthor = fbComment.from?.name || 'Facebook User';
+        
+        if (existingComment.comment_text !== fbMessage || existingComment.author_name !== fbAuthor) {
+          try {
+            // Update edited comment
+            await pool.query(`
+              UPDATE social_comments 
+              SET comment_text = $1, author_name = $2, updated_at = NOW()
+              WHERE external_comment_id = $3
+            `, [fbMessage, fbAuthor, commentId]);
+            
+            commentsUpdated++;
+            console.log(`� Updated edited comment: ${fbAuthor} - "${fbMessage.substring(0, 30)}..."`);
+          } catch (error) {
+            console.error(`❌ Error updating comment ${fbComment.id}:`, error.message);
+          }
+        }
+      } else {
+        // New comment - add to database
+        try {
+          const commentQuery = `
+            INSERT INTO social_comments (
+              platform_id, external_comment_id, external_post_id, 
+              comment_text, author_name, author_handle, author_id,
+              post_title, post_url, status, created_at, updated_at
+            ) VALUES (
+              (SELECT id FROM social_platforms WHERE platform_type = 'facebook' LIMIT 1),
+              $1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, NOW()
+            )
+          `;
+
+          await pool.query(commentQuery, [
+            commentId,
+            postId,
+            fbComment.message || '[Comment content unavailable]',
+            fbComment.from?.name || 'Facebook User',
+            `@${fbComment.from?.id || 'unknown'}`,
+            fbComment.from?.id || 'unknown',
+            'Facebook Post',
+            `https://facebook.com/${postId}`,
+            new Date(fbComment.created_time || Date.now())
+          ]);
+
+          newCommentsAdded++;
+          console.log(`✅ Added new comment: ${fbComment.from?.name} - "${fbComment.message?.substring(0, 30)}..."`);
+
+        } catch (error) {
+          if (error.code === '23505') { // Duplicate key - comment already exists (webhook vs sync race condition)
+            console.log(`⏭️ Skipping duplicate comment ${fbComment.id} - already exists (likely added by webhook)`);
+          } else {
+            console.error(`❌ Error adding comment ${fbComment.id}:`, error.message);
+          }
+        }
+      }
+    }
+
+    // Check for deleted comments (exist in DB but not on Facebook)
+    for (const existingComment of existingComments.rows) {
+      if (!facebookCommentIds.has(existingComment.external_comment_id)) {
+        commentsToDelete.push(existingComment);
+      }
+    }
+
+    // Delete comments that no longer exist on Facebook
+    for (const commentToDelete of commentsToDelete) {
+      try {
+        console.log(`🗑️ Deleting comment that no longer exists on Facebook: ${commentToDelete.external_comment_id}`);
+        
+        // Delete related records first
+        await pool.query('DELETE FROM social_activity WHERE comment_id = $1', [commentToDelete.id]);
+        await pool.query('DELETE FROM ai_suggestions WHERE comment_id = $1', [commentToDelete.id]);
+        await pool.query('DELETE FROM social_replies WHERE comment_id = $1', [commentToDelete.id]);
+        
+        // Delete the comment
+        await pool.query('DELETE FROM social_comments WHERE id = $1', [commentToDelete.id]);
+        
+        console.log(`✅ Deleted comment ${commentToDelete.id}`);
+      } catch (error) {
+        console.error(`❌ Error deleting comment ${commentToDelete.id}:`, error.message);
+      }
+    }
+
+    console.log(`🎉 Post sync completed:`);
+    console.log(`   ➕ ${newCommentsAdded} new comments added`);
+    console.log(`   📝 ${commentsUpdated} comments updated`);
+    console.log(`   🗑️ ${commentsToDelete.length} comments deleted`);
+
+  } catch (error) {
+    console.error('❌ Error during post scanning:', error);
+  } finally {
+    // Clean up sync tracking
+    if (global.activeSyncs) {
+      global.activeSyncs.delete(syncKey);
+    }
+  }
+}
+
+// Handle sync Facebook post request from frontend
+async function handleSyncFacebookPost(req, res) {
+  try {
+    const { postId } = req.body;
+
+    if (!postId) {
+      return res.status(400).json({ error: 'Post ID is required' });
+    }
+
+    console.log(`🔄 Frontend requested sync for Facebook post: ${postId}`);
+
+    // Call the existing scan and sync function
+    await scanAndSyncPostComments(postId, 'facebook');
+
+    return res.json({ 
+      success: true, 
+      message: `Facebook post ${postId} synced successfully`,
+      postId: postId 
+    });
+
+  } catch (error) {
+    console.error('❌ Error syncing Facebook post:', error);
     return res.status(500).json({ error: error.message });
   }
 }

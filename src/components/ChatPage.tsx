@@ -459,7 +459,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
   // WhatsApp Gallery State
   const [showWhatsAppGallery, setShowWhatsAppGallery] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || '';
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   // Function to generate privacy-safe file description
   // When PRIVACY_MODE is enabled, file names are never exposed in messages or logs
@@ -754,7 +754,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
       
       try {
         // Direct API call for uncached comments only
-        const response = await fetch(`${API_BASE}/api/social-commenter?action=comment-replies&comment_ids=${uncachedIds.join(',')}`);
+        const url = `${API_BASE}/api/social-commenter?action=comment-replies&comment_ids=${uncachedIds.join(',')}`;
+        console.log('🌐 Fetching page replies from URL:', url);
+        const response = await fetch(url);
         const data = await response.json();
         
         if (data.success) {
@@ -1109,7 +1111,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setMessages(prev => [...prev, newMessage]);
 
     try {
-      const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      const API_BASE = import.meta.env.DEV ? 'http://localhost:3000' : (import.meta.env.VITE_API_URL || 'http://localhost:3000');
       
       // Try to send as proper WhatsApp interactive product message first
       const productPayload = {
@@ -1444,7 +1446,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     setMessages(prev => [...prev, newMessage]);
 
     try {
-      const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      const API_BASE = import.meta.env.DEV ? 'http://localhost:3000' : (import.meta.env.VITE_API_URL || 'http://localhost:3000');
       
       // Try to send as proper WhatsApp interactive product message first
       const productPayload = {
@@ -1834,7 +1836,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     console.log('Phone number:', phoneNumber);
 
     try {
-      const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      const API_BASE = import.meta.env.DEV ? 'http://localhost:3000' : (import.meta.env.VITE_API_URL || 'http://localhost:3000');
       console.log('API_BASE:', API_BASE);
       
       // First, send a product image card with the first product in cart
@@ -2861,14 +2863,48 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     }
   };
 
-  // Function to expand and show all comments
+  // Function to expand and show all comments with real-time Facebook sync
   const expandAllComments = async () => {
-    if (!selectedConversation || !selectedConversation.startsWith('sm_') || allComments.length === 0) {
+    if (!selectedConversation || !selectedConversation.startsWith('sm_')) {
       return;
     }
 
     const conversation = socialMediaConversations.find(c => c.id === selectedConversation);
     if (!conversation) return;
+
+    // First, sync with Facebook to get latest comments if this is a Facebook conversation
+    if (conversation.platform === 'facebook' && conversation.post_id) {
+      console.log(`🔄 Syncing with Facebook for post ${conversation.post_id} before expanding...`);
+      
+      try {
+        const syncResponse = await fetch(`${API_BASE}/api/social-media/sync-facebook-post`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            postId: conversation.post_id
+          })
+        });
+
+        if (syncResponse.ok) {
+          console.log('✅ Facebook sync completed, refreshing comments...');
+          // Refresh the comments after sync
+          await fetchSocialMediaMessages(selectedConversation);
+        } else {
+          console.warn('⚠️ Facebook sync failed, proceeding with cached data');
+        }
+      } catch (error) {
+        console.error('❌ Facebook sync error:', error);
+        console.log('⚠️ Proceeding with cached data');
+      }
+    }
+
+    // Check if we have comments after potential sync
+    if (allComments.length === 0) {
+      console.log('ℹ️ No comments to expand');
+      return;
+    }
 
     console.log(`🔄 Expanding to show all ${allComments.length} comments`);
 
@@ -5835,7 +5871,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                           </div>
                         </div>
                       ) : message.type === 'social_comment' ? (
-                        <div className="social-comment-message">
+                        <div className="social-comment-message" style={{ position: 'relative' }}>
                           <div className="social-comment-header">
                             <div className="platform-badge" style={{
                               backgroundColor: message.platform === 'facebook' ? '#1877f2' : message.platform === 'instagram' ? '#E4405F' : '#333',
@@ -5861,7 +5897,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                               )}
                             </div>
                             {/* Status Indicators */}
-                            <div className="status-badges" style={{ marginLeft: 'auto', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <div className="status-badges" style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
                               {message.statusIndicators?.isEdited && (
                                 <span className="edited-badge" style={{
                                   backgroundColor: '#ffc107',
@@ -5874,95 +5910,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                                   ✏️ EDITED ({message.statusIndicators.editCount || 1}x)
                                 </span>
                               )}
-                              
-                              {/* Three-dot menu for comment actions */}
-                              {message.commentId && (
-                                <div className="comment-menu" style={{ position: 'relative', marginLeft: '8px' }}>
-                                  <button 
-                                    className="menu-trigger"
-                                    onClick={() => {
-                                      console.log('Menu clicked for comment:', message.commentId);
-                                      setShowMenu(showMenu === message.commentId ? null : message.commentId);
-                                    }}
-                                    title="Comment options"
-                                    style={{
-                                      background: 'rgba(0, 0, 0, 0.1)',
-                                      border: '1px solid #ccc',
-                                      fontSize: '14px',
-                                      color: '#333',
-                                      cursor: 'pointer',
-                                      padding: '4px 6px',
-                                      borderRadius: '50%',
-                                      transition: 'all 0.2s ease',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      width: '24px',
-                                      height: '24px',
-                                      fontWeight: 'bold'
-                                    }}
-                                  >
-                                    ⋯
-                                  </button>
-                                  {showMenu === message.commentId && (
-                                    <div className="menu-dropdown" style={{
-                                      position: 'absolute',
-                                      top: '100%',
-                                      right: '0',
-                                      background: 'white',
-                                      border: '1px solid #e0e0e0',
-                                      borderRadius: '8px',
-                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                      zIndex: 1000,
-                                      minWidth: '140px',
-                                      overflow: 'hidden'
-                                    }}>
-                                      <button 
-                                        className="menu-item hide-option"
-                                        onClick={() => {
-                                          setShowMenu(null);
-                                          handleHideComment(message.commentId!);
-                                        }}
-                                        style={{
-                                          display: 'block',
-                                          width: '100%',
-                                          padding: '12px 16px',
-                                          background: 'none',
-                                          border: 'none',
-                                          textAlign: 'left',
-                                          cursor: 'pointer',
-                                          transition: 'background-color 0.2s ease',
-                                          fontSize: '13px',
-                                          color: '#333'
-                                        }}
-                                      >
-                                        👁️‍🗨️ Hide Comment
-                                      </button>
-                                      <button 
-                                        className="menu-item delete-option"
-                                        onClick={() => {
-                                          setShowMenu(null);
-                                          handleDeleteComment(message.commentId!);
-                                        }}
-                                        style={{
-                                          display: 'block',
-                                          width: '100%',
-                                          padding: '12px 16px',
-                                          background: 'none',
-                                          border: 'none',
-                                          textAlign: 'left',
-                                          cursor: 'pointer',
-                                          transition: 'background-color 0.2s ease',
-                                          fontSize: '13px',
-                                          color: '#d32f2f'
-                                        }}
-                                      >
-                                        🗑️ Delete Comment
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
                             </div>
                           </div>
                           <div className="social-comment-content" style={{
@@ -5970,8 +5917,112 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             padding: '8px',
                             borderRadius: '8px',
                             border: '1px solid #e9ecef',
-                            marginTop: '6px'
+                            marginTop: '6px',
+                            position: 'relative'
                           }}>
+                            {/* Three-dot menu positioned outside the right edge of the white box */}
+                            {message.commentId && (
+                              <div className="comment-menu" style={{ 
+                                position: 'absolute', 
+                                top: '50%', 
+                                right: '-40px',
+                                transform: 'translateY(-50%)',
+                                zIndex: 10
+                              }}>
+                                <button 
+                                  className="menu-trigger"
+                                  onClick={() => {
+                                    console.log('Menu clicked for comment:', message.commentId);
+                                    setShowMenu(showMenu === message.commentId ? null : message.commentId);
+                                  }}
+                                  title="Comment options"
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = '#6c757d';
+                                    e.currentTarget.style.transform = 'none';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = '#6c757d';
+                                    e.currentTarget.style.transform = 'none';
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    fontSize: '14px',
+                                    color: '#6c757d',
+                                    cursor: 'pointer',
+                                    padding: '4px 6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '24px',
+                                    height: '24px',
+                                    fontWeight: 'bold'
+                                  }}
+                                >
+                                  ⋯
+                                </button>
+                                {showMenu === message.commentId && (
+                                  <div className="menu-dropdown" style={{
+                                    position: 'absolute',
+                                    top: '0',
+                                    left: '100%',
+                                    background: 'white',
+                                    border: '1px solid #e0e0e0',
+                                    borderRadius: '6px',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    zIndex: 1000,
+                                    minWidth: '140px',
+                                    overflow: 'hidden',
+                                    marginLeft: '4px'
+                                  }}>
+                                    <button 
+                                      className="menu-item hide-option"
+                                      onClick={() => {
+                                        setShowMenu(null);
+                                        handleHideComment(message.commentId!);
+                                      }}
+                                      style={{
+                                        display: 'block',
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        background: 'none',
+                                        border: 'none',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s ease',
+                                        fontSize: '12px',
+                                        color: '#333'
+                                      }}
+                                    >
+                                      👁️‍🗨️ Hide Comment
+                                    </button>
+                                    <button 
+                                      className="menu-item delete-option"
+                                      onClick={() => {
+                                        setShowMenu(null);
+                                        handleDeleteComment(message.commentId!);
+                                      }}
+                                      style={{
+                                        display: 'block',
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        background: 'none',
+                                        border: 'none',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s ease',
+                                        fontSize: '12px',
+                                        color: '#d32f2f'
+                                      }}
+                                    >
+                                      🗑️ Delete Comment
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div className="comment-text" style={{
                               fontSize: '14px',
                               lineHeight: '1.4',
