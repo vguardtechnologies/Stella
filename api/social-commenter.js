@@ -868,9 +868,6 @@ async function handleDeleteComment(req, res) {
       action: 'manual_removal'
     });
     
-    `;
-    await pool.query(deleteReactionsQuery, [commentId]);
-    
     // Delete the comment completely
     const deleteCommentQuery = `
       DELETE FROM social_comments 
@@ -1628,9 +1625,6 @@ async function handleCommentDeletion(commentData) {
       deletion_time: new Date().toISOString(),
       action: 'permanent_removal'
     });
-    
-    `;
-    await pool.query(deleteReactionsQuery, [commentId]);
     
     // Now delete the comment completely
     const deleteCommentQuery = `

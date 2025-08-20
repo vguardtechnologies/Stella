@@ -212,6 +212,7 @@ interface Message {
   };
   author?: string;
   placeholder?: string;
+  avatarUrl?: string;
   // Social comment specific fields
   commentId?: number;
   senderName?: string;
@@ -618,12 +619,28 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
     try {
       if (!isAutoRefresh) {
         console.log('Fetching Social Media conversations...');
+      } else {
+        console.log('🔄 Auto-refreshing Social Media conversations...');
       }
-      const socialMediaService = new SocialMediaService(API_BASE);
-      // Get all comments (deleted comments are automatically removed from database)
-      const allComments = await socialMediaService.getComments();
       
-      console.log('All social media comments:', allComments);
+      const socialMediaService = new SocialMediaService(API_BASE);
+      
+      // Add timeout protection for API calls
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('API timeout')), 10000)
+      );
+      
+      // Get all comments with timeout protection
+      const allComments = await Promise.race([
+        socialMediaService.getComments(),
+        timeoutPromise
+      ]);
+      
+      if (!isAutoRefresh) {
+        console.log('All social media comments:', allComments);
+      } else {
+        console.log(`✅ Auto-refresh found ${allComments?.length || 0} comments`);
+      }
       
       // Filter out page replies (comments made by our page/business account)
       // Page replies should not appear as separate conversations
@@ -713,7 +730,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
         console.log(`⏰ Reply fetch cooldown active (${Math.round((REPLY_FETCH_COOLDOWN - (now - lastReplyFetchTime)) / 1000)}s remaining), skipping reply indicator fetch`);
       }
     } catch (error) {
-      console.error('Error fetching Social Media conversations:', error);
+      console.error('❌ Error fetching Social Media conversations:', error);
+      // Don't let errors block future polling attempts
+      if (isAutoRefresh) {
+        console.log('🔄 Auto-refresh error - will retry next cycle');
+      }
     }
   };
 
@@ -2684,10 +2705,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             text: `${comment.author_name}: ${comment.comment_text}`,
             type: 'social_comment' as const,
             status: 'sent' as const,
-        author: comment.author_name,
-        platform: conversation.platform,
-        commentId: comment.id
-      });          // Add existing page replies for this comment (if any)
+            author: comment.author_name,
+            platform: conversation.platform,
+            commentId: comment.id,
+            avatarUrl: comment.author_avatar_url
+          });          // Add existing page replies for this comment (if any)
           const pageReplies = pageRepliesByComment[comment.id] || [];
           pageReplies.forEach((reply: any, replyIndex: number) => {
             // Extract the Facebook comment ID from external_comment_id (format: postId_commentId)
@@ -2705,7 +2727,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               platform: conversation.platform,
               commentId: comment.id,
               replyId: `${facebookCommentId}_${cleanReplyId}`, // Use clean reply ID without post ID
-              isPageReply: true
+              isPageReply: true,
+              avatarUrl: reply.from?.picture?.data?.url || ''
             });
           });
 
@@ -2770,7 +2793,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
               platform: conversation.platform,
               commentId: initialComment.id,
               replyId: `${facebookCommentId}_${cleanReplyId}`, // Use clean reply ID without post ID
-              isPageReply: true
+              isPageReply: true,
+              avatarUrl: reply.from?.picture?.data?.url || ''
             });
           });
 
@@ -3259,19 +3283,34 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             fetchSocialMediaConversations(true);
           }
         }, 2500);
+      } else {
+        console.log('🚫 Polling blocked - conversationsLoading is true');
       }
-    }, 5000); // 5s interval for responsive updates
+    }, 3000); // Reduced to 3s for faster updates
 
-    // Safety timeout: Reset loading state if it gets stuck for more than 30 seconds
+    // Safety timeout: Reset loading state if it gets stuck for more than 15 seconds
     const safetyTimeout = setTimeout(() => {
       if (conversationsLoading) {
+        console.log('⚠️ Forcing reset of conversationsLoading - was stuck for 15s');
         setConversationsLoading(false);
       }
-    }, 30000);
+    }, 15000); // Reduced from 30s to 15s
+    
+    // Additional safety interval to force periodic polling even if loading is stuck
+    const forcePollingInterval = setInterval(() => {
+      console.log('🔍 Force polling check - conversationsLoading:', conversationsLoading);
+      if (conversationsLoading) {
+        console.log('⚠️ conversationsLoading stuck - forcing social media refresh');
+        fetchSocialMediaConversations(true).catch(err => 
+          console.error('Force polling error:', err)
+        );
+      }
+    }, 10000); // Every 10 seconds, force check
     
     return () => {
       clearInterval(interval);
       clearTimeout(safetyTimeout);
+      clearInterval(forcePollingInterval);
     };
   }, []);
 
@@ -5714,16 +5753,31 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                       ) : message.type === 'social_comment' ? (
                         <div className="social-comment-message" style={{ position: 'relative' }}>
                           <div className="social-comment-header">
-                            <div className="platform-badge" style={{
-                              backgroundColor: message.platform === 'facebook' ? '#1877f2' : message.platform === 'instagram' ? '#E4405F' : '#333',
-                              color: 'white',
-                              padding: '2px 6px',
-                              borderRadius: '10px',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              textTransform: 'uppercase'
-                            }}>
-                              {message.platform}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {message.avatarUrl && (
+                                <img 
+                                  src={message.avatarUrl} 
+                                  alt={`${message.author || 'User'} profile`}
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                    border: '2px solid #e9ecef'
+                                  }}
+                                />
+                              )}
+                              <div className="platform-badge" style={{
+                                backgroundColor: message.platform === 'facebook' ? '#1877f2' : message.platform === 'instagram' ? '#E4405F' : '#333',
+                                color: 'white',
+                                padding: '2px 6px',
+                                borderRadius: '10px',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                textTransform: 'uppercase'
+                              }}>
+                                {message.platform}
+                              </div>
                             </div>
                             <div className="comment-author" style={{
                               fontSize: '13px',
@@ -5933,6 +5987,19 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
                             color: '#1976d2'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {message.avatarUrl && (
+                                <img 
+                                  src={message.avatarUrl} 
+                                  alt={`${message.author || 'Page'} profile`}
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                    border: '2px solid #2196f3'
+                                  }}
+                                />
+                              )}
                               <span style={{ 
                                 backgroundColor: '#2196f3',
                                 color: 'white',
