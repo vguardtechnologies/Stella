@@ -208,7 +208,7 @@ router.get('/config', (req, res) => {
     success: true,
     data: {
       name: shopifyConfig.storeName,
-      shop: shopifyConfig.storeName,
+      shop: shopifyConfig.shopDomain,
       domain: shopifyConfig.shopDomain,
       connected: shopifyConfig.isConfigured,
       // Don't send sensitive data to frontend
@@ -225,7 +225,7 @@ router.post('/proxy', async (req, res) => {
 
     // Use stored config if no credentials provided
     const finalAccessToken = accessToken || shopifyConfig.accessToken;
-    const finalShop = shop || shopifyConfig.storeName;
+    const finalShop = shop || shopifyConfig.shopDomain;
 
     if (!endpoint || !finalShop || !finalAccessToken) {
       return res.status(400).json({ 

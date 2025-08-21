@@ -2,6 +2,7 @@
 // Handles comment monitoring, AI responses, and cross-platform integration
 
 const { pool } = require('../config/database');
+const fetch = require('node-fetch');
 
 module.exports = async function handler(req, res) {
   // Enable CORS
@@ -77,6 +78,8 @@ module.exports = async function handler(req, res) {
           return handleDisconnectPlatform(req, res);
         } else if (query.action === 'delete-comment') {
           return handleDeleteComment(req, res);
+        } else if (query.action === 'delete-facebook-comment') {
+          return handleDeleteFacebookComment(req, res);
         } else {
           return res.status(400).json({ error: 'Invalid action' });
         }
@@ -830,8 +833,10 @@ async function handleDisconnectPlatform(req, res) {
 
 // Handle manual comment deletion from frontend
 async function handleDeleteComment(req, res) {
+  console.log(`🚀 DELETE FUNCTION CALLED - Comment ID: ${req.query.commentId}`);
   try {
     const { commentId } = req.query;
+    console.log(`📋 Starting deletion process for comment ID: ${commentId}`);
     
     if (!commentId) {
       return res.status(400).json({
@@ -857,18 +862,33 @@ async function handleDeleteComment(req, res) {
     }
     
     const comment = findResult.rows[0];
+    console.log(`✅ Comment found in database, proceeding with deletion...`);
     
-    // Log deletion activity before removing
-    await logCommentActivity(comment.id, 'comment_deleted', {
+    // Store comment data for potential logging after deletion (if needed)
+    const commentData = {
       external_comment_id: comment.external_comment_id,
       author_name: comment.author_name,
       comment_text: comment.comment_text,
       deleted_by: 'admin',
       deletion_time: new Date().toISOString(),
       action: 'manual_removal'
-    });
+    };
     
-    // Delete the comment completely
+    console.log(`🔄 About to start cleanup process...`);
+    
+    // Delete related records first to avoid foreign key constraint violations
+    console.log(`🗑️ Cleaning up related records for comment ${commentId}...`);
+    
+    // Delete from social_activity table first
+    await pool.query('DELETE FROM social_activity WHERE comment_id = $1', [commentId]);
+    
+    // Delete from ai_suggestions table if exists
+    await pool.query('DELETE FROM ai_suggestions WHERE comment_id = $1', [commentId]);
+    
+    // Delete from social_replies table if exists
+    await pool.query('DELETE FROM social_replies WHERE comment_id = $1', [commentId]);
+    
+    // Now delete the main comment from database
     const deleteCommentQuery = `
       DELETE FROM social_comments 
       WHERE id = $1
@@ -876,11 +896,65 @@ async function handleDeleteComment(req, res) {
     
     await pool.query(deleteCommentQuery, [commentId]);
     
-    console.log(`✅ Comment ${commentId} manually deleted and removed from database`);
+    console.log(`✅ Comment ${commentId} deleted from database successfully`);
+    
+    // Now delete the comment from Facebook
+    try {
+      console.log(`🔄 Attempting to delete comment from Facebook (ID: ${comment.external_comment_id})...`);
+      
+      // Check if we have a Facebook access token (prioritize page token)
+      let accessToken = null;
+      let tokenType = 'unknown';
+      
+      if (process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+        accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+        tokenType = 'page';
+      } else if (process.env.FACEBOOK_PERMANENT_ACCESS_TOKEN) {
+        accessToken = process.env.FACEBOOK_PERMANENT_ACCESS_TOKEN;
+        tokenType = 'permanent';
+      } else if (process.env.FACEBOOK_ACCESS_TOKEN) {
+        accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+        tokenType = 'general';
+      }
+      
+      if (!accessToken) {
+        console.log(`⚠️ No Facebook access token found - skipping Facebook deletion`);
+      } else {
+        console.log(`🔑 Using Facebook ${tokenType} access token: ${accessToken.substring(0, 15)}...`);
+        const facebookDeleteResponse = await fetch(`https://graph.facebook.com/v18.0/${comment.external_comment_id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (facebookDeleteResponse.ok) {
+          const result = await facebookDeleteResponse.json();
+          console.log(`✅ Comment successfully deleted from Facebook:`, result);
+        } else {
+          const errorData = await facebookDeleteResponse.text();
+          console.log(`⚠️ Failed to delete comment from Facebook: ${errorData}`);
+          console.log(`📋 Comment was deleted from database but may still exist on Facebook`);
+          
+          // Log more details about the error
+          console.log(`🔍 Facebook deletion error details:`, {
+            status: facebookDeleteResponse.status,
+            statusText: facebookDeleteResponse.statusText,
+            commentId: comment.external_comment_id
+          });
+        }
+      }
+    } catch (facebookError) {
+      console.error(`❌ Error deleting comment from Facebook:`, facebookError.message);
+      console.log(`📋 Comment was deleted from database but may still exist on Facebook`);
+    }
+    
+    console.log(`✅ Comment ${commentId} deletion process completed`);
     
     return res.status(200).json({
       success: true,
-      message: 'Comment permanently deleted',
+      message: 'Comment deleted from database and Facebook',
       commentId: commentId
     });
     
@@ -1626,6 +1700,18 @@ async function handleCommentDeletion(commentData) {
       action: 'permanent_removal'
     });
     
+    // Delete related records first to avoid foreign key constraint violations
+    console.log(`🗑️ Cleaning up related records for comment ${commentId}...`);
+    
+    // Delete from social_activity table first
+    await pool.query('DELETE FROM social_activity WHERE comment_id = $1', [commentId]);
+    
+    // Delete from ai_suggestions table if exists
+    await pool.query('DELETE FROM ai_suggestions WHERE comment_id = $1', [commentId]);
+    
+    // Delete from social_replies table if exists
+    await pool.query('DELETE FROM social_replies WHERE comment_id = $1', [commentId]);
+    
     // Now delete the comment completely
     const deleteCommentQuery = `
       DELETE FROM social_comments 
@@ -1955,4 +2041,93 @@ async function scanAndSyncPostComments(postId, platform) {
 // POST-SCANNING FUNCTIONS REMOVED:
 // handleSyncFacebookPost() and scanAndSyncPostComments() removed since 
 // webhooks provide real-time updates and post-scanning conflicts with webhook data.
+
+// Function to delete a comment directly from Facebook (for orphaned comments)
+async function handleDeleteFacebookComment(req, res) {
+  console.log(`🚀 FACEBOOK DELETE FUNCTION CALLED - FB Comment ID: ${req.query.fbCommentId}`);
+  try {
+    const { fbCommentId } = req.query;
+    console.log(`📋 Starting Facebook deletion process for FB comment ID: ${fbCommentId}`);
+
+    if (!fbCommentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Facebook comment ID is required'
+      });
+    }
+
+    // Check if we have a Facebook access token (prioritize page token)
+    let accessToken = null;
+    let tokenType = 'unknown';
+    
+    if (process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+      accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+      tokenType = 'page';
+    } else if (process.env.FACEBOOK_PERMANENT_ACCESS_TOKEN) {
+      accessToken = process.env.FACEBOOK_PERMANENT_ACCESS_TOKEN;
+      tokenType = 'permanent';
+    } else if (process.env.FACEBOOK_ACCESS_TOKEN) {
+      accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+      tokenType = 'general';
+    }
+    
+    if (!accessToken) {
+      console.log(`⚠️ No Facebook access token found in environment variables`);
+      return res.status(500).json({
+        success: false,
+        error: 'Facebook access token not configured'
+      });
+    }
+
+    console.log(`🔑 Using Facebook ${tokenType} access token: ${accessToken.substring(0, 15)}...`);
+
+    // Delete the comment from Facebook
+    console.log(`🔄 Attempting to delete comment from Facebook (ID: ${fbCommentId})...`);
+    
+    const facebookDeleteResponse = await fetch(`https://graph.facebook.com/v18.0/${fbCommentId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (facebookDeleteResponse.ok) {
+      const result = await facebookDeleteResponse.json();
+      console.log(`✅ Comment successfully deleted from Facebook:`, result);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Comment deleted from Facebook',
+        fbCommentId: fbCommentId,
+        result: result
+      });
+    } else {
+      const errorData = await facebookDeleteResponse.text();
+      console.log(`⚠️ Failed to delete comment from Facebook: ${errorData}`);
+      
+      // Log more details about the error
+      console.log(`🔍 Facebook deletion error details:`, {
+        status: facebookDeleteResponse.status,
+        statusText: facebookDeleteResponse.statusText,
+        commentId: fbCommentId
+      });
+      
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to delete comment from Facebook',
+        details: errorData,
+        fbCommentId: fbCommentId
+      });
+    }
+
+  } catch (error) {
+    console.error('Error deleting Facebook comment:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+}
 // Webhooks handle all comment lifecycle events (add/edit/remove/hide) efficiently.
