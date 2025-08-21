@@ -2709,7 +2709,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ onClose, shopifyStore }) => {
             platform: conversation.platform,
             commentId: comment.id,
             avatarUrl: comment.author_avatar_url
-          });          // Add existing page replies for this comment (if any)
+          });
+          
+          // Add existing page replies for this comment (if any)
           const pageReplies = pageRepliesByComment[comment.id] || [];
           pageReplies.forEach((reply: any, replyIndex: number) => {
             // Extract the Facebook comment ID from external_comment_id (format: postId_commentId)

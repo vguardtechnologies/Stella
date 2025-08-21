@@ -130,6 +130,7 @@ async function handleGetComments(req, res) {
         c.last_edited_at,
         c.edit_count,
         c.original_text,
+        c.moderation_note,
         p.platform_type as platform,
         p.name as platform_name, 
         p.icon as platform_icon,
@@ -161,9 +162,9 @@ async function handleGetComments(req, res) {
       whereConditions.push(`NOT (c.author_id = '113981868340389' OR c.author_name = 'SUSA')`);
     }
 
-    // Filter out hidden comments by default (unless specifically requesting hidden status)
-    if (status !== 'hidden') {
-      whereConditions.push(`c.status != 'hidden'`);
+    // Filter out hidden and deleted comments by default (unless specifically requesting them)
+    if (status !== 'hidden' && status !== 'deleted') {
+      whereConditions.push(`c.status NOT IN ('hidden', 'deleted')`);
     }
 
     if (whereConditions.length > 0) {
@@ -847,7 +848,7 @@ async function handleDeleteComment(req, res) {
     
     // Find the comment first to get its details for logging
     const findQuery = `
-      SELECT id, external_comment_id, author_name, comment_text 
+      SELECT id, external_comment_id, author_name, comment_text, status
       FROM social_comments 
       WHERE id = $1
     `;
@@ -864,41 +865,8 @@ async function handleDeleteComment(req, res) {
     const comment = findResult.rows[0];
     console.log(`✅ Comment found in database, proceeding with deletion...`);
     
-    // Store comment data for potential logging after deletion (if needed)
-    const commentData = {
-      external_comment_id: comment.external_comment_id,
-      author_name: comment.author_name,
-      comment_text: comment.comment_text,
-      deleted_by: 'admin',
-      deletion_time: new Date().toISOString(),
-      action: 'manual_removal'
-    };
-    
-    console.log(`🔄 About to start cleanup process...`);
-    
-    // Delete related records first to avoid foreign key constraint violations
-    console.log(`🗑️ Cleaning up related records for comment ${commentId}...`);
-    
-    // Delete from social_activity table first
-    await pool.query('DELETE FROM social_activity WHERE comment_id = $1', [commentId]);
-    
-    // Delete from ai_suggestions table if exists
-    await pool.query('DELETE FROM ai_suggestions WHERE comment_id = $1', [commentId]);
-    
-    // Delete from social_replies table if exists
-    await pool.query('DELETE FROM social_replies WHERE comment_id = $1', [commentId]);
-    
-    // Now delete the main comment from database
-    const deleteCommentQuery = `
-      DELETE FROM social_comments 
-      WHERE id = $1
-    `;
-    
-    await pool.query(deleteCommentQuery, [commentId]);
-    
-    console.log(`✅ Comment ${commentId} deleted from database successfully`);
-    
-    // Now delete the comment from Facebook
+    // First, delete the comment from Facebook
+    let facebookDeleteSuccess = false;
     try {
       console.log(`🔄 Attempting to delete comment from Facebook (ID: ${comment.external_comment_id})...`);
       
@@ -932,10 +900,10 @@ async function handleDeleteComment(req, res) {
         if (facebookDeleteResponse.ok) {
           const result = await facebookDeleteResponse.json();
           console.log(`✅ Comment successfully deleted from Facebook:`, result);
+          facebookDeleteSuccess = true;
         } else {
           const errorData = await facebookDeleteResponse.text();
           console.log(`⚠️ Failed to delete comment from Facebook: ${errorData}`);
-          console.log(`📋 Comment was deleted from database but may still exist on Facebook`);
           
           // Log more details about the error
           console.log(`🔍 Facebook deletion error details:`, {
@@ -947,15 +915,50 @@ async function handleDeleteComment(req, res) {
       }
     } catch (facebookError) {
       console.error(`❌ Error deleting comment from Facebook:`, facebookError.message);
-      console.log(`📋 Comment was deleted from database but may still exist on Facebook`);
     }
+    
+    // Now update the comment in our database (don't delete, just mark as deleted)
+    console.log(`� Marking comment as deleted in database (keeping record for audit trail)...`);
+    
+    const updateQuery = `
+      UPDATE social_comments 
+      SET status = 'deleted', 
+          updated_at = NOW(),
+          moderation_note = $2,
+          is_deleted = true,
+          deleted_at = NOW()
+      WHERE id = $1
+    `;
+    
+    const moderationNote = facebookDeleteSuccess 
+      ? 'Comment deleted by SUSA from Facebook platform'
+      : 'Comment marked as deleted by SUSA (Facebook deletion may have failed)';
+    
+    await pool.query(updateQuery, [commentId, moderationNote]);
+    
+    // Log deletion activity (keeping activity record)
+    await logCommentActivity(comment.id, 'comment_deleted', {
+      external_comment_id: comment.external_comment_id,
+      author_name: comment.author_name,
+      comment_text: comment.comment_text,
+      previous_status: comment.status,
+      deleted_by: 'SUSA',
+      deletion_time: new Date().toISOString(),
+      action: 'manual_deletion',
+      facebook_deletion_success: facebookDeleteSuccess,
+      moderation_note: moderationNote
+    });
     
     console.log(`✅ Comment ${commentId} deletion process completed`);
     
     return res.status(200).json({
       success: true,
-      message: 'Comment deleted from database and Facebook',
-      commentId: commentId
+      message: facebookDeleteSuccess 
+        ? 'Comment deleted from Facebook and marked as deleted in database'
+        : 'Comment marked as deleted in database (Facebook deletion may have failed)',
+      commentId: commentId,
+      facebookDeleteSuccess: facebookDeleteSuccess,
+      moderationNote: moderationNote
     });
     
   } catch (error) {
@@ -969,8 +972,10 @@ async function handleDeleteComment(req, res) {
 
 // Handle hiding comments from view (soft hide)
 async function handleHideComment(req, res) {
+  console.log(`🙈 HIDE FUNCTION CALLED - Comment ID: ${req.query.commentId}`);
   try {
     const { commentId } = req.query;
+    console.log(`📋 Starting hide process for comment ID: ${commentId}`);
     
     if (!commentId) {
       return res.status(400).json({
@@ -996,33 +1001,105 @@ async function handleHideComment(req, res) {
     }
     
     const comment = findResult.rows[0];
+    console.log(`✅ Comment found in database, proceeding with hiding...`);
     
-    // Update comment status to 'hidden'
+    // First, hide the comment on Facebook
+    let facebookHideSuccess = false;
+    try {
+      console.log(`🔄 Attempting to hide comment on Facebook (ID: ${comment.external_comment_id})...`);
+      
+      // Check if we have a Facebook access token (prioritize page token)
+      let accessToken = null;
+      let tokenType = 'unknown';
+      
+      if (process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+        accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+        tokenType = 'page';
+      } else if (process.env.FACEBOOK_PERMANENT_ACCESS_TOKEN) {
+        accessToken = process.env.FACEBOOK_PERMANENT_ACCESS_TOKEN;
+        tokenType = 'permanent';
+      } else if (process.env.FACEBOOK_ACCESS_TOKEN) {
+        accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+        tokenType = 'general';
+      }
+      
+      if (!accessToken) {
+        console.log(`⚠️ No Facebook access token found - skipping Facebook hiding`);
+      } else {
+        console.log(`🔑 Using Facebook ${tokenType} access token: ${accessToken.substring(0, 15)}...`);
+        
+        // Use Facebook Graph API to hide comment (set is_hidden to true)
+        const facebookHideResponse = await fetch(`https://graph.facebook.com/v18.0/${comment.external_comment_id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            is_hidden: true
+          })
+        });
+        
+        if (facebookHideResponse.ok) {
+          const result = await facebookHideResponse.json();
+          console.log(`✅ Comment successfully hidden on Facebook:`, result);
+          facebookHideSuccess = true;
+        } else {
+          const errorData = await facebookHideResponse.text();
+          console.log(`⚠️ Failed to hide comment on Facebook: ${errorData}`);
+          
+          // Log more details about the error
+          console.log(`🔍 Facebook hide error details:`, {
+            status: facebookHideResponse.status,
+            statusText: facebookHideResponse.statusText,
+            commentId: comment.external_comment_id
+          });
+        }
+      }
+    } catch (facebookError) {
+      console.error(`❌ Error hiding comment on Facebook:`, facebookError.message);
+    }
+    
+    // Now update the comment status in our database (keep record for audit trail)
+    console.log(`🔄 Marking comment as hidden in database (keeping record for audit trail)...`);
+    
     const updateQuery = `
       UPDATE social_comments 
-      SET status = 'hidden', updated_at = NOW()
+      SET status = 'hidden', 
+          updated_at = NOW(),
+          moderation_note = $2
       WHERE id = $1
     `;
     
-    await pool.query(updateQuery, [commentId]);
+    const moderationNote = facebookHideSuccess 
+      ? 'Comment hidden by Stella on Facebook platform'
+      : 'Comment marked as hidden by Stella (Facebook hiding may have failed)';
     
-    // Log hide activity
+    await pool.query(updateQuery, [commentId, moderationNote]);
+    
+    // Log hide activity (keeping activity record)
     await logCommentActivity(comment.id, 'comment_hidden', {
       external_comment_id: comment.external_comment_id,
       author_name: comment.author_name,
       comment_text: comment.comment_text,
       previous_status: comment.status,
-      hidden_by: 'admin',
+      hidden_by: 'Stella',
       hidden_time: new Date().toISOString(),
-      action: 'manual_hide'
+      action: 'manual_hide',
+      facebook_hide_success: facebookHideSuccess,
+      moderation_note: moderationNote
     });
     
-    console.log(`✅ Comment ${commentId} hidden from view`);
+    console.log(`✅ Comment ${commentId} hide process completed`);
     
     return res.status(200).json({
       success: true,
-      message: 'Comment hidden successfully',
-      commentId: commentId
+      message: facebookHideSuccess 
+        ? 'Comment hidden on Facebook and marked as hidden in database'
+        : 'Comment marked as hidden in database (Facebook hiding may have failed)',
+      commentId: commentId,
+      facebookHideSuccess: facebookHideSuccess,
+      moderationNote: moderationNote
     });
     
   } catch (error) {
